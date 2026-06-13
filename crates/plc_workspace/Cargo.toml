@@ -1,0 +1,9 @@
+[package]
+name = "plc_workspace"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Architecture contract for the PLC VS Code workspace."
+
+[lib]
+path = "src/lib.rs"

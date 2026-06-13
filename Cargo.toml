@@ -2,4 +2,5 @@
 resolver = "3"
 members = [
     "crates/plc_workspace",
+    "crates/plc_compiler_core",
 ]

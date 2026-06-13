@@ -1,0 +1,9 @@
+[package]
+name = "plc_compiler_core"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Shared compiler-core API for PLC VS Code CLI, LSP, runtime and backends."
+
+[lib]
+path = "src/lib.rs"

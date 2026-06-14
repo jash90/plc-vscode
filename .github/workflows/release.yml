@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Package and publish VSIX
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build language server (release)
+        working-directory: .
+        run: cargo build --release --package plc_lsp_server --bin plc-lsp-server
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install extension dependencies
+        run: npm ci || npm install
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Package VSIX
+        run: npm run package
+
+      - name: Upload VSIX to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: editors/vscode/*.vsix
+
+      # Publishing to the Marketplace requires a VSCE_PAT secret. The step is
+      # skipped automatically when the secret is not configured.
+      - name: Publish to VS Code Marketplace
+        if: ${{ secrets.VSCE_PAT != '' }}
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx vsce publish --no-dependencies --pat "$VSCE_PAT"

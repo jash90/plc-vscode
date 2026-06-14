@@ -335,6 +335,38 @@ fn compiler_core_semantic_tokens_scale_to_large_files() {
 }
 
 #[test]
+fn compiler_core_analyze_scales_with_many_symbols() {
+    use std::time::{Duration, Instant};
+
+    // Many distinct variables and many assignments. Guards against the
+    // O(assignments × symbols) linear symbol resolution in analysis (PLC-80):
+    // symbol-heavy library files used to time out completion/hover/diagnostics.
+    let mut source = String::from("PROGRAM Big\nVAR\n");
+    for i in 0..15_000 {
+        source.push_str(&format!("    v{i} : INT;\n"));
+    }
+    source.push_str("END_VAR\n");
+    for i in 0..15_000 {
+        source.push_str(&format!("v{i} := {i};\n"));
+    }
+    source.push_str("END_PROGRAM\n");
+
+    let core = CompilerCore;
+    let document = SourceDocument::new("file:///big.st", 1, source);
+
+    let started = Instant::now();
+    let analysis = core.analyze(&document);
+    let elapsed = started.elapsed();
+
+    // Every `v{i} := {i}` resolves (declared) and is INT := INT, so no diagnostics.
+    assert!(analysis.diagnostics().is_empty());
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "analyze took {elapsed:?} (possible O(assignments × symbols) regression)"
+    );
+}
+
+#[test]
 fn compiler_core_does_not_flag_named_call_arguments_as_unresolved() {
     // PLC-79: named call arguments (`RIGHT(IN := s, L := 3)`) must not be
     // treated as assignment statements, so their parameter names do not produce

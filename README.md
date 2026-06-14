@@ -18,6 +18,7 @@ See [`docs/architecture/workspace.md`](docs/architecture/workspace.md) for the i
 Planning and contributor references:
 
 - [`docs/licensing.md`](docs/licensing.md) — reference-project licensing rules for IronPLC and RuSTy.
+- [`docs/roadmap.md`](docs/roadmap.md) — Phase 0 through Phase 4 delivery gates.
 
 ## Development
 

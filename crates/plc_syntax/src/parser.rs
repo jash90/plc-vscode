@@ -167,6 +167,20 @@ pub fn parse_source(source: &str) -> SyntaxParse {
             .map(|(_, token)| token)
             .filter(|token| token.kind == TokenKind::Identifier)
             .map(|token| token.text.clone());
+
+        // CODESYS INTERFACE forward declarations (`FUNCTION Name;`) have no body
+        // or terminator; treat them as non-POU and skip so they do not produce a
+        // false missing-END_FUNCTION diagnostic. The real definition inside
+        // IMPLEMENTATION still parses normally.
+        let after_header = cursor + 1 + usize::from(name.is_some());
+        if significant
+            .get(after_header)
+            .is_some_and(|(_, token)| token.text == ";")
+        {
+            cursor = after_header + 1;
+            continue;
+        }
+
         let mut search = cursor + 1;
         let mut end_index = None;
         let mut next_pou_index = None;

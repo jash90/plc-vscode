@@ -68,6 +68,41 @@ fn parser_recovers_and_finds_following_pous() {
 }
 
 #[test]
+fn parser_recovers_codesys_interface_forward_declarations() {
+    // PLC-78: `FUNCTION Name;` forward declarations in a CODESYS INTERFACE block
+    // have no body/terminator and must not produce a SYN0002 missing-END_FUNCTION;
+    // the real definition inside IMPLEMENTATION still parses as a unit.
+    let parsed = parse_source(concat!(
+        "UNIT UTIL;\n",
+        "INTERFACE\n",
+        "  USES OTHER;\n",
+        "  FUNCTION SortArray;\n",
+        "  FUNCTION ReverseArray;\n",
+        "END_INTERFACE\n",
+        "IMPLEMENTATION\n",
+        "  FUNCTION SortArray\n",
+        "  VAR_INPUT\n    a : INT;\n  END_VAR\n",
+        "  END_FUNCTION\n",
+        "END_IMPLEMENTATION\n",
+    ));
+
+    assert!(
+        !parsed
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.code == "SYN0002"),
+        "unexpected missing-terminator diagnostics: {:?}",
+        parsed.diagnostics()
+    );
+    assert!(
+        parsed
+            .units()
+            .iter()
+            .any(|unit| unit.name.as_deref() == Some("SortArray"))
+    );
+}
+
+#[test]
 fn parser_recovers_configuration_blocks_without_spurious_terminator() {
     // PLC-73: an OpenPLC CONFIGURATION/RESOURCE/TASK wrapper after a complete
     // PROGRAM must not be parsed as a POU (the inner `PROGRAM instance … WITH`

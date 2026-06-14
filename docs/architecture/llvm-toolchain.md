@@ -53,6 +53,28 @@ command above builds it.
 - **Linker errors for `libLLVM`** — usually a static/shared mismatch; prefer the
   Homebrew keg's `lib` directory and a consistent `LLVM_SYS_*_PREFIX`.
 
+## Output modes and cross-compilation
+
+The backend (`plc_llvm_backend::compile`) supports these output modes:
+
+- `LlvmIr` / `Assembly` — textual output.
+- `Object` — host machine-code object bytes.
+- `StaticLibrary` / `SharedLibrary` / `Executable` — emit object code as the
+  compile step (shared output is position-independent); producing the final
+  archive / shared object / executable is a subsequent **link** step that takes
+  these object bytes as linker input.
+
+Native emission targets the **host triple** by default
+(`TargetMachine::get_default_triple()` + host CPU/features). Cross-compilation
+requires:
+
+- the target triple (e.g. `aarch64-unknown-linux-gnu`) and matching CPU/feature
+  strings passed to the target machine,
+- the corresponding LLVM target initialized (the prototype initializes the
+  native target only; cross targets need `Target::initialize_all` or the
+  specific target),
+- a cross linker/sysroot for the link step of the linkable modes.
+
 ## CI isolation
 
 The native-backend build and its golden IR tests are **gated behind an isolated

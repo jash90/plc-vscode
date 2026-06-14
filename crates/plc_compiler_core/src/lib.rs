@@ -57,6 +57,23 @@ impl Analysis {
     }
 }
 
+/// Result of executing a Structured Text document with the development runtime.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExecutionResult {
+    diagnostics: Vec<Diagnostic>,
+    output: Vec<String>,
+}
+
+impl ExecutionResult {
+    pub fn diagnostics(&self) -> &[Diagnostic] {
+        &self.diagnostics
+    }
+
+    pub fn output(&self) -> &[String] {
+        &self.output
+    }
+}
+
 /// Diagnostic severity that can be mapped to LSP, CLI, or editor output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagnosticSeverity {
@@ -114,6 +131,21 @@ impl CompilerCore {
             diagnostics,
         }
     }
+
+    pub fn execute(&self, document: &SourceDocument) -> ExecutionResult {
+        let analysis = self.analyze(document);
+        if !analysis.diagnostics().is_empty() {
+            return ExecutionResult {
+                diagnostics: analysis.diagnostics().to_vec(),
+                output: Vec::new(),
+            };
+        }
+
+        ExecutionResult {
+            diagnostics: Vec::new(),
+            output: collect_plc_print_output(document.text()),
+        }
+    }
 }
 
 fn analyze_text(text: &str) -> Vec<Diagnostic> {
@@ -167,4 +199,32 @@ fn find_next_comment_marker(text: &str) -> Option<(usize, &'static str)> {
         (None, Some(close)) => Some((close, "*)")),
         (None, None) => None,
     }
+}
+
+fn collect_plc_print_output(text: &str) -> Vec<String> {
+    let mut output = Vec::new();
+    let mut remaining = text;
+    const CALL: &str = "PLC_PRINT";
+
+    while let Some(call_index) = remaining.to_ascii_uppercase().find(CALL) {
+        remaining = &remaining[call_index + CALL.len()..];
+        let Some(open_paren) = remaining.find('(') else {
+            continue;
+        };
+        remaining = &remaining[open_paren + 1..];
+        let trimmed = remaining.trim_start();
+        let Some(quote) = trimmed.chars().next().filter(|c| *c == '\'' || *c == '"') else {
+            remaining = trimmed;
+            continue;
+        };
+        let after_quote = &trimmed[quote.len_utf8()..];
+        if let Some(end_quote) = after_quote.find(quote) {
+            output.push(after_quote[..end_quote].to_owned());
+            remaining = &after_quote[end_quote + quote.len_utf8()..];
+        } else {
+            break;
+        }
+    }
+
+    output
 }

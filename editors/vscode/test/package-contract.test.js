@@ -10,4 +10,5 @@ assert.strictEqual(pkg.activationEvents.includes('onLanguage:structured-text'), 
 assert.strictEqual(pkg.main, './dist/extension.js');
 assert.ok(pkg.contributes.languages.some((language) => language.id === 'structured-text'));
 assert.ok(pkg.contributes.commands.some((command) => command.command === 'plc-vscode.showStatus'));
+assert.ok(pkg.contributes.commands.some((command) => command.command === 'plc-vscode.runCurrentFile'));
 console.log('package contract ok');

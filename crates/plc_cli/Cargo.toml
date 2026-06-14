@@ -1,0 +1,16 @@
+[package]
+name = "plc_cli"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "CLI for PLC VS Code Structured Text tooling."
+
+[dependencies]
+plc_compiler_core = { path = "../plc_compiler_core" }
+
+[dev-dependencies]
+tempfile = "3"
+
+[[bin]]
+name = "plc"
+path = "src/main.rs"

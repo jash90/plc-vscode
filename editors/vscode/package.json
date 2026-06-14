@@ -34,6 +34,13 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "grammars": [
+      {
+        "language": "structured-text",
+        "scopeName": "source.st",
+        "path": "./syntaxes/structured-text.tmLanguage.json"
+      }
+    ],
     "commands": [
       {
         "command": "plc-vscode.showStatus",

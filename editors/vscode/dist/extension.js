@@ -113,7 +113,7 @@ async function deactivate() {
     }
 }
 async function runCurrentStructuredTextFile(context) {
-    const editor = vscode.window.activeTextEditor;
+    const editor = findStructuredTextEditor();
     if (!editor) {
         await vscode.window.showWarningMessage('Open a Structured Text file before running PLC VS Code.');
         return;
@@ -147,5 +147,17 @@ async function runCurrentStructuredTextFile(context) {
             resolve();
         });
     });
+}
+function findStructuredTextEditor() {
+    const activeEditor = vscode.window.activeTextEditor;
+    if (isStructuredTextEditor(activeEditor)) {
+        return activeEditor;
+    }
+    return vscode.window.visibleTextEditors.find(isStructuredTextEditor);
+}
+function isStructuredTextEditor(editor) {
+    return Boolean(editor &&
+        editor.document.uri.scheme === 'file' &&
+        editor.document.languageId === 'structured-text');
 }
 //# sourceMappingURL=extension.js.map

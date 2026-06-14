@@ -335,6 +335,36 @@ fn compiler_core_semantic_tokens_scale_to_large_files() {
 }
 
 #[test]
+fn compiler_core_workspace_symbols_scale_to_large_workspaces() {
+    use std::time::{Duration, Instant};
+
+    // Many documents, each with many top-level functions; an empty query returns
+    // them all. Guards against the O(symbols × documents) lookup and
+    // O(symbols × file length) range mapping that timed out workspace/symbol
+    // on the full corpus (PLC-81).
+    let documents: Vec<SourceDocument> = (0..30)
+        .map(|file| {
+            let mut text = String::new();
+            for func in 0..2000 {
+                text.push_str(&format!("FUNCTION F{file}_{func} : INT\nEND_FUNCTION\n"));
+            }
+            SourceDocument::new(format!("file:///f{file}.st"), 1, text)
+        })
+        .collect();
+
+    let core = CompilerCore;
+    let started = Instant::now();
+    let symbols = core.workspace_symbols(&documents, "");
+    let elapsed = started.elapsed();
+
+    assert!(symbols.len() >= 30 * 2000);
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "workspace_symbols took {elapsed:?} (possible O(n^2) regression)"
+    );
+}
+
+#[test]
 fn compiler_core_analyze_scales_with_many_symbols() {
     use std::time::{Duration, Instant};
 

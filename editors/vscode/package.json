@@ -110,7 +110,8 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node test/package-contract.test.js",
+    "test": "npm run compile && node test/package-contract.test.js && node test/verify-vsix.test.js",
+    "verify-vsix": "node scripts/verify-vsix.js",
     "package": "vsce package --no-dependencies"
   },
   "dependencies": {

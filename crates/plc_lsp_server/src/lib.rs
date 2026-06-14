@@ -229,12 +229,16 @@ impl LanguageServer for PlcLanguageServer {
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         let uri = params.text_document.uri;
         let version = params.text_document.version;
-        let text = params
-            .content_changes
-            .into_iter()
-            .next()
-            .map(|change| change.text)
-            .unwrap_or_default();
+        let text = if let Some(change) = params.content_changes.into_iter().next() {
+            change.text
+        } else {
+            self.documents
+                .read()
+                .await
+                .get(&uri)
+                .map(|snapshot| snapshot.text.clone())
+                .unwrap_or_default()
+        };
 
         self.documents.write().await.insert(
             uri.clone(),

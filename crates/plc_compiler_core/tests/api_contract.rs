@@ -1,6 +1,48 @@
 use plc_compiler_core::{CompilerCore, DiagnosticSeverity, Position, SourceDocument, SymbolKind};
 
 #[test]
+fn compiler_core_formats_keyword_casing_and_indentation() {
+    let core = CompilerCore::default();
+    let document = SourceDocument::new(
+        "file:///main.st",
+        1,
+        "program Main\nvar\nEnabled : BOOL;\nend_var\nend_program\n",
+    );
+
+    let edits = core.formatting(&document);
+    assert_eq!(edits.len(), 1);
+    assert_eq!(
+        edits[0].new_text,
+        "PROGRAM Main\n    VAR\n        Enabled : BOOL;\n    END_VAR\nEND_PROGRAM\n"
+    );
+}
+
+#[test]
+fn compiler_core_formatting_is_idempotent_for_clean_source() {
+    let core = CompilerCore::default();
+    let document = SourceDocument::new(
+        "file:///main.st",
+        1,
+        "PROGRAM Main\n    VAR\n        Enabled : BOOL;\n    END_VAR\nEND_PROGRAM\n",
+    );
+
+    assert!(core.formatting(&document).is_empty());
+}
+
+#[test]
+fn compiler_core_offers_quick_fix_for_missing_terminator() {
+    let core = CompilerCore::default();
+    let document = SourceDocument::new("file:///main.st", 1, "PROGRAM Main\nVAR\nEND_VAR\n");
+
+    let actions = core.code_actions(&document);
+    assert!(
+        actions
+            .iter()
+            .any(|action| action.title.contains("END_PROGRAM") && !action.edits.is_empty())
+    );
+}
+
+#[test]
 fn compiler_core_resolves_definition_to_declaration() {
     let core = CompilerCore::default();
     let document = SourceDocument::new(

@@ -191,6 +191,20 @@ pub struct Location {
     pub range: Range,
 }
 
+/// Text edit (range replacement) used by formatting and code actions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextEdit {
+    pub range: Range,
+    pub new_text: String,
+}
+
+/// Code action (quick fix) with a title and the edits it applies.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeAction {
+    pub title: String,
+    pub edits: Vec<TextEdit>,
+}
+
 /// Shared compiler facade.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CompilerCore;
@@ -248,6 +262,182 @@ impl CompilerCore {
     ) -> Vec<Location> {
         references_at_position(document, position, include_declaration)
     }
+
+    pub fn formatting(&self, document: &SourceDocument) -> Vec<TextEdit> {
+        let formatted = format_text(document.text());
+        if formatted == document.text() {
+            return Vec::new();
+        }
+        vec![TextEdit {
+            range: whole_document_range(document.text()),
+            new_text: formatted,
+        }]
+    }
+
+    pub fn formatting_range(&self, document: &SourceDocument, range: Range) -> Vec<TextEdit> {
+        let text = document.text();
+        let lines: Vec<&str> = text.split('\n').collect();
+        if lines.is_empty() {
+            return Vec::new();
+        }
+        let last = lines.len() - 1;
+        let start_line = (range.start.line as usize).min(last);
+        let end_line = (range.end.line as usize).min(last);
+        if start_line > end_line {
+            return Vec::new();
+        }
+
+        let formatted: Vec<String> = lines[start_line..=end_line]
+            .iter()
+            .map(|line| case_keywords(line).trim_end().to_owned())
+            .collect();
+        let new_text = formatted.join("\n");
+
+        let original: String = lines[start_line..=end_line].join("\n");
+        if new_text == original {
+            return Vec::new();
+        }
+
+        vec![TextEdit {
+            range: Range {
+                start: Position {
+                    line: start_line as u32,
+                    character: 0,
+                },
+                end: Position {
+                    line: end_line as u32,
+                    character: lines[end_line].chars().count() as u32,
+                },
+            },
+            new_text,
+        }]
+    }
+
+    pub fn code_actions(&self, document: &SourceDocument) -> Vec<CodeAction> {
+        let mut actions = Vec::new();
+        let analysis = self.analyze(document);
+
+        if analysis
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PLC0002")
+        {
+            let end = byte_offset_to_position(document.text(), document.text().len());
+            let suffix = if document.text().ends_with('\n') {
+                "END_PROGRAM\n"
+            } else {
+                "\nEND_PROGRAM\n"
+            };
+            actions.push(CodeAction {
+                title: "Add missing END_PROGRAM terminator".to_owned(),
+                edits: vec![TextEdit {
+                    range: Range { start: end, end },
+                    new_text: suffix.to_owned(),
+                }],
+            });
+        }
+
+        actions
+    }
+}
+
+fn whole_document_range(text: &str) -> Range {
+    Range {
+        start: Position::default(),
+        end: byte_offset_to_position(text, text.len()),
+    }
+}
+
+/// Format Structured Text: normalize keyword casing (trivia-preserving),
+/// re-indent block structure, and trim trailing whitespace.
+fn format_text(text: &str) -> String {
+    let cased = case_keywords(text);
+    reindent(&cased)
+}
+
+fn case_keywords(text: &str) -> String {
+    let parse = parse_source(text);
+    let mut out = String::with_capacity(text.len());
+    for token in parse.tokens() {
+        if token.kind == TokenKind::Keyword {
+            out.push_str(&token.text.to_ascii_uppercase());
+        } else {
+            out.push_str(&token.text);
+        }
+    }
+    out
+}
+
+fn reindent(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut depth: usize = 0;
+
+    for line in text.lines() {
+        let trimmed = line.trim();
+        let first = trimmed
+            .split(|c: char| c.is_whitespace())
+            .next()
+            .unwrap_or("")
+            .to_ascii_uppercase();
+
+        if trimmed.is_empty() {
+            out.push('\n');
+            continue;
+        }
+
+        if is_block_closer(&first) {
+            depth = depth.saturating_sub(1);
+        }
+
+        for _ in 0..depth {
+            out.push_str("    ");
+        }
+        out.push_str(trimmed);
+        out.push('\n');
+
+        if is_block_opener(&first, trimmed) {
+            depth += 1;
+        }
+    }
+
+    out
+}
+
+fn is_block_opener(first: &str, line: &str) -> bool {
+    matches!(
+        first,
+        "PROGRAM"
+            | "FUNCTION"
+            | "FUNCTION_BLOCK"
+            | "ACTION"
+            | "VAR"
+            | "VAR_INPUT"
+            | "VAR_OUTPUT"
+            | "VAR_IN_OUT"
+            | "VAR_GLOBAL"
+            | "VAR_TEMP"
+            | "FOR"
+            | "WHILE"
+            | "CASE"
+            | "REPEAT"
+    ) || (first == "IF" && line.to_ascii_uppercase().trim_end().ends_with("THEN"))
+}
+
+fn is_block_closer(first: &str) -> bool {
+    matches!(
+        first,
+        "END_PROGRAM"
+            | "END_FUNCTION"
+            | "END_FUNCTION_BLOCK"
+            | "END_ACTION"
+            | "END_VAR"
+            | "END_IF"
+            | "END_FOR"
+            | "END_WHILE"
+            | "END_CASE"
+            | "END_REPEAT"
+            | "UNTIL"
+    )
 }
 
 fn document_symbols(document: &SourceDocument) -> Vec<DocumentSymbol> {

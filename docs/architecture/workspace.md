@@ -22,9 +22,17 @@ The compiler core is the shared boundary. CLI, LSP, runtime, bytecode VM, and na
 
 ## Delivery order
 
-1. Syntax layer: lexer, parser, CST, diagnostics.
-2. Semantic layer: symbols, name resolution, type checking.
-3. IDE layer: LSP diagnostics, completion, hover, navigation.
-4. Runtime layer: scan-cycle interpreter/bytecode VM.
-5. Native backend: LLVM IR and native artifacts.
-6. Client packaging: VS Code distribution and bundled server binaries.
+1. Foundation and guardrails: licensing policy, roadmap gates, developer setup, and IEC conformance scope.
+2. Syntax layer: lexer, parser, CST, diagnostics.
+3. Semantic layer: symbols, name resolution, type checking.
+4. IDE layer: LSP diagnostics, completion, hover, navigation.
+5. Runtime layer: scan-cycle interpreter/bytecode VM.
+6. Native backend: LLVM IR and native artifacts.
+7. Client packaging: VS Code distribution and bundled server binaries.
+
+Supporting documents:
+
+- [`../licensing.md`](../licensing.md) records allowed use of IronPLC and RuSTy references.
+- [`../roadmap.md`](../roadmap.md) defines Phase 0 through Phase 4 milestone gates.
+- [`../setup.md`](../setup.md) lists local build prerequisites for contributors.
+- [`../conformance.md`](../conformance.md) maps IEC 61131-3 feature coverage across parser, semantics, and runtime.

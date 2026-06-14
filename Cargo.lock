@@ -490,6 +490,10 @@ dependencies = [
 [[package]]
 name = "plc_compiler_core"
 version = "0.1.0"
+dependencies = [
+ "plc_semantics",
+ "plc_syntax",
+]
 
 [[package]]
 name = "plc_lsp_server"

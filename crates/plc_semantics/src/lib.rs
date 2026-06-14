@@ -1,13 +1,14 @@
 //! Semantic analysis for PLC VS Code.
 //!
-//! This crate builds the first workspace symbol index from `plc_syntax` output.
-//! The API is intentionally deterministic so it can later be backed by
-//! incremental queries without changing CLI/LSP callers. Type checking and the
-//! incremental query facade are added by later tasks.
+//! This crate builds the workspace symbol index from `plc_syntax` output and
+//! resolves assignment targets against it. The API is intentionally
+//! deterministic so it can later be backed by incremental queries without
+//! changing CLI/LSP callers. Type checking and the incremental query facade are
+//! added by later tasks.
 
 mod types;
 
-use plc_syntax::PouKind;
+use plc_syntax::{PouKind, StatementKind};
 
 pub use types::{
     SemanticAnalysis, SemanticDiagnostic, SourceFile, Symbol, SymbolIndex, SymbolKind, TypeKind,
@@ -21,15 +22,48 @@ pub fn analyze_file(uri: impl Into<String>, text: impl Into<String>) -> Semantic
 /// Analyze a workspace snapshot and build a cross-file symbol index.
 pub fn analyze_workspace(files: &[SourceFile]) -> SemanticAnalysis {
     let mut symbol_index = SymbolIndex::default();
+    let mut diagnostics = Vec::new();
+    let mut parsed_files = Vec::new();
 
     for file in files {
         let parsed = plc_syntax::parse_source(&file.text);
         index_file_symbols(file, &parsed, &mut symbol_index);
+        parsed_files.push(parsed);
+    }
+
+    for parsed in &parsed_files {
+        for unit in parsed.units() {
+            let Some(container) = unit.name.as_deref() else {
+                continue;
+            };
+
+            for statement in &unit.statements {
+                if statement.kind != StatementKind::Assignment {
+                    continue;
+                }
+
+                let Some(target) = statement.target.as_deref() else {
+                    continue;
+                };
+
+                if symbol_index
+                    .find_in_container(container, target)
+                    .or_else(|| symbol_index.find_top_level(target))
+                    .is_none()
+                {
+                    diagnostics.push(SemanticDiagnostic {
+                        code: "SEM0001",
+                        range: statement.range,
+                        message: format!("Unresolved symbol `{target}`"),
+                    });
+                }
+            }
+        }
     }
 
     SemanticAnalysis {
         symbol_index,
-        diagnostics: Vec::new(),
+        diagnostics,
     }
 }
 

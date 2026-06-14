@@ -37,6 +37,10 @@
       {
         "command": "plc-vscode.showStatus",
         "title": "PLC VS Code: Show Language Server Status"
+      },
+      {
+        "command": "plc-vscode.runCurrentFile",
+        "title": "PLC VS Code: Run Current Structured Text File"
       }
     ],
     "configuration": {
@@ -61,6 +65,31 @@
             "type": "string"
           },
           "description": "Arguments used to launch the PLC VS Code language server in development."
+        },
+        "plcVscode.repositoryRoot": {
+          "type": "string",
+          "default": "",
+          "description": "Repository root used to run development Rust commands. Leave empty for extension development mode."
+        },
+        "plcVscode.cliCommand": {
+          "type": "string",
+          "default": "cargo",
+          "description": "Command used by the extension to execute Structured Text files."
+        },
+        "plcVscode.cliArgs": {
+          "type": "array",
+          "default": [
+            "run",
+            "--quiet",
+            "--package",
+            "plc_cli",
+            "--",
+            "run"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments prepended before the current file path when running Structured Text."
         }
       }
     }

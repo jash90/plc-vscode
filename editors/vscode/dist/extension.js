@@ -36,9 +36,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.deactivate = deactivate;
 const path = __importStar(require("node:path"));
+const node_child_process_1 = require("node:child_process");
 const vscode = __importStar(require("vscode"));
 const node_1 = require("vscode-languageclient/node");
 let client;
+let outputChannel;
 function workspaceRoot(context) {
     return path.resolve(context.extensionPath, '..', '..');
 }
@@ -62,6 +64,8 @@ function serverOptions(context) {
     };
 }
 async function activate(context) {
+    outputChannel = vscode.window.createOutputChannel('PLC VS Code');
+    context.subscriptions.push(outputChannel);
     const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     status.text = 'PLC VS Code';
     status.tooltip = 'PLC VS Code language support is active';
@@ -71,6 +75,9 @@ async function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('plc-vscode.showStatus', async () => {
         const state = client ? 'running' : 'not started';
         await vscode.window.showInformationMessage(`PLC VS Code extension active; language server is ${state}.`);
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('plc-vscode.runCurrentFile', async () => {
+        await runCurrentStructuredTextFile(context);
     }));
     const clientOptions = {
         documentSelector: [{ scheme: 'file', language: 'structured-text' }],
@@ -88,5 +95,41 @@ async function deactivate() {
     if (runningClient) {
         await runningClient.stop();
     }
+}
+async function runCurrentStructuredTextFile(context) {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        await vscode.window.showWarningMessage('Open a Structured Text file before running PLC VS Code.');
+        return;
+    }
+    if (editor.document.isDirty) {
+        await editor.document.save();
+    }
+    const config = vscode.workspace.getConfiguration('plcVscode');
+    const repositoryRoot = config.get('repositoryRoot', '') || workspaceRoot(context);
+    const command = config.get('cliCommand', 'cargo');
+    const args = [...config.get('cliArgs', ['run', '--quiet', '--package', 'plc_cli', '--', 'run']), editor.document.uri.fsPath];
+    outputChannel?.clear();
+    outputChannel?.appendLine(`$ ${command} ${args.join(' ')}`);
+    outputChannel?.show(true);
+    await new Promise((resolve) => {
+        const child = (0, node_child_process_1.spawn)(command, args, { cwd: repositoryRoot });
+        child.stdout.on('data', (chunk) => outputChannel?.append(chunk.toString()));
+        child.stderr.on('data', (chunk) => outputChannel?.append(chunk.toString()));
+        child.on('error', async (error) => {
+            outputChannel?.appendLine(`Failed to run Structured Text: ${error.message}`);
+            await vscode.window.showErrorMessage(`PLC VS Code run failed: ${error.message}`);
+            resolve();
+        });
+        child.on('close', async (code) => {
+            if (code === 0) {
+                await vscode.window.showInformationMessage('PLC VS Code run completed.');
+            }
+            else {
+                await vscode.window.showErrorMessage(`PLC VS Code run failed with exit code ${code}.`);
+            }
+            resolve();
+        });
+    });
 }
 //# sourceMappingURL=extension.js.map

@@ -516,6 +516,7 @@ name = "plc_runtime"
 version = "0.1.0"
 dependencies = [
  "plc_compiler_core",
+ "plc_hir",
  "plc_syntax",
  "serde",
  "serde_json",

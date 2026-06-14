@@ -6,6 +6,7 @@
 //! be persisted and rendered by an external VS Code bytecode viewer; the viewer
 //! contract is the [`BytecodeModule::disassemble`] mnemonic listing.
 
+use plc_hir::{BinaryOp, HirExpr, HirModule, HirProgram};
 use serde::{Deserialize, Serialize};
 
 /// A single stack-machine instruction.
@@ -69,5 +70,38 @@ impl BytecodeModule {
             .enumerate()
             .map(|(index, instruction)| format!("{index:04}  {}", instruction.mnemonic()))
             .collect()
+    }
+}
+
+/// Lower a HIR program to a bytecode module (the VM-side consumer of HIR).
+pub fn lower_program(program: &HirProgram) -> BytecodeModule {
+    let mut instructions = Vec::new();
+    for assign in &program.body {
+        lower_expr(&assign.value, &mut instructions);
+        instructions.push(Instruction::StoreVar(assign.target.clone()));
+    }
+    BytecodeModule::new(program.name.clone(), instructions)
+}
+
+/// Lower every program in a HIR module to its own bytecode module.
+pub fn lower_module(module: &HirModule) -> Vec<BytecodeModule> {
+    module.programs.iter().map(lower_program).collect()
+}
+
+fn lower_expr(expr: &HirExpr, out: &mut Vec<Instruction>) {
+    match expr {
+        HirExpr::Int(value) => out.push(Instruction::PushInt(*value)),
+        HirExpr::Bool(value) => out.push(Instruction::PushBool(*value)),
+        HirExpr::Real(value) => out.push(Instruction::PushReal(*value)),
+        HirExpr::Str(value) => out.push(Instruction::PushStr(value.clone())),
+        HirExpr::Var(name) => out.push(Instruction::LoadVar(name.clone())),
+        HirExpr::Binary { op, lhs, rhs } => {
+            lower_expr(lhs, out);
+            lower_expr(rhs, out);
+            out.push(match op {
+                BinaryOp::Add => Instruction::Add,
+                BinaryOp::Sub => Instruction::Sub,
+            });
+        }
     }
 }

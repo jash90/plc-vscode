@@ -501,6 +501,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "plc_semantics"
+version = "0.1.0"
+dependencies = [
+ "plc_syntax",
+]
+
+[[package]]
 name = "plc_syntax"
 version = "0.1.0"
 dependencies = [

@@ -8,6 +8,7 @@
 mod execution;
 
 use execution::collect_execution_output;
+use plc_semantics::{SymbolKind as SemanticSymbolKind, analyze_file};
 use plc_syntax::{TextRange, parse_source};
 
 /// Source document snapshot passed into compiler-core operations.
@@ -123,6 +124,51 @@ pub struct Diagnostic {
     pub message: String,
 }
 
+/// Stable symbol kind exposed by compiler-core to IDE consumers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SymbolKind {
+    Program,
+    Function,
+    FunctionBlock,
+    Action,
+    Variable,
+    Type,
+    Keyword,
+}
+
+/// Hierarchical document symbol used by LSP and future editor consumers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentSymbol {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: SymbolKind,
+    pub range: Range,
+    pub selection_range: Range,
+    pub children: Vec<DocumentSymbol>,
+}
+
+/// Document symbol analysis result for a source snapshot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SymbolAnalysis {
+    uri: String,
+    version: i32,
+    symbols: Vec<DocumentSymbol>,
+}
+
+impl SymbolAnalysis {
+    pub fn uri(&self) -> &str {
+        &self.uri
+    }
+
+    pub fn version(&self) -> i32 {
+        self.version
+    }
+
+    pub fn symbols(&self) -> &[DocumentSymbol] {
+        &self.symbols
+    }
+}
+
 /// Shared compiler facade.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CompilerCore;
@@ -150,6 +196,71 @@ impl CompilerCore {
             diagnostics: Vec::new(),
             output: collect_execution_output(document.text()),
         }
+    }
+
+    pub fn document_symbols(&self, document: &SourceDocument) -> SymbolAnalysis {
+        SymbolAnalysis {
+            uri: document.uri().to_owned(),
+            version: document.version(),
+            symbols: document_symbols(document),
+        }
+    }
+}
+
+fn document_symbols(document: &SourceDocument) -> Vec<DocumentSymbol> {
+    let semantic = analyze_file(document.uri(), document.text());
+    let mut symbols = Vec::new();
+
+    for symbol in semantic
+        .symbol_index
+        .symbols()
+        .iter()
+        .filter(|symbol| symbol.container.is_none())
+    {
+        let children = semantic
+            .symbol_index
+            .symbols()
+            .iter()
+            .filter(|child| {
+                child
+                    .container
+                    .as_deref()
+                    .is_some_and(|container| container.eq_ignore_ascii_case(&symbol.name))
+            })
+            .map(|child| DocumentSymbol {
+                name: child.name.clone(),
+                detail: child
+                    .type_kind
+                    .as_ref()
+                    .map(|type_kind| type_kind.display_name().to_owned()),
+                kind: symbol_kind(child.kind),
+                range: text_range_to_range(document.text(), child.range),
+                selection_range: text_range_to_range(document.text(), child.range),
+                children: Vec::new(),
+            })
+            .collect();
+
+        symbols.push(DocumentSymbol {
+            name: symbol.name.clone(),
+            detail: None,
+            kind: symbol_kind(symbol.kind),
+            range: text_range_to_range(document.text(), symbol.range),
+            selection_range: text_range_to_range(document.text(), symbol.range),
+            children,
+        });
+    }
+
+    symbols
+}
+
+fn symbol_kind(kind: SemanticSymbolKind) -> SymbolKind {
+    match kind {
+        SemanticSymbolKind::Program => SymbolKind::Program,
+        SemanticSymbolKind::Function => SymbolKind::Function,
+        SemanticSymbolKind::FunctionBlock => SymbolKind::FunctionBlock,
+        SemanticSymbolKind::Action => SymbolKind::Action,
+        SemanticSymbolKind::Variable => SymbolKind::Variable,
+        SemanticSymbolKind::Type => SymbolKind::Type,
     }
 }
 

@@ -1,13 +1,17 @@
 //! LSP server implementation for PLC VS Code.
 
-use plc_compiler_core::{CompilerCore, DiagnosticSeverity as CoreSeverity, SourceDocument};
+use plc_compiler_core::{
+    CompilerCore, DiagnosticSeverity as CoreSeverity, DocumentSymbol as CoreDocumentSymbol,
+    Range as CoreRange, SourceDocument, SymbolKind as CoreSymbolKind,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::{
     Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
-    InitializeParams, InitializeResult, MessageType, Position, Range, ServerCapabilities,
+    DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, InitializeParams,
+    InitializeResult, MessageType, OneOf, Position, Range, ServerCapabilities, SymbolKind,
     TextDocumentSyncCapability, TextDocumentSyncKind, Url,
 };
 use tower_lsp::{Client, LanguageServer};
@@ -20,16 +24,7 @@ pub fn diagnostics_for_text(uri: &str, version: i32, text: &str) -> Vec<Diagnost
         .diagnostics()
         .iter()
         .map(|diagnostic| Diagnostic {
-            range: Range {
-                start: Position {
-                    line: diagnostic.range.start.line,
-                    character: diagnostic.range.start.character,
-                },
-                end: Position {
-                    line: diagnostic.range.end.line,
-                    character: diagnostic.range.end.character,
-                },
-            },
+            range: lsp_range(diagnostic.range),
             severity: Some(match diagnostic.severity {
                 CoreSeverity::Error => DiagnosticSeverity::ERROR,
                 CoreSeverity::Warning => DiagnosticSeverity::WARNING,
@@ -47,6 +42,60 @@ pub fn diagnostics_for_text(uri: &str, version: i32, text: &str) -> Vec<Diagnost
             data: None,
         })
         .collect()
+}
+
+/// Convert compiler-core document symbols into LSP nested document symbols.
+pub fn document_symbols_for_text(uri: &str, version: i32, text: &str) -> Vec<DocumentSymbol> {
+    let core = CompilerCore;
+    let document = SourceDocument::new(uri, version, text);
+    core.document_symbols(&document)
+        .symbols()
+        .iter()
+        .map(lsp_document_symbol)
+        .collect()
+}
+
+#[allow(deprecated)]
+fn lsp_document_symbol(symbol: &CoreDocumentSymbol) -> DocumentSymbol {
+    DocumentSymbol {
+        name: symbol.name.clone(),
+        detail: symbol.detail.clone(),
+        kind: lsp_symbol_kind(symbol.kind),
+        tags: None,
+        deprecated: None,
+        range: lsp_range(symbol.range),
+        selection_range: lsp_range(symbol.selection_range),
+        children: if symbol.children.is_empty() {
+            None
+        } else {
+            Some(symbol.children.iter().map(lsp_document_symbol).collect())
+        },
+    }
+}
+
+fn lsp_symbol_kind(kind: CoreSymbolKind) -> SymbolKind {
+    match kind {
+        CoreSymbolKind::Program => SymbolKind::MODULE,
+        CoreSymbolKind::Function => SymbolKind::FUNCTION,
+        CoreSymbolKind::FunctionBlock => SymbolKind::CLASS,
+        CoreSymbolKind::Action => SymbolKind::METHOD,
+        CoreSymbolKind::Variable => SymbolKind::VARIABLE,
+        CoreSymbolKind::Type => SymbolKind::STRUCT,
+        CoreSymbolKind::Keyword => SymbolKind::KEY,
+    }
+}
+
+fn lsp_range(range: CoreRange) -> Range {
+    Range {
+        start: Position {
+            line: range.start.line,
+            character: range.start.character,
+        },
+        end: Position {
+            line: range.end.line,
+            character: range.end.character,
+        },
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -86,12 +135,7 @@ impl PlcLanguageServer {
 impl LanguageServer for PlcLanguageServer {
     async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
         Ok(InitializeResult {
-            capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Kind(
-                    TextDocumentSyncKind::FULL,
-                )),
-                ..ServerCapabilities::default()
-            },
+            capabilities: server_capabilities(),
             server_info: Some(tower_lsp::lsp_types::ServerInfo {
                 name: "PLC VS Code Language Server".to_owned(),
                 version: Some(env!("CARGO_PKG_VERSION").to_owned()),
@@ -143,12 +187,28 @@ impl LanguageServer for PlcLanguageServer {
         );
         self.publish_for(uri, version, &text).await;
     }
+
+    async fn document_symbol(
+        &self,
+        params: DocumentSymbolParams,
+    ) -> Result<Option<DocumentSymbolResponse>> {
+        let uri = params.text_document.uri;
+        let documents = self.documents.read().await;
+        Ok(documents.get(&uri).map(|snapshot| {
+            DocumentSymbolResponse::Nested(document_symbols_for_text(
+                uri.as_str(),
+                snapshot.version,
+                &snapshot.text,
+            ))
+        }))
+    }
 }
 
 /// Server capabilities helper used by tests and by `initialize`.
 pub fn server_capabilities() -> ServerCapabilities {
     ServerCapabilities {
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+        document_symbol_provider: Some(OneOf::Left(true)),
         ..ServerCapabilities::default()
     }
 }

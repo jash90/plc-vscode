@@ -1,18 +1,21 @@
 //! LSP server implementation for PLC VS Code.
 
 use plc_compiler_core::{
-    CompilerCore, DiagnosticSeverity as CoreSeverity, DocumentSymbol as CoreDocumentSymbol,
-    Range as CoreRange, SourceDocument, SymbolKind as CoreSymbolKind,
+    CompilerCore, CompletionCandidate as CoreCompletionCandidate,
+    DiagnosticSeverity as CoreSeverity, DocumentSymbol as CoreDocumentSymbol,
+    HoverInfo as CoreHoverInfo, Position as CorePosition, Range as CoreRange, SourceDocument,
+    SymbolKind as CoreSymbolKind,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::{
+    CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
     Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, InitializeParams,
-    InitializeResult, MessageType, OneOf, Position, Range, ServerCapabilities, SymbolKind,
-    TextDocumentSyncCapability, TextDocumentSyncKind, Url,
+    DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Hover, HoverContents, HoverParams,
+    InitializeParams, InitializeResult, MarkupContent, MarkupKind, MessageType, OneOf, Position,
+    Range, ServerCapabilities, SymbolKind, TextDocumentSyncCapability, TextDocumentSyncKind, Url,
 };
 use tower_lsp::{Client, LanguageServer};
 
@@ -95,6 +98,61 @@ fn lsp_range(range: CoreRange) -> Range {
             line: range.end.line,
             character: range.end.character,
         },
+    }
+}
+
+/// Convert compiler-core completion candidates into LSP completion items.
+pub fn completion_items_for_text(uri: &str, version: i32, text: &str) -> Vec<CompletionItem> {
+    let core = CompilerCore;
+    let document = SourceDocument::new(uri, version, text);
+    core.completions(&document)
+        .iter()
+        .map(lsp_completion_item)
+        .collect()
+}
+
+/// Convert compiler-core hover payloads into LSP hover responses.
+pub fn hover_for_text(uri: &str, version: i32, text: &str, position: Position) -> Option<Hover> {
+    let core = CompilerCore;
+    let document = SourceDocument::new(uri, version, text);
+    core.hover(
+        &document,
+        CorePosition {
+            line: position.line,
+            character: position.character,
+        },
+    )
+    .map(lsp_hover)
+}
+
+fn lsp_completion_item(candidate: &CoreCompletionCandidate) -> CompletionItem {
+    CompletionItem {
+        label: candidate.label.clone(),
+        kind: Some(lsp_completion_kind(candidate.kind)),
+        detail: candidate.detail.clone(),
+        ..CompletionItem::default()
+    }
+}
+
+fn lsp_completion_kind(kind: CoreSymbolKind) -> CompletionItemKind {
+    match kind {
+        CoreSymbolKind::Program => CompletionItemKind::MODULE,
+        CoreSymbolKind::Function => CompletionItemKind::FUNCTION,
+        CoreSymbolKind::FunctionBlock => CompletionItemKind::CLASS,
+        CoreSymbolKind::Action => CompletionItemKind::METHOD,
+        CoreSymbolKind::Variable => CompletionItemKind::VARIABLE,
+        CoreSymbolKind::Type => CompletionItemKind::STRUCT,
+        CoreSymbolKind::Keyword => CompletionItemKind::KEYWORD,
+    }
+}
+
+fn lsp_hover(hover: CoreHoverInfo) -> Hover {
+    Hover {
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: hover.contents,
+        }),
+        range: Some(lsp_range(hover.range)),
     }
 }
 
@@ -202,6 +260,27 @@ impl LanguageServer for PlcLanguageServer {
             ))
         }))
     }
+
+    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
+        let uri = params.text_document_position.text_document.uri;
+        let documents = self.documents.read().await;
+        Ok(documents.get(&uri).map(|snapshot| {
+            CompletionResponse::Array(completion_items_for_text(
+                uri.as_str(),
+                snapshot.version,
+                &snapshot.text,
+            ))
+        }))
+    }
+
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+        let documents = self.documents.read().await;
+        Ok(documents.get(&uri).and_then(|snapshot| {
+            hover_for_text(uri.as_str(), snapshot.version, &snapshot.text, position)
+        }))
+    }
 }
 
 /// Server capabilities helper used by tests and by `initialize`.
@@ -209,6 +288,8 @@ pub fn server_capabilities() -> ServerCapabilities {
     ServerCapabilities {
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         document_symbol_provider: Some(OneOf::Left(true)),
+        completion_provider: Some(CompletionOptions::default()),
+        hover_provider: Some(tower_lsp::lsp_types::HoverProviderCapability::Simple(true)),
         ..ServerCapabilities::default()
     }
 }

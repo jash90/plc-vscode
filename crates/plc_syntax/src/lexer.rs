@@ -174,6 +174,24 @@ pub fn lex_source(source: &str) -> LexedSource {
                 }
                 tokens.push(Token::new(TokenKind::NumberLiteral, start, cursor, source));
             }
+            '%' => {
+                // IEC located variable / direct address (`%IX0.0`, `%MW10`,
+                // `%QB4`). Lex the whole address as one operand token; semantic
+                // validation of the location is deferred.
+                cursor += '%'.len_utf8();
+                while cursor < bytes.len() {
+                    let next = source[cursor..].chars().next().unwrap();
+                    // Address chars plus hierarchical `.`, but never a `..` range.
+                    let is_address_char = next.is_ascii_alphanumeric()
+                        || next == '_'
+                        || (next == '.' && !source[cursor + next.len_utf8()..].starts_with('.'));
+                    if !is_address_char {
+                        break;
+                    }
+                    cursor += next.len_utf8();
+                }
+                tokens.push(Token::new(TokenKind::Identifier, start, cursor, source));
+            }
             _ if scan_operator(source, cursor).is_some() => {
                 cursor = scan_operator(source, cursor).unwrap();
                 tokens.push(Token::new(TokenKind::Operator, start, cursor, source));

@@ -100,6 +100,38 @@ fn lexer_accepts_typed_and_duration_literals() {
     assert_eq!(single_literal("BYTE#9"), "BYTE#9");
 }
 
+// PLC-63: IEC located variables / direct addresses (`%IX0.0`, `%MW10`) must
+// lex as a single token with no SYN0000.
+fn single_address(source: &str) -> String {
+    let lexed = lex_source(source);
+    assert!(
+        lexed.diagnostics().is_empty(),
+        "unexpected diagnostics for {source:?}: {:?}",
+        lexed.diagnostics()
+    );
+    let identifiers: Vec<&plc_syntax::Token> = lexed
+        .tokens()
+        .iter()
+        .filter(|token| token.kind == TokenKind::Identifier)
+        .collect();
+    assert_eq!(
+        identifiers.len(),
+        1,
+        "expected one address token in {source:?}"
+    );
+    identifiers[0].text.clone()
+}
+
+#[test]
+fn lexer_accepts_located_variable_addresses() {
+    assert_eq!(single_address("%IX7.8"), "%IX7.8");
+    assert_eq!(single_address("%QX7.7"), "%QX7.7");
+    assert_eq!(single_address("%IB4.8"), "%IB4.8");
+    assert_eq!(single_address("%MW10"), "%MW10");
+    assert_eq!(single_address("%I0.0"), "%I0.0");
+    assert_eq!(single_address("%B6"), "%B6");
+}
+
 #[test]
 fn lexer_splits_typed_literal_case_ranges() {
     // `BYTE#9..BYTE#10` must keep the `..` range operator separate.

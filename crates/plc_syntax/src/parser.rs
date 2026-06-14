@@ -241,16 +241,28 @@ fn parse_declaration(
     if name.kind != TokenKind::Identifier {
         return None;
     }
-    let colon = tokens.get(cursor + 1)?.1;
+
+    // Optional `AT <located-address>` clause (`binvar AT %IX7.8 : BOOL`). The
+    // address operand is skipped here; its token range is preserved for future
+    // semantic validation.
+    let mut colon_index = cursor + 1;
+    if tokens
+        .get(colon_index)
+        .is_some_and(|(_, token)| token.text.eq_ignore_ascii_case("AT"))
+    {
+        colon_index += 2;
+    }
+
+    let colon = tokens.get(colon_index)?.1;
     if colon.text != ":" {
         return None;
     }
-    let type_token = tokens.get(cursor + 2)?.1;
+    let type_token = tokens.get(colon_index + 1)?.1;
     if !matches!(type_token.kind, TokenKind::Identifier | TokenKind::Keyword) {
         return None;
     }
 
-    let mut next = cursor + 3;
+    let mut next = colon_index + 2;
     let mut initializer = None;
     if tokens
         .get(next)

@@ -68,6 +68,36 @@ fn parser_recovers_and_finds_following_pous() {
 }
 
 #[test]
+fn parser_accepts_located_variable_declarations() {
+    // PLC-63: `AT %IX0.0` located declarations must parse without SYN0000 and
+    // still expose the variable name and type.
+    let parsed = parse_source(
+        "PROGRAM Main\nVAR\n    binvar AT %IX7.8 : BOOL;\n    inbyte AT %IB4.8 : BYTE;\nEND_VAR\nEND_PROGRAM\n",
+    );
+
+    assert!(
+        !parsed
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.code == "SYN0000"),
+        "unexpected invalid-token diagnostics: {:?}",
+        parsed.diagnostics()
+    );
+
+    let declarations = &parsed.units()[0].declaration_blocks[0].declarations;
+    assert!(
+        declarations
+            .iter()
+            .any(|declaration| declaration.name == "binvar" && declaration.type_name == "BOOL")
+    );
+    assert!(
+        declarations
+            .iter()
+            .any(|declaration| declaration.name == "inbyte" && declaration.type_name == "BYTE")
+    );
+}
+
+#[test]
 fn parser_accepts_typed_literals_without_invalid_token_diagnostics() {
     // PLC-62: duration literal in an assignment and BYTE# ranges in a CASE must
     // not produce SYN0000 invalid-token diagnostics for `#`.

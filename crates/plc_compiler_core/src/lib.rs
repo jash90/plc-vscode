@@ -13,6 +13,7 @@ use plc_semantics::{
     analyze_workspace,
 };
 use plc_syntax::{Pou, PouKind, TextRange, Token, TokenKind, VarBlockKind, parse_source};
+use std::collections::HashMap;
 
 /// Source document snapshot passed into compiler-core operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -572,6 +573,16 @@ fn workspace_symbols(documents: &[SourceDocument], query: &str) -> Vec<Workspace
     let semantic = analyze_workspace(&files);
     let needle = query.to_ascii_lowercase();
 
+    // O(1) uri -> text, plus a per-document line index reused across that file's
+    // symbols, so converting symbol ranges stays linear instead of
+    // O(symbols × documents) lookup + O(symbols × file length) mapping that
+    // timed out `workspace/symbol` on large workspaces (PLC-81).
+    let text_by_uri: HashMap<&str, &str> = documents
+        .iter()
+        .map(|document| (document.uri(), document.text()))
+        .collect();
+    let mut index_by_uri: HashMap<&str, LineIndex> = HashMap::new();
+
     semantic
         .symbol_index
         .symbols()
@@ -579,16 +590,16 @@ fn workspace_symbols(documents: &[SourceDocument], query: &str) -> Vec<Workspace
         .filter(|symbol| symbol.container.is_none())
         .filter(|symbol| needle.is_empty() || symbol.name.to_ascii_lowercase().contains(&needle))
         .filter_map(|symbol| {
-            let text = documents
-                .iter()
-                .find(|document| document.uri() == symbol.uri)
-                .map(SourceDocument::text)?;
+            let text = *text_by_uri.get(symbol.uri.as_str())?;
+            let index = index_by_uri
+                .entry(symbol.uri.as_str())
+                .or_insert_with(|| LineIndex::new(text));
             Some(WorkspaceSymbol {
                 name: symbol.name.clone(),
                 kind: symbol_kind(symbol.kind),
                 location: Location {
                     uri: symbol.uri.clone(),
-                    range: text_range_to_range(text, symbol.range),
+                    range: index.range(text, symbol.range),
                 },
                 container_name: symbol.container.clone(),
             })

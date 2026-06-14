@@ -1,0 +1,12 @@
+[package]
+name = "plc_syntax"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Structured Text lexer, parser facade, and syntax diagnostics for PLC VS Code."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+rowan = "0.16"

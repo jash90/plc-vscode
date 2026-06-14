@@ -68,6 +68,30 @@ fn parser_recovers_and_finds_following_pous() {
 }
 
 #[test]
+fn parser_accepts_wstring_declarations() {
+    // PLC-76: a WSTRING declaration with a double-quoted initializer and a `$N`
+    // escape must parse without invalid-token/unclosed diagnostics.
+    let parsed =
+        parse_source("PROGRAM Main\nVAR\n    msg : WSTRING := \"hi$N\";\nEND_VAR\nEND_PROGRAM\n");
+
+    assert!(
+        !parsed
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.code == "SYN0000" || diagnostic.code == "SYN0001"),
+        "unexpected string diagnostics: {:?}",
+        parsed.diagnostics()
+    );
+
+    let declarations = &parsed.units()[0].declaration_blocks[0].declarations;
+    assert!(
+        declarations
+            .iter()
+            .any(|declaration| declaration.name == "msg" && declaration.type_name == "WSTRING")
+    );
+}
+
+#[test]
 fn parser_accepts_located_variable_declarations() {
     // PLC-63: `AT %IX0.0` located declarations must parse without SYN0000 and
     // still expose the variable name and type.

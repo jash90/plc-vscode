@@ -1,0 +1,2 @@
+/Users/bartlomiejzimny/Projects/plc-vscode/tests/st/non-utf8/rusty/tests/integration/data/encoding_utf_16.st
+/Users/bartlomiejzimny/Projects/plc-vscode/tests/st/non-utf8/rusty/tests/integration/data/encoding_win.st

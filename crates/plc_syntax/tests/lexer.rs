@@ -100,6 +100,51 @@ fn lexer_accepts_typed_and_duration_literals() {
     assert_eq!(single_literal("BYTE#9"), "BYTE#9");
 }
 
+// PLC-76: IEC WSTRING double-quoted literals and `$` escapes must lex as a
+// single string token with no invalid-token / unclosed diagnostics.
+fn single_string_token(source: &str) -> String {
+    let lexed = lex_source(source);
+    assert!(
+        lexed.diagnostics().is_empty(),
+        "unexpected diagnostics for {source:?}: {:?}",
+        lexed.diagnostics()
+    );
+    let strings: Vec<&plc_syntax::Token> = lexed
+        .tokens()
+        .iter()
+        .filter(|token| token.kind == TokenKind::StringLiteral)
+        .collect();
+    assert_eq!(strings.len(), 1, "expected one string token in {source:?}");
+    strings[0].text.clone()
+}
+
+#[test]
+fn lexer_accepts_double_quoted_wstring_literals() {
+    assert_eq!(single_string_token("\"hello\""), "\"hello\"");
+    assert_eq!(single_string_token("\"\""), "\"\"");
+}
+
+#[test]
+fn lexer_handles_dollar_escapes_in_strings() {
+    // `$"` inside a WSTRING does not terminate it; `$0048` wide-char escape and
+    // `$N` control escape are absorbed; `$'` works inside a single-quoted STRING.
+    assert_eq!(single_string_token("\"a$\"b\""), "\"a$\"b\"");
+    assert_eq!(single_string_token("\"$0048\""), "\"$0048\"");
+    assert_eq!(single_string_token("\"line$N\""), "\"line$N\"");
+    assert_eq!(single_string_token("'it$'s'"), "'it$'s'");
+}
+
+#[test]
+fn lexer_reports_unclosed_double_quoted_string() {
+    let lexed = lex_source("PROGRAM Main\n\"abc\nEND_PROGRAM\n");
+    assert!(
+        lexed
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.code == "SYN0001")
+    );
+}
+
 // PLC-63: IEC located variables / direct addresses (`%IX0.0`, `%MW10`) must
 // lex as a single token with no SYN0000.
 fn single_address(source: &str) -> String {

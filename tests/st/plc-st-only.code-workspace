@@ -1,0 +1,13 @@
+{
+  "folders": [
+    {
+      "path": "/Users/bartlomiejzimny/Projects/plc-vscode/tests/st/test-ready"
+    }
+  ],
+  "settings": {
+    "files.associations": {
+      "*.st": "structured-text"
+    },
+    "plcVscode.repositoryRoot": "/Users/bartlomiejzimny/Projects/plc-vscode"
+  }
+}

@@ -177,6 +177,27 @@ pub fn lex_source(source: &str) -> LexedSource {
                 }
                 tokens.push(Token::new(TokenKind::NumberLiteral, start, cursor, source));
             }
+            // Siemens SCL hash-prefixed local reference (`#Enable`). Only a `#`
+            // directly followed by an identifier start is consumed as one token;
+            // a bare `#` still falls through to an invalid-token diagnostic. (A
+            // `#` after an identifier/number is handled as an IEC typed literal
+            // in those branches.)
+            '#' if source[cursor + '#'.len_utf8()..]
+                .chars()
+                .next()
+                .is_some_and(is_identifier_start) =>
+            {
+                cursor += '#'.len_utf8();
+                while cursor < bytes.len() {
+                    let next = source[cursor..].chars().next().unwrap();
+                    if is_identifier_continue(next) {
+                        cursor += next.len_utf8();
+                    } else {
+                        break;
+                    }
+                }
+                tokens.push(Token::new(TokenKind::Identifier, start, cursor, source));
+            }
             '{' => {
                 // Vendor pragma / brace-delimited metadata (`{attribute 'hide'}`,
                 // `{region}`). Consume through the matching `}` and treat it as

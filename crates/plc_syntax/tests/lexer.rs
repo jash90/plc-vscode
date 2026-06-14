@@ -135,6 +135,29 @@ fn lexer_handles_dollar_escapes_in_strings() {
 }
 
 #[test]
+fn lexer_accepts_siemens_scl_local_refs() {
+    // PLC-75: Siemens SCL hash-prefixed locals (`#Enable`) lex as one identifier
+    // token, not SYN0000. A stray `#` not followed by a name still errors.
+    let lexed = lex_source("#Enable := #Counter;");
+    assert!(
+        lexed.diagnostics().is_empty(),
+        "unexpected diagnostics: {:?}",
+        lexed.diagnostics()
+    );
+    let names: Vec<&str> = lexed
+        .tokens()
+        .iter()
+        .filter(|token| token.kind == TokenKind::Identifier)
+        .map(|token| token.text.as_str())
+        .collect();
+    assert!(names.contains(&"#Enable"));
+    assert!(names.contains(&"#Counter"));
+
+    // A bare `#` (no following identifier) remains an invalid token.
+    assert_eq!(lex_source("# ").diagnostics().len(), 1);
+}
+
+#[test]
 fn lexer_consumes_brace_pragmas_as_trivia() {
     // PLC-77: vendor pragmas / brace metadata are consumed as trivia and must
     // not cascade as SYN0000.

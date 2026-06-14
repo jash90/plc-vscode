@@ -16,6 +16,24 @@ The bundled language server binary is produced from the Rust workspace
 (`cargo build --release --package plc_lsp_server --bin plc-lsp-server`) and is
 shipped with the extension (see PLC-48).
 
+## Verifying the packaged VSIX
+
+After packaging, verify that the produced `.vsix` actually bundles both the
+language server and the CLI under `server/`. The check inspects the VSIX archive
+contents (not just the source tree) and fails clearly if `server/` is missing or
+only one binary was bundled:
+
+```bash
+cd editors/vscode
+node scripts/verify-vsix.js plc-vscode-<platform>.vsix --target <vsce-platform>
+# e.g. node scripts/verify-vsix.js plc-vscode-win32-x64.vsix --target win32-x64
+```
+
+`--target` (or `--platform win32`) makes the check expect the `.exe` suffix for
+Windows builds. The release workflow runs this automatically after `vsce package`
+for every platform; run it locally before tagging if you package by hand. The
+assertion logic is also covered by `npm test` (`test/verify-vsix.test.js`).
+
 ## Automated release workflow
 
 `.github/workflows/release.yml` runs on a `v*` tag push and:
@@ -28,8 +46,10 @@ Windows x64) and for each:
 3. type-checks + runs the contract test, then packages a platform VSIX with
    `vsce package --target <vsce-platform>` (e.g. `darwin-arm64`, `linux-x64`,
    `win32-x64`),
-4. uploads each `plc-vscode-<platform>.vsix` to the GitHub release,
-5. publishes each platform VSIX to the Marketplace **iff** the `VSCE_PAT`
+4. verifies the packaged VSIX bundles `server/plc-lsp-server` and `server/plc`
+   (`node scripts/verify-vsix.js … --target <vsce-platform>`),
+5. uploads each `plc-vscode-<platform>.vsix` to the GitHub release,
+6. publishes each platform VSIX to the Marketplace **iff** the `VSCE_PAT`
    secret is configured (`vsce publish --target …`).
 
 The Marketplace serves the matching platform build automatically, so a user
@@ -45,6 +65,7 @@ against the workspace.
 - [ ] Ensure CI (`.github/workflows/ci.yml`) is green on `main`.
 - [ ] Verify the bundled server binary builds in release mode.
 - [ ] `npm run package` succeeds locally and the `.vsix` installs/activates.
+- [ ] Verify bundled binaries: `node scripts/verify-vsix.js <file>.vsix --target <vsce-platform>`.
 - [ ] Tag the release: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 - [ ] Confirm the release workflow uploaded the `.vsix` artifact.
 - [ ] Confirm Marketplace publish (if `VSCE_PAT` configured) or publish manually.

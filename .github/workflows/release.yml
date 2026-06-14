@@ -86,6 +86,10 @@ jobs:
         working-directory: editors/vscode
         run: npx vsce package --no-dependencies --target ${{ matrix.vsce_target }} -o "plc-vscode-${{ matrix.vsce_target }}.vsix"
 
+      - name: Verify bundled binaries in the VSIX
+        working-directory: editors/vscode
+        run: node scripts/verify-vsix.js "plc-vscode-${{ matrix.vsce_target }}.vsix" --target ${{ matrix.vsce_target }}
+
       - name: Upload VSIX to GitHub release
         uses: softprops/action-gh-release@v2
         with:

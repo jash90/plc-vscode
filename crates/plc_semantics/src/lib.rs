@@ -3,13 +3,15 @@
 //! This crate builds the workspace symbol index from `plc_syntax` output and
 //! resolves assignment targets against it. The API is intentionally
 //! deterministic so it can later be backed by incremental queries without
-//! changing CLI/LSP callers. Type checking and the incremental query facade are
-//! added by later tasks.
+//! changing CLI/LSP callers. A memoized query facade establishes the boundaries
+//! a future salsa database can adopt directly.
 
+mod query;
 mod types;
 
 use plc_syntax::{PouKind, StatementKind};
 
+pub use query::{QueryDurability, QueryStats, SemanticQueryDatabase, SourceSnapshot};
 pub use types::{
     SemanticAnalysis, SemanticDiagnostic, SourceFile, Symbol, SymbolIndex, SymbolKind, TypeKind,
 };

@@ -1,4 +1,25 @@
-use plc_syntax::{PouKind, StatementKind, VarBlockKind, parse_source};
+use plc_syntax::{PouKind, Statement, StatementKind, VarBlockKind, parse_source};
+
+#[test]
+fn parser_does_not_treat_named_call_arguments_as_assignments() {
+    // PLC-79: named call arguments `f(IN := x, L := y)` must NOT be parsed as
+    // assignment statements. Previously every named argument became a spurious
+    // assignment whose parameter name flooded SEM0001 (unresolved symbol).
+    let parsed = parse_source(concat!(
+        "PROGRAM Main\n",
+        "VAR\n    s : STRING;\n    r : STRING;\nEND_VAR\n",
+        "r := RIGHT(IN := s, L := 3);\n",
+        "END_PROGRAM\n",
+    ));
+
+    let assignments: Vec<&Statement> = parsed.units()[0]
+        .statements
+        .iter()
+        .filter(|statement| statement.kind == StatementKind::Assignment)
+        .collect();
+    assert_eq!(assignments.len(), 1, "got: {assignments:?}");
+    assert_eq!(assignments[0].target.as_deref(), Some("r"));
+}
 
 #[test]
 fn parser_recognizes_core_pou_program() {

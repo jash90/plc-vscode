@@ -339,6 +339,7 @@ fn parse_declaration(
 fn parse_statements(tokens: &[(usize, &Token)]) -> Vec<Statement> {
     let mut statements = Vec::new();
     let mut cursor = 0usize;
+    let mut paren_depth: u32 = 0;
 
     while cursor < tokens.len() {
         if var_block_kind(tokens[cursor].1).is_some() {
@@ -347,7 +348,21 @@ fn parse_statements(tokens: &[(usize, &Token)]) -> Vec<Statement> {
         }
 
         let token = tokens[cursor].1;
-        if token.kind == TokenKind::Identifier
+        // Track call/grouping parenthesis depth so named arguments (`p := v`)
+        // inside a call are not mistaken for statement-level assignments.
+        if token.text == "(" {
+            paren_depth += 1;
+            cursor += 1;
+            continue;
+        }
+        if token.text == ")" {
+            paren_depth = paren_depth.saturating_sub(1);
+            cursor += 1;
+            continue;
+        }
+
+        if paren_depth == 0
+            && token.kind == TokenKind::Identifier
             && tokens
                 .get(cursor + 1)
                 .is_some_and(|(_, next)| next.text == ":=")

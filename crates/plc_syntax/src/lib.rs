@@ -2,9 +2,12 @@
 //!
 //! The crate owns source-preserving lexical analysis that downstream crates
 //! consume instead of duplicating syntax checks in CLI, LSP, or compiler-core
-//! consumers. Concrete syntax tree and parser facades are added by later tasks.
+//! consumers. A rowan-backed concrete syntax tree preserves trivia and exact
+//! token text; the parser facade is added by a later task.
 
 mod lexer;
+
+pub mod cst;
 
 pub use lexer::{LexedSource, Token, TokenKind, lex_source};
 

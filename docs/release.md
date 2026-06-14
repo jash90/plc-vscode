@@ -20,11 +20,23 @@ shipped with the extension (see PLC-48).
 
 `.github/workflows/release.yml` runs on a `v*` tag push and:
 
-1. builds the release language-server binary,
-2. installs extension dependencies and type-checks,
-3. packages the `.vsix`,
-4. uploads the `.vsix` to the GitHub release,
-5. publishes to the Marketplace **iff** the `VSCE_PAT` secret is configured.
+runs a **matrix over target platforms** (macOS arm64/x64, Linux x64/arm64,
+Windows x64) and for each:
+
+1. builds the release `plc-lsp-server` and `plc` binaries for that target,
+2. bundles them into `editors/vscode/server/` (`.exe` on Windows),
+3. type-checks + runs the contract test, then packages a platform VSIX with
+   `vsce package --target <vsce-platform>` (e.g. `darwin-arm64`, `linux-x64`,
+   `win32-x64`),
+4. uploads each `plc-vscode-<platform>.vsix` to the GitHub release,
+5. publishes each platform VSIX to the Marketplace **iff** the `VSCE_PAT`
+   secret is configured (`vsce publish --target …`).
+
+The Marketplace serves the matching platform build automatically, so a user
+installs one extension that already contains the right native server — no Rust
+toolchain required. When **installed** (Production mode) the extension runs the
+bundled `server/plc-lsp-server`; in development it falls back to `cargo run`
+against the workspace.
 
 ## Release checklist
 

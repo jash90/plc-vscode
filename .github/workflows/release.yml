@@ -12,22 +12,62 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  release:
-    name: Package and publish VSIX
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: editors/vscode
+  # Build the server + CLI for each target, bundle them into the extension's
+  # server/ directory, and package one platform-specific VSIX per target.
+  package:
+    name: package ${{ matrix.vsce_target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            rust_target: aarch64-apple-darwin
+            vsce_target: darwin-arm64
+            ext: ""
+          - os: macos-latest
+            rust_target: x86_64-apple-darwin
+            vsce_target: darwin-x64
+            ext: ""
+          - os: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
+            vsce_target: linux-x64
+            ext: ""
+          - os: ubuntu-latest
+            rust_target: aarch64-unknown-linux-gnu
+            vsce_target: linux-arm64
+            ext: ""
+          - os: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            vsce_target: win32-x64
+            ext: ".exe"
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
       - uses: Swatinem/rust-cache@v2
 
-      - name: Build language server (release)
-        working-directory: .
-        run: cargo build --release --package plc_lsp_server --bin plc-lsp-server
+      - name: Install aarch64 Linux cross linker
+        if: matrix.vsce_target == 'linux-arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
+
+      - name: Build server and CLI (release)
+        run: |
+          cargo build --release --target ${{ matrix.rust_target }} --package plc_lsp_server --bin plc-lsp-server
+          cargo build --release --target ${{ matrix.rust_target }} --package plc_cli --bin plc
+
+      - name: Bundle binaries into the extension
+        shell: bash
+        run: |
+          mkdir -p editors/vscode/server
+          cp "target/${{ matrix.rust_target }}/release/plc-lsp-server${{ matrix.ext }}" editors/vscode/server/
+          cp "target/${{ matrix.rust_target }}/release/plc${{ matrix.ext }}" editors/vscode/server/
 
       - name: Install Node
         uses: actions/setup-node@v4
@@ -35,23 +75,26 @@ jobs:
           node-version: 22
 
       - name: Install extension dependencies
+        working-directory: editors/vscode
         run: npm ci || npm install
 
-      - name: Type-check
-        run: npx tsc --noEmit
+      - name: Type-check and contract test
+        working-directory: editors/vscode
+        run: npm test
 
-      - name: Package VSIX
-        run: npm run package
+      - name: Package platform VSIX
+        working-directory: editors/vscode
+        run: npx vsce package --no-dependencies --target ${{ matrix.vsce_target }} -o "plc-vscode-${{ matrix.vsce_target }}.vsix"
 
       - name: Upload VSIX to GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: editors/vscode/*.vsix
+          files: editors/vscode/plc-vscode-${{ matrix.vsce_target }}.vsix
 
-      # Publishing to the Marketplace requires a VSCE_PAT secret. The step is
-      # skipped automatically when the secret is not configured.
-      - name: Publish to VS Code Marketplace
+      # Publishing requires a VSCE_PAT secret; skipped automatically otherwise.
+      - name: Publish platform VSIX to VS Code Marketplace
         if: ${{ secrets.VSCE_PAT != '' }}
+        working-directory: editors/vscode
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: npx vsce publish --no-dependencies --pat "$VSCE_PAT"
+        run: npx vsce publish --no-dependencies --target ${{ matrix.vsce_target }} --packagePath "plc-vscode-${{ matrix.vsce_target }}.vsix" --pat "$VSCE_PAT"

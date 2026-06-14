@@ -22,11 +22,13 @@ function serverOptions(context: vscode.ExtensionContext): ServerOptions {
     '--',
   ]);
 
+  const repositoryRoot = config.get<string>('repositoryRoot', '') || workspaceRoot(context);
+
   return {
     command,
     args,
     options: {
-      cwd: workspaceRoot(context),
+      cwd: repositoryRoot,
     },
   };
 }

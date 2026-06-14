@@ -55,11 +55,12 @@ function serverOptions(context) {
         'plc-lsp-server',
         '--',
     ]);
+    const repositoryRoot = config.get('repositoryRoot', '') || workspaceRoot(context);
     return {
         command,
         args,
         options: {
-            cwd: workspaceRoot(context),
+            cwd: repositoryRoot,
         },
     };
 }

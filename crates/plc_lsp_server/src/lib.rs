@@ -4,8 +4,9 @@ use plc_compiler_core::{
     CodeAction as CoreCodeAction, CompilerCore, CompletionCandidate as CoreCompletionCandidate,
     DiagnosticSeverity as CoreSeverity, DocumentSymbol as CoreDocumentSymbol,
     HoverInfo as CoreHoverInfo, Location as CoreLocation, Position as CorePosition,
-    Range as CoreRange, SignatureInfo as CoreSignatureInfo, SourceDocument,
-    SymbolKind as CoreSymbolKind, TextEdit as CoreTextEdit, WorkspaceSymbol as CoreWorkspaceSymbol,
+    Range as CoreRange, SemanticTokenKind as CoreSemanticTokenKind,
+    SignatureInfo as CoreSignatureInfo, SourceDocument, SymbolKind as CoreSymbolKind,
+    TextEdit as CoreTextEdit, WorkspaceSymbol as CoreWorkspaceSymbol,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -19,10 +20,13 @@ use tower_lsp::lsp_types::{
     DocumentRangeFormattingParams, DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse,
     GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
     InitializeParams, InitializeResult, Location, MarkupContent, MarkupKind, MessageType, OneOf,
-    ParameterInformation, ParameterLabel, Position, Range, ReferenceParams, ServerCapabilities,
-    SignatureHelp, SignatureHelpOptions, SignatureHelpParams, SignatureInformation,
-    SymbolInformation, SymbolKind, TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url,
-    WorkspaceEdit, WorkspaceSymbolParams,
+    ParameterInformation, ParameterLabel, Position, Range, ReferenceParams, SemanticToken,
+    SemanticTokenType, SemanticTokens, SemanticTokensFullOptions, SemanticTokensLegend,
+    SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelp, SignatureHelpOptions,
+    SignatureHelpParams, SignatureInformation, SymbolInformation, SymbolKind,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url, WorkspaceEdit,
+    WorkspaceSymbolParams,
 };
 use tower_lsp::{Client, LanguageServer};
 
@@ -95,6 +99,79 @@ fn lsp_symbol_information(symbol: CoreWorkspaceSymbol) -> Option<SymbolInformati
         },
         container_name: symbol.container_name,
     })
+}
+
+/// Stable semantic tokens legend. The order of `token_types` defines the
+/// numeric `token_type` indices used in encoded tokens — keep it in sync with
+/// `semantic_token_type_index`.
+pub fn semantic_tokens_legend() -> SemanticTokensLegend {
+    SemanticTokensLegend {
+        token_types: vec![
+            SemanticTokenType::KEYWORD,
+            SemanticTokenType::TYPE,
+            SemanticTokenType::VARIABLE,
+            SemanticTokenType::FUNCTION,
+            SemanticTokenType::CLASS,
+            SemanticTokenType::NUMBER,
+            SemanticTokenType::STRING,
+            SemanticTokenType::COMMENT,
+            SemanticTokenType::OPERATOR,
+        ],
+        token_modifiers: Vec::new(),
+    }
+}
+
+fn semantic_token_type_index(kind: CoreSemanticTokenKind) -> u32 {
+    match kind {
+        CoreSemanticTokenKind::Keyword => 0,
+        CoreSemanticTokenKind::Type => 1,
+        CoreSemanticTokenKind::Variable => 2,
+        CoreSemanticTokenKind::Function => 3,
+        CoreSemanticTokenKind::FunctionBlock => 4,
+        CoreSemanticTokenKind::Number => 5,
+        CoreSemanticTokenKind::String => 6,
+        CoreSemanticTokenKind::Comment => 7,
+        CoreSemanticTokenKind::Operator => 8,
+    }
+}
+
+/// Build delta-encoded LSP semantic tokens for a document. Compiler-core yields
+/// single-line tokens in source order, so encoding is a straight delta pass.
+pub fn semantic_tokens_for_text(uri: &str, version: i32, text: &str) -> SemanticTokens {
+    let core = CompilerCore;
+    let document = SourceDocument::new(uri, version, text);
+
+    let mut data = Vec::new();
+    let mut last_line = 0u32;
+    let mut last_start = 0u32;
+
+    for token in core.semantic_tokens(&document) {
+        let line = token.range.start.line;
+        let start = token.range.start.character;
+        let length = token.range.end.character.saturating_sub(start);
+        let delta_line = line - last_line;
+        let delta_start = if delta_line == 0 {
+            start - last_start
+        } else {
+            start
+        };
+
+        data.push(SemanticToken {
+            delta_line,
+            delta_start,
+            length,
+            token_type: semantic_token_type_index(token.kind),
+            token_modifiers_bitset: 0,
+        });
+
+        last_line = line;
+        last_start = start;
+    }
+
+    SemanticTokens {
+        result_id: None,
+        data,
+    }
 }
 
 #[allow(deprecated)]
@@ -466,6 +543,21 @@ impl LanguageServer for PlcLanguageServer {
         }))
     }
 
+    async fn semantic_tokens_full(
+        &self,
+        params: SemanticTokensParams,
+    ) -> Result<Option<SemanticTokensResult>> {
+        let uri = params.text_document.uri;
+        let documents = self.documents.read().await;
+        Ok(documents.get(&uri).map(|snapshot| {
+            SemanticTokensResult::Tokens(semantic_tokens_for_text(
+                uri.as_str(),
+                snapshot.version,
+                &snapshot.text,
+            ))
+        }))
+    }
+
     async fn symbol(
         &self,
         params: WorkspaceSymbolParams,
@@ -584,6 +676,14 @@ pub fn server_capabilities() -> ServerCapabilities {
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         document_symbol_provider: Some(OneOf::Left(true)),
         workspace_symbol_provider: Some(OneOf::Left(true)),
+        semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+            SemanticTokensOptions {
+                legend: semantic_tokens_legend(),
+                range: Some(false),
+                full: Some(SemanticTokensFullOptions::Bool(true)),
+                ..SemanticTokensOptions::default()
+            },
+        )),
         completion_provider: Some(CompletionOptions::default()),
         signature_help_provider: Some(SignatureHelpOptions::default()),
         hover_provider: Some(tower_lsp::lsp_types::HoverProviderCapability::Simple(true)),

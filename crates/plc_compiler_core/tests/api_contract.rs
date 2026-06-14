@@ -1,4 +1,6 @@
-use plc_compiler_core::{CompilerCore, DiagnosticSeverity, Position, SourceDocument, SymbolKind};
+use plc_compiler_core::{
+    CompilerCore, DiagnosticSeverity, Position, SemanticTokenKind, SourceDocument, SymbolKind,
+};
 
 #[test]
 fn compiler_core_formats_keyword_casing_and_indentation() {
@@ -549,4 +551,89 @@ fn compiler_core_workspace_symbols_are_top_level_only() {
     );
     // Member variables are not top-level workspace symbols.
     assert!(core.workspace_symbols(&documents, "Enabled").is_empty());
+}
+
+#[test]
+fn compiler_core_classifies_semantic_tokens() {
+    let core = CompilerCore;
+    let document = SourceDocument::new(
+        "file:///main.st",
+        1,
+        "PROGRAM Main\nVAR\n    Speed : INT;\nEND_VAR\nSpeed := 42;\nEND_PROGRAM\n",
+    );
+
+    let tokens = core.semantic_tokens(&document);
+
+    // `PROGRAM` keyword at the start of line 0.
+    assert!(
+        tokens
+            .iter()
+            .any(|token| token.kind == SemanticTokenKind::Keyword
+                && token.range.start.line == 0
+                && token.range.start.character == 0)
+    );
+    // `INT` elementary type on line 2.
+    assert!(
+        tokens
+            .iter()
+            .any(|token| token.kind == SemanticTokenKind::Type && token.range.start.line == 2)
+    );
+    // `Speed` variable on line 2 (declaration) and line 4 (usage).
+    assert!(
+        tokens
+            .iter()
+            .any(|token| token.kind == SemanticTokenKind::Variable && token.range.start.line == 4)
+    );
+    // `42` numeric literal on line 4.
+    assert!(
+        tokens
+            .iter()
+            .any(|token| token.kind == SemanticTokenKind::Number && token.range.start.line == 4)
+    );
+}
+
+#[test]
+fn compiler_core_classifies_functions_and_function_blocks() {
+    let core = CompilerCore;
+    let document = SourceDocument::new(
+        "file:///main.st",
+        1,
+        concat!(
+            "FUNCTION_BLOCK Counter\n",
+            "END_FUNCTION_BLOCK\n",
+            "FUNCTION Add\n",
+            "END_FUNCTION\n",
+            "PROGRAM Main\n",
+            "VAR\n",
+            "    inst : Counter;\n",
+            "    t : TON;\n",
+            "    r : INT;\n",
+            "END_VAR\n",
+            "r := MIN(1, 2);\n",
+            "END_PROGRAM\n",
+        ),
+    );
+
+    let tokens = core.semantic_tokens(&document);
+
+    // User function block `Counter` used as a type on line 6.
+    assert!(
+        tokens
+            .iter()
+            .any(|token| token.kind == SemanticTokenKind::FunctionBlock
+                && token.range.start.line == 6)
+    );
+    // Standard function block `TON` used as a type on line 7.
+    assert!(
+        tokens
+            .iter()
+            .any(|token| token.kind == SemanticTokenKind::FunctionBlock
+                && token.range.start.line == 7)
+    );
+    // Standard function `MIN` called on line 10.
+    assert!(
+        tokens
+            .iter()
+            .any(|token| token.kind == SemanticTokenKind::Function && token.range.start.line == 10)
+    );
 }

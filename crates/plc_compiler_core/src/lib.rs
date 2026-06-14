@@ -217,6 +217,27 @@ pub struct WorkspaceSymbol {
     pub container_name: Option<String>,
 }
 
+/// Semantic token category exposed by compiler-core for syntax highlighting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SemanticTokenKind {
+    Keyword,
+    Type,
+    Variable,
+    Function,
+    FunctionBlock,
+    Number,
+    String,
+    Comment,
+    Operator,
+}
+
+/// A classified, single-line semantic token with its source range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SemanticToken {
+    pub range: Range,
+    pub kind: SemanticTokenKind,
+}
+
 /// Text edit (range replacement) used by formatting and code actions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextEdit {
@@ -277,6 +298,13 @@ impl CompilerCore {
         query: &str,
     ) -> Vec<WorkspaceSymbol> {
         workspace_symbols(documents, query)
+    }
+
+    /// Classify the document's tokens into semantic highlighting categories.
+    /// Multi-line tokens (block comments, multi-line strings) are skipped and
+    /// left to the editor's TextMate grammar.
+    pub fn semantic_tokens(&self, document: &SourceDocument) -> Vec<SemanticToken> {
+        semantic_tokens(document)
     }
 
     pub fn completions(
@@ -565,6 +593,123 @@ fn workspace_symbols(documents: &[SourceDocument], query: &str) -> Vec<Workspace
             })
         })
         .collect()
+}
+
+fn semantic_tokens(document: &SourceDocument) -> Vec<SemanticToken> {
+    let text = document.text();
+    let parse = parse_source(text);
+    let semantic = analyze_file(document.uri(), text);
+
+    parse
+        .tokens()
+        .iter()
+        .filter_map(|token| {
+            let kind = classify_semantic_token(token, &semantic)?;
+            let start = byte_offset_to_position(text, token.range.start);
+            let end = byte_offset_to_position(text, token.range.end);
+            // Skip multi-line and empty tokens; single-line tokens encode cleanly.
+            if start.line != end.line || end.character <= start.character {
+                return None;
+            }
+            Some(SemanticToken {
+                range: Range { start, end },
+                kind,
+            })
+        })
+        .collect()
+}
+
+fn classify_semantic_token(
+    token: &plc_syntax::Token,
+    semantic: &plc_semantics::SemanticAnalysis,
+) -> Option<SemanticTokenKind> {
+    match token.kind {
+        TokenKind::Keyword => Some(if is_elementary_type(&token.text) {
+            SemanticTokenKind::Type
+        } else {
+            SemanticTokenKind::Keyword
+        }),
+        TokenKind::NumberLiteral => Some(SemanticTokenKind::Number),
+        TokenKind::StringLiteral => Some(SemanticTokenKind::String),
+        TokenKind::Comment => Some(SemanticTokenKind::Comment),
+        TokenKind::Operator => Some(SemanticTokenKind::Operator),
+        TokenKind::Identifier => Some(classify_identifier_token(&token.text, semantic)),
+        TokenKind::Whitespace | TokenKind::Newline | TokenKind::Invalid => None,
+    }
+}
+
+fn classify_identifier_token(
+    name: &str,
+    semantic: &plc_semantics::SemanticAnalysis,
+) -> SemanticTokenKind {
+    if is_elementary_type(name) {
+        return SemanticTokenKind::Type;
+    }
+    if let Some(kind) = top_level_symbol_kind(semantic, name) {
+        match kind {
+            SemanticSymbolKind::Function => return SemanticTokenKind::Function,
+            SemanticSymbolKind::FunctionBlock => return SemanticTokenKind::FunctionBlock,
+            _ => {}
+        }
+    }
+    if is_standard_function_name(name) {
+        return SemanticTokenKind::Function;
+    }
+    if standard_fb_members(name).is_some() {
+        return SemanticTokenKind::FunctionBlock;
+    }
+    SemanticTokenKind::Variable
+}
+
+fn top_level_symbol_kind(
+    semantic: &plc_semantics::SemanticAnalysis,
+    name: &str,
+) -> Option<SemanticSymbolKind> {
+    semantic
+        .symbol_index
+        .symbols()
+        .iter()
+        .find(|symbol| symbol.container.is_none() && symbol.name.eq_ignore_ascii_case(name))
+        .map(|symbol| symbol.kind)
+}
+
+fn is_standard_function_name(name: &str) -> bool {
+    let upper = name.to_ascii_uppercase();
+    STANDARD_FUNCTION_NAMES
+        .iter()
+        .any(|candidate| *candidate == upper)
+}
+
+/// IEC 61131-3 elementary type names recognized for semantic highlighting.
+fn is_elementary_type(name: &str) -> bool {
+    matches!(
+        name.to_ascii_uppercase().as_str(),
+        "BOOL"
+            | "BYTE"
+            | "WORD"
+            | "DWORD"
+            | "LWORD"
+            | "SINT"
+            | "INT"
+            | "DINT"
+            | "LINT"
+            | "USINT"
+            | "UINT"
+            | "UDINT"
+            | "ULINT"
+            | "REAL"
+            | "LREAL"
+            | "TIME"
+            | "DATE"
+            | "TIME_OF_DAY"
+            | "TOD"
+            | "DATE_AND_TIME"
+            | "DT"
+            | "STRING"
+            | "WSTRING"
+            | "CHAR"
+            | "WCHAR"
+    )
 }
 
 fn symbol_kind(kind: SemanticSymbolKind) -> SymbolKind {

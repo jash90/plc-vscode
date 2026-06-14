@@ -24,11 +24,8 @@ pub struct SemanticDiagnostic {
     pub message: String,
 }
 
-/// Baseline type model used by the symbol index.
-///
-/// This first cut covers the elementary kinds needed to attach types to
-/// indexed variables. The full IEC elementary and derived type model is added
-/// by a later task.
+/// IEC elementary and derived type model used by early diagnostics and LSP
+/// hover.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TypeKind {
     Bool,
@@ -36,6 +33,13 @@ pub enum TypeKind {
     Real,
     Time,
     String,
+    WString,
+    Array,
+    Struct,
+    Enum,
+    Alias,
+    Subrange,
+    Derived(String),
     Unknown(String),
 }
 
@@ -50,6 +54,13 @@ impl TypeKind {
             "REAL" | "LREAL" => Self::Real,
             "TIME" | "DATE" | "TIME_OF_DAY" | "TOD" | "DATE_AND_TIME" | "DT" => Self::Time,
             "STRING" => Self::String,
+            "WSTRING" => Self::WString,
+            "ARRAY" => Self::Array,
+            "STRUCT" => Self::Struct,
+            "ENUM" => Self::Enum,
+            "ALIAS" => Self::Alias,
+            "SUBRANGE" => Self::Subrange,
+            _ if !name.trim().is_empty() => Self::Derived(name.to_owned()),
             _ => Self::Unknown(name.to_owned()),
         }
     }
@@ -61,8 +72,27 @@ impl TypeKind {
             Self::Real => "real",
             Self::Time => "time/date",
             Self::String => "STRING",
-            Self::Unknown(name) => name.as_str(),
+            Self::WString => "WSTRING",
+            Self::Array => "ARRAY",
+            Self::Struct => "STRUCT",
+            Self::Enum => "ENUM",
+            Self::Alias => "ALIAS",
+            Self::Subrange => "SUBRANGE",
+            Self::Derived(name) | Self::Unknown(name) => name.as_str(),
         }
+    }
+
+    pub fn assignment_compatible(&self, value: &Self) -> bool {
+        matches!(
+            (self, value),
+            (Self::Integer, Self::Integer)
+                | (Self::Real, Self::Real)
+                | (Self::Real, Self::Integer)
+                | (Self::Bool, Self::Bool)
+                | (Self::String, Self::String)
+                | (Self::WString, Self::String)
+                | (Self::Time, Self::Time)
+        ) || matches!(value, Self::Unknown(_))
     }
 }
 

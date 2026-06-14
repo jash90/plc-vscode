@@ -9,8 +9,10 @@ use std::collections::HashMap;
 
 use plc_syntax::{StatementKind, parse_source};
 
+mod clock;
 mod value;
 
+pub use clock::VirtualClock;
 pub use value::Value;
 
 /// The phase of a single scan cycle.
@@ -60,6 +62,7 @@ pub struct Runtime {
     pending_inputs: VariableTable,
     outputs: Vec<String>,
     scan_count: u64,
+    clock: VirtualClock,
 }
 
 impl Runtime {
@@ -109,7 +112,28 @@ impl Runtime {
             pending_inputs: VariableTable::default(),
             outputs,
             scan_count: 0,
+            clock: VirtualClock::default(),
         }
+    }
+
+    /// Current virtual time in milliseconds.
+    pub fn now_ms(&self) -> i64 {
+        self.clock.now_ms()
+    }
+
+    /// Read-only access to the virtual clock.
+    pub fn clock(&self) -> &VirtualClock {
+        &self.clock
+    }
+
+    /// Configure the per-scan virtual time increment.
+    pub fn set_scan_interval_ms(&mut self, scan_interval_ms: i64) {
+        self.clock.set_scan_interval_ms(scan_interval_ms);
+    }
+
+    /// Advance virtual time explicitly without running a scan.
+    pub fn advance_time(&mut self, delta_ms: i64) {
+        self.clock.advance(delta_ms);
     }
 
     /// Stage an input value to be latched at the next input scan.
@@ -137,6 +161,7 @@ impl Runtime {
     /// Returns the output-scan snapshot (`name = value`) for the declared
     /// output variables.
     pub fn run_scan(&mut self) -> Vec<String> {
+        self.clock.tick();
         self.scan_phase(ScanPhase::Input);
         self.scan_phase(ScanPhase::Logic);
         let snapshot = self.scan_phase_output();

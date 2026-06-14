@@ -1,0 +1,7 @@
+PROGRAM Broken
+VAR
+    Value : BOOL;
+END_VAR
+
+FUNCTION_BLOCK StillParsed
+END_FUNCTION_BLOCK

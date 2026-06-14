@@ -1,4 +1,4 @@
-use plc_syntax::{PouKind, parse_source};
+use plc_syntax::{PouKind, StatementKind, VarBlockKind, parse_source};
 
 #[test]
 fn parser_recognizes_core_pou_program() {
@@ -8,6 +8,42 @@ fn parser_recognizes_core_pou_program() {
     assert_eq!(parsed.units().len(), 1);
     assert_eq!(parsed.units()[0].kind, PouKind::Program);
     assert_eq!(parsed.units()[0].name.as_deref(), Some("Main"));
+}
+
+#[test]
+fn parser_recognizes_mvp_declarations_and_statements() {
+    let parsed = parse_source(
+        "PROGRAM Main\nVAR_INPUT\n    Start : BOOL;\nEND_VAR\nVAR\n    Count : INT := 1;\nEND_VAR\nStart := TRUE;\nIF Start THEN\n    RETURN;\nEND_IF\nEND_PROGRAM\n",
+    );
+
+    assert!(parsed.diagnostics().is_empty());
+    let unit = &parsed.units()[0];
+    assert_eq!(unit.declaration_blocks.len(), 2);
+    assert_eq!(unit.declaration_blocks[0].kind, VarBlockKind::Input);
+    assert_eq!(unit.declaration_blocks[0].declarations[0].name, "Start");
+    assert_eq!(unit.declaration_blocks[0].declarations[0].type_name, "BOOL");
+    assert_eq!(unit.declaration_blocks[1].kind, VarBlockKind::Var);
+    assert_eq!(
+        unit.declaration_blocks[1].declarations[0]
+            .initializer
+            .as_deref(),
+        Some("1")
+    );
+    assert!(
+        unit.statements
+            .iter()
+            .any(|statement| statement.kind == StatementKind::Assignment)
+    );
+    assert!(
+        unit.statements
+            .iter()
+            .any(|statement| statement.kind == StatementKind::If)
+    );
+    assert!(
+        unit.statements
+            .iter()
+            .any(|statement| statement.kind == StatementKind::Return)
+    );
 }
 
 #[test]

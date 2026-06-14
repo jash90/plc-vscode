@@ -5,6 +5,7 @@ members = [
     "crates/plc_syntax",
     "crates/plc_semantics",
     "crates/plc_runtime",
+    "crates/plc_hir",
     "crates/plc_lsp_server",
     "crates/plc_compiler_core",
     "crates/plc_cli",

@@ -496,6 +496,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "plc_hir"
+version = "0.1.0"
+dependencies = [
+ "plc_syntax",
+]
+
+[[package]]
 name = "plc_lsp_server"
 version = "0.1.0"
 dependencies = [

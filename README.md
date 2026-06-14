@@ -15,6 +15,10 @@ The repository is organized around a shared Rust compiler core consumed by:
 
 See [`docs/architecture/workspace.md`](docs/architecture/workspace.md) for the initial workspace contract.
 
+Planning and contributor references:
+
+- [`docs/licensing.md`](docs/licensing.md) — reference-project licensing rules for IronPLC and RuSTy.
+
 ## Development
 
 Run the architecture contract tests:

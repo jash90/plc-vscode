@@ -143,12 +143,19 @@ pub fn lex_source(source: &str) -> LexedSource {
                         break;
                     }
                 }
-                let kind = if is_keyword(&source[start..cursor]) {
-                    TokenKind::Keyword
+                // A `#` after an identifier starts an IEC typed/duration literal
+                // (e.g. `T#20ms`, `BYTE#9`, `INT#16#FF`); lex it as one literal.
+                if source[cursor..].starts_with('#') {
+                    cursor = scan_typed_literal_body(source, cursor);
+                    tokens.push(Token::new(TokenKind::NumberLiteral, start, cursor, source));
                 } else {
-                    TokenKind::Identifier
-                };
-                tokens.push(Token::new(kind, start, cursor, source));
+                    let kind = if is_keyword(&source[start..cursor]) {
+                        TokenKind::Keyword
+                    } else {
+                        TokenKind::Identifier
+                    };
+                    tokens.push(Token::new(kind, start, cursor, source));
+                }
             }
             c if c.is_ascii_digit() => {
                 cursor += c.len_utf8();
@@ -159,6 +166,11 @@ pub fn lex_source(source: &str) -> LexedSource {
                     } else {
                         break;
                     }
+                }
+                // A `#` after a number starts an IEC base/radix literal (`16#FF`,
+                // `2#1010_0110`); absorb it into the same literal token.
+                if source[cursor..].starts_with('#') {
+                    cursor = scan_typed_literal_body(source, cursor);
                 }
                 tokens.push(Token::new(TokenKind::NumberLiteral, start, cursor, source));
             }
@@ -226,6 +238,34 @@ fn scan_string_literal(source: &str, start: usize) -> (usize, bool) {
     }
 
     (cursor, false)
+}
+
+/// Scan the body of an IEC typed/base/duration literal starting at the `#`
+/// separator (the `#FF` of `16#FF`, the `#20ms` of `T#20ms`). Consumes the `#`,
+/// an optional sign for signed durations, then literal characters. Stops at
+/// whitespace, operators, or a `..` range so CASE ranges keep their separator.
+fn scan_typed_literal_body(source: &str, start: usize) -> usize {
+    let mut cursor = start + '#'.len_utf8();
+
+    if let Some(sign) = source[cursor..].chars().next()
+        && (sign == '+' || sign == '-')
+    {
+        cursor += sign.len_utf8();
+    }
+
+    while cursor < source.len() {
+        let ch = source[cursor..].chars().next().unwrap();
+        if ch.is_ascii_alphanumeric() || ch == '_' || ch == '#' {
+            cursor += ch.len_utf8();
+        } else if ch == '.' && !source[cursor + ch.len_utf8()..].starts_with('.') {
+            // A lone `.` is a decimal point; `..` is a range operator — stop.
+            cursor += ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+
+    cursor
 }
 
 fn scan_operator(source: &str, cursor: usize) -> Option<usize> {

@@ -13,7 +13,8 @@
   ],
   "activationEvents": [
     "onLanguage:structured-text",
-    "onCommand:plc-vscode.showStatus"
+    "onCommand:plc-vscode.showStatus",
+    "onCommand:plc-vscode.runCurrentFile"
   ],
   "main": "./dist/extension.js",
   "contributes": {

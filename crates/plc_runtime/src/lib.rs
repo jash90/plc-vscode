@@ -17,7 +17,7 @@ pub mod stdlib;
 pub mod timers;
 mod value;
 
-pub use bytecode::{BytecodeModule, Instruction};
+pub use bytecode::{BytecodeModule, Instruction, lower_module, lower_program};
 pub use clock::VirtualClock;
 pub use counters::{Ctd, Ctu, Ctud};
 pub use edge::{FTrig, RTrig};

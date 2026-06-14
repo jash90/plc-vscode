@@ -27,18 +27,94 @@ pub fn emit_ir_from_source(text: &str) -> String {
 /// Lower a HIR module to LLVM IR text.
 pub fn emit_ir(module: &HirModule) -> String {
     let context = Context::create();
+    let llvm_module = build_llvm_module(&context, module);
+    llvm_module.print_to_string().to_string()
+}
+
+/// Backend output artifact modes.
+///
+/// `LlvmIr` and `Assembly` are textual; `Object` and the linkable artifacts
+/// (`StaticLibrary`, `SharedLibrary`, `Executable`) emit machine code. The
+/// linkable modes share object emission as their compile step; producing the
+/// final archive/shared-object/executable is a subsequent link step (the object
+/// bytes returned here are the linker input). Shared output is compiled
+/// position-independent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputMode {
+    LlvmIr,
+    Assembly,
+    Object,
+    StaticLibrary,
+    SharedLibrary,
+    Executable,
+}
+
+/// Compile a HIR module to the requested output mode, returning the bytes.
+///
+/// Native modes target the host triple; cross-compilation is documented in
+/// `docs/architecture/llvm-toolchain.md` (set the target triple/CPU features).
+pub fn compile(module: &HirModule, mode: OutputMode) -> Result<Vec<u8>, String> {
+    use inkwell::OptimizationLevel;
+    use inkwell::targets::{
+        CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine,
+    };
+
+    let context = Context::create();
+    let llvm_module = build_llvm_module(&context, module);
+
+    if mode == OutputMode::LlvmIr {
+        return Ok(llvm_module.print_to_string().to_bytes().to_vec());
+    }
+
+    Target::initialize_native(&InitializationConfig::default())
+        .map_err(|err| format!("failed to initialize native target: {err}"))?;
+    let triple = TargetMachine::get_default_triple();
+    let target =
+        Target::from_triple(&triple).map_err(|err| format!("unknown target triple: {err}"))?;
+
+    // Shared libraries require position-independent code.
+    let reloc = match mode {
+        OutputMode::SharedLibrary => RelocMode::PIC,
+        _ => RelocMode::Default,
+    };
+
+    let machine = target
+        .create_target_machine(
+            &triple,
+            TargetMachine::get_host_cpu_name().to_str().unwrap_or(""),
+            TargetMachine::get_host_cpu_features()
+                .to_str()
+                .unwrap_or(""),
+            OptimizationLevel::Default,
+            reloc,
+            CodeModel::Default,
+        )
+        .ok_or_else(|| "failed to create target machine".to_owned())?;
+
+    let file_type = match mode {
+        OutputMode::Assembly => FileType::Assembly,
+        _ => FileType::Object,
+    };
+
+    let buffer = machine
+        .write_to_memory_buffer(&llvm_module, file_type)
+        .map_err(|err| format!("failed to emit code: {err}"))?;
+    Ok(buffer.as_slice().to_vec())
+}
+
+fn build_llvm_module<'ctx>(context: &'ctx Context, module: &HirModule) -> Module<'ctx> {
     let llvm_module = context.create_module("plc");
     let builder = context.create_builder();
 
     for program in &module.programs {
         if program.kind == HirPouKind::FunctionBlock {
-            emit_function_block(&context, &llvm_module, &builder, program);
+            emit_function_block(context, &llvm_module, &builder, program);
         } else {
-            emit_program(&context, &llvm_module, &builder, program);
+            emit_program(context, &llvm_module, &builder, program);
         }
     }
 
-    llvm_module.print_to_string().to_string()
+    llvm_module
 }
 
 /// Lower a FUNCTION_BLOCK so its state persists across calls: the instance

@@ -1,0 +1,3 @@
+/Users/bartlomiejzimny/Projects/plc-vscode/tests/st/large-over-100kb/oscat/oscat.st
+/Users/bartlomiejzimny/Projects/plc-vscode/tests/st/large-over-100kb/rusty/xtask/res/combined.st
+/Users/bartlomiejzimny/Projects/plc-vscode/tests/st/large-over-100kb/trust-platform/crates/trust-runtime/tests/fixtures/plcopen_motion/single_axis_core/src/tests.st

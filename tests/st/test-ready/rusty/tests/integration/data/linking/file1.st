@@ -1,0 +1,7 @@
+{external}
+FUNCTION func2 : DINT
+END_FUNCTION
+
+FUNCTION func1 : DINT
+    func2();
+END_FUNCTION

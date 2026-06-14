@@ -121,15 +121,18 @@ pub fn lex_source(source: &str) -> LexedSource {
                 }
                 tokens.push(Token::new(TokenKind::Comment, start, cursor, source));
             }
-            '\'' => {
-                let (end, closed) = scan_string_literal(source, cursor);
+            // Single-quoted STRING and double-quoted WSTRING literals share the
+            // same scanning rules (IEC `$` escapes); the closing quote matches
+            // the opener.
+            '\'' | '"' => {
+                let (end, closed) = scan_string_literal(source, cursor, ch);
                 cursor = end;
                 tokens.push(Token::new(TokenKind::StringLiteral, start, cursor, source));
                 if !closed {
                     diagnostics.push(SyntaxDiagnostic {
                         code: "SYN0001",
                         range: TextRange::new(start, cursor),
-                        message: "Unclosed string literal: expected closing '".to_owned(),
+                        message: format!("Unclosed string literal: expected closing {ch}"),
                     });
                 }
             }
@@ -237,15 +240,27 @@ fn scan_block_comment(source: &str, start: usize) -> (usize, bool) {
     (cursor, false)
 }
 
-fn scan_string_literal(source: &str, start: usize) -> (usize, bool) {
-    let mut cursor = start + 1;
+/// Scan a string literal delimited by `quote` (`'` for STRING, `"` for
+/// WSTRING). Handles IEC `$` escapes (`$'`, `$"`, `$$`, `$N`, `$0048`, …) so an
+/// escaped quote does not end the literal, plus the legacy doubled-quote form.
+/// Returns the end offset and whether the literal was closed.
+fn scan_string_literal(source: &str, start: usize, quote: char) -> (usize, bool) {
+    let mut cursor = start + quote.len_utf8();
 
     while cursor < source.len() {
         let ch = source[cursor..].chars().next().unwrap();
         cursor += ch.len_utf8();
-        if ch == '\'' {
-            if source[cursor..].starts_with('\'') {
-                cursor += 1;
+        if ch == '$' {
+            // The next character is escaped (control char, quote, or the first
+            // digit of a `$<hex>` code); consume it so it cannot terminate.
+            if let Some(next) = source[cursor..].chars().next() {
+                cursor += next.len_utf8();
+            }
+            continue;
+        }
+        if ch == quote {
+            if source[cursor..].starts_with(quote) {
+                cursor += quote.len_utf8();
             } else {
                 return (cursor, true);
             }

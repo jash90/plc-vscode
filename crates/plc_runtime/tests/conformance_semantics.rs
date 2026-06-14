@@ -32,7 +32,7 @@ const FIXTURES: &[SemanticFixture] = &[
 
 #[test]
 fn semantics_conformance_fixtures() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     for fixture in FIXTURES {
         let document = SourceDocument::new(fixture.name, 1, fixture.source);
         let codes: Vec<&str> = core

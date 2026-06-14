@@ -28,7 +28,7 @@ fn run_file(path: PathBuf) -> Result<(), String> {
     let text = fs::read_to_string(&path)
         .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
     let document = SourceDocument::new(format!("file://{}", path.display()), 0, text);
-    let result = CompilerCore::default().execute(&document);
+    let result = CompilerCore.execute(&document);
 
     if !result.diagnostics().is_empty() {
         for diagnostic in result.diagnostics() {

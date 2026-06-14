@@ -68,6 +68,37 @@ fn parser_recovers_and_finds_following_pous() {
 }
 
 #[test]
+fn parser_recovers_configuration_blocks_without_spurious_terminator() {
+    // PLC-73: an OpenPLC CONFIGURATION/RESOURCE/TASK wrapper after a complete
+    // PROGRAM must not be parsed as a POU (the inner `PROGRAM instance … WITH`
+    // mapping previously triggered a spurious PLC0002 missing END_PROGRAM).
+    let parsed = parse_source(concat!(
+        "PROGRAM Main\n",
+        "VAR\n    x : BOOL;\nEND_VAR\n",
+        "x := TRUE;\n",
+        "END_PROGRAM\n",
+        "\n",
+        "CONFIGURATION Config0\n",
+        "  RESOURCE Res0 ON PLC\n",
+        "    TASK task0(INTERVAL := T#20ms,PRIORITY := 0);\n",
+        "    PROGRAM instance0 WITH task0 : Main;\n",
+        "  END_RESOURCE\n",
+        "END_CONFIGURATION\n",
+    ));
+
+    assert!(
+        !parsed
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.code == "PLC0002"),
+        "unexpected missing-terminator diagnostics: {:?}",
+        parsed.diagnostics()
+    );
+    assert_eq!(parsed.units().len(), 1);
+    assert_eq!(parsed.units()[0].name.as_deref(), Some("Main"));
+}
+
+#[test]
 fn parser_ignores_brace_pragmas() {
     // PLC-77: a leading `{attribute …}` pragma must not break POU parsing.
     let parsed = parse_source("{attribute 'hide'}\nFUNCTION_BLOCK Motor\nEND_FUNCTION_BLOCK\n");

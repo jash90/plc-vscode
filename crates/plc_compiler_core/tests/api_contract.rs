@@ -1,6 +1,29 @@
 use plc_compiler_core::{CompilerCore, DiagnosticSeverity, SourceDocument};
 
 #[test]
+fn compiler_core_returns_hierarchical_document_symbols() {
+    let core = CompilerCore::default();
+    let document = SourceDocument::new(
+        "file:///main.st",
+        3,
+        "PROGRAM Main\nVAR\n    Enabled : BOOL;\nEND_VAR\nEND_PROGRAM\n",
+    );
+
+    let symbols = core.document_symbols(&document);
+
+    assert_eq!(symbols.uri(), "file:///main.st");
+    assert_eq!(symbols.version(), 3);
+    assert_eq!(symbols.symbols().len(), 1);
+    assert_eq!(symbols.symbols()[0].name, "Main");
+    assert_eq!(symbols.symbols()[0].children.len(), 1);
+    assert_eq!(symbols.symbols()[0].children[0].name, "Enabled");
+    assert_eq!(
+        symbols.symbols()[0].children[0].detail.as_deref(),
+        Some("BOOL")
+    );
+}
+
+#[test]
 fn compiler_core_uses_syntax_ranges_for_diagnostics() {
     let core = CompilerCore::default();
     let document = SourceDocument::new(

@@ -1,22 +1,25 @@
 //! LSP server implementation for PLC VS Code.
 
 use plc_compiler_core::{
-    CompilerCore, CompletionCandidate as CoreCompletionCandidate,
+    CodeAction as CoreCodeAction, CompilerCore, CompletionCandidate as CoreCompletionCandidate,
     DiagnosticSeverity as CoreSeverity, DocumentSymbol as CoreDocumentSymbol,
     HoverInfo as CoreHoverInfo, Location as CoreLocation, Position as CorePosition,
-    Range as CoreRange, SourceDocument, SymbolKind as CoreSymbolKind,
+    Range as CoreRange, SourceDocument, SymbolKind as CoreSymbolKind, TextEdit as CoreTextEdit,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
-    Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, GotoDefinitionParams,
-    GotoDefinitionResponse, Hover, HoverContents, HoverParams, InitializeParams, InitializeResult,
-    Location, MarkupContent, MarkupKind, MessageType, OneOf, Position, Range, ReferenceParams,
-    ServerCapabilities, SymbolKind, TextDocumentSyncCapability, TextDocumentSyncKind, Url,
+    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams,
+    CodeActionProviderCapability, CodeActionResponse, CompletionItem, CompletionItemKind,
+    CompletionOptions, CompletionParams, CompletionResponse, Diagnostic, DiagnosticSeverity,
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFormattingParams,
+    DocumentRangeFormattingParams, DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
+    InitializeParams, InitializeResult, Location, MarkupContent, MarkupKind, MessageType, OneOf,
+    Position, Range, ReferenceParams, ServerCapabilities, SymbolKind, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextEdit, Url, WorkspaceEdit,
 };
 use tower_lsp::{Client, LanguageServer};
 
@@ -207,6 +210,65 @@ fn lsp_location(location: CoreLocation) -> Option<Location> {
     })
 }
 
+/// Produce whole-document formatting edits through compiler-core.
+pub fn formatting_edits_for_text(uri: &str, version: i32, text: &str) -> Vec<TextEdit> {
+    let core = CompilerCore;
+    let document = SourceDocument::new(uri, version, text);
+    core.formatting(&document)
+        .into_iter()
+        .map(lsp_text_edit)
+        .collect()
+}
+
+/// Produce range formatting edits through compiler-core.
+pub fn range_formatting_edits_for_text(
+    uri: &str,
+    version: i32,
+    text: &str,
+    range: Range,
+) -> Vec<TextEdit> {
+    let core = CompilerCore;
+    let document = SourceDocument::new(uri, version, text);
+    core.formatting_range(
+        &document,
+        CoreRange {
+            start: CorePosition {
+                line: range.start.line,
+                character: range.start.character,
+            },
+            end: CorePosition {
+                line: range.end.line,
+                character: range.end.character,
+            },
+        },
+    )
+    .into_iter()
+    .map(lsp_text_edit)
+    .collect()
+}
+
+fn lsp_text_edit(edit: CoreTextEdit) -> TextEdit {
+    TextEdit {
+        range: lsp_range(edit.range),
+        new_text: edit.new_text,
+    }
+}
+
+fn lsp_code_action(uri: &Url, action: CoreCodeAction) -> CodeActionOrCommand {
+    let edits: Vec<TextEdit> = action.edits.into_iter().map(lsp_text_edit).collect();
+    let mut changes = HashMap::new();
+    changes.insert(uri.clone(), edits);
+    CodeActionOrCommand::CodeAction(CodeAction {
+        title: action.title,
+        kind: Some(CodeActionKind::QUICKFIX),
+        edit: Some(WorkspaceEdit {
+            changes: Some(changes),
+            ..WorkspaceEdit::default()
+        }),
+        ..CodeAction::default()
+    })
+}
+
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 struct DocumentSnapshot {
@@ -365,6 +427,39 @@ impl LanguageServer for PlcLanguageServer {
             )
         }))
     }
+
+    async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {
+        let uri = params.text_document.uri;
+        let documents = self.documents.read().await;
+        Ok(documents.get(&uri).map(|snapshot| {
+            formatting_edits_for_text(uri.as_str(), snapshot.version, &snapshot.text)
+        }))
+    }
+
+    async fn range_formatting(
+        &self,
+        params: DocumentRangeFormattingParams,
+    ) -> Result<Option<Vec<TextEdit>>> {
+        let uri = params.text_document.uri;
+        let range = params.range;
+        let documents = self.documents.read().await;
+        Ok(documents.get(&uri).map(|snapshot| {
+            range_formatting_edits_for_text(uri.as_str(), snapshot.version, &snapshot.text, range)
+        }))
+    }
+
+    async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
+        let uri = params.text_document.uri;
+        let documents = self.documents.read().await;
+        Ok(documents.get(&uri).map(|snapshot| {
+            let core = CompilerCore;
+            let document = SourceDocument::new(uri.as_str(), snapshot.version, &snapshot.text);
+            core.code_actions(&document)
+                .into_iter()
+                .map(|action| lsp_code_action(&uri, action))
+                .collect::<CodeActionResponse>()
+        }))
+    }
 }
 
 /// Server capabilities helper used by tests and by `initialize`.
@@ -376,6 +471,9 @@ pub fn server_capabilities() -> ServerCapabilities {
         hover_provider: Some(tower_lsp::lsp_types::HoverProviderCapability::Simple(true)),
         definition_provider: Some(OneOf::Left(true)),
         references_provider: Some(OneOf::Left(true)),
+        document_formatting_provider: Some(OneOf::Left(true)),
+        document_range_formatting_provider: Some(OneOf::Left(true)),
+        code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
         ..ServerCapabilities::default()
     }
 }

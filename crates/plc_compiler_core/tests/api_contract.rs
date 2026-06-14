@@ -306,6 +306,30 @@ fn compiler_core_surfaces_semantic_diagnostics() {
 }
 
 #[test]
+fn compiler_core_does_not_flag_named_call_arguments_as_unresolved() {
+    // PLC-79: named call arguments (`RIGHT(IN := s, L := 3)`) must not be
+    // treated as assignment statements, so their parameter names do not produce
+    // spurious SEM0001 unresolved-symbol diagnostics.
+    let core = CompilerCore;
+    let document = SourceDocument::new(
+        "file:///main.st",
+        1,
+        "PROGRAM Main\nVAR\n    s : STRING;\n    r : STRING;\nEND_VAR\nr := RIGHT(IN := s, L := 3);\nEND_PROGRAM\n",
+    );
+
+    let analysis = core.analyze(&document);
+
+    assert!(
+        !analysis
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.code == "SEM0001"),
+        "unexpected unresolved-symbol diagnostics: {:?}",
+        analysis.diagnostics()
+    );
+}
+
+#[test]
 fn compiler_core_analyzes_text_and_returns_versioned_diagnostics() {
     let core = CompilerCore;
     let document = SourceDocument::new("file:///main.st", 7, "PROGRAM Main\nVAR\nEND_VAR\n");

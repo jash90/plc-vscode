@@ -12,10 +12,12 @@ use plc_syntax::{StatementKind, parse_source};
 mod bytecode;
 mod clock;
 pub mod stdlib;
+pub mod timers;
 mod value;
 
 pub use bytecode::{BytecodeModule, Instruction};
 pub use clock::VirtualClock;
+pub use timers::{Tof, Ton, Tp};
 pub use value::Value;
 
 /// The phase of a single scan cycle.

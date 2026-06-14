@@ -1,0 +1,12 @@
+[package]
+name = "plc_semantics"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Semantic analysis, symbol indexing, and type diagnostics for PLC VS Code."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+plc_syntax = { path = "../plc_syntax" }

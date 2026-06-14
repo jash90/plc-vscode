@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/plc_workspace",
     "crates/plc_syntax",
+    "crates/plc_semantics",
     "crates/plc_lsp_server",
     "crates/plc_compiler_core",
     "crates/plc_cli",

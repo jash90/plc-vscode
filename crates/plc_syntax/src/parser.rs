@@ -130,6 +130,32 @@ pub fn parse_source(source: &str) -> SyntaxParse {
     let mut cursor = 0usize;
 
     while cursor < significant.len() {
+        // IEC `CONFIGURATION … END_CONFIGURATION` wrappers (and the `PROGRAM
+        // <instance> WITH …` mappings inside them) are not POUs. These words are
+        // not lexer keywords, so match on text and skip the whole block to avoid
+        // a spurious missing-terminator on the inner `PROGRAM` instance.
+        if significant[cursor]
+            .1
+            .text
+            .eq_ignore_ascii_case("CONFIGURATION")
+        {
+            let mut search = cursor + 1;
+            while search < significant.len()
+                && !significant[search]
+                    .1
+                    .text
+                    .eq_ignore_ascii_case("END_CONFIGURATION")
+            {
+                search += 1;
+            }
+            cursor = if search < significant.len() {
+                search + 1
+            } else {
+                significant.len()
+            };
+            continue;
+        }
+
         let Some(kind) = pou_start_kind(significant[cursor].1) else {
             cursor += 1;
             continue;

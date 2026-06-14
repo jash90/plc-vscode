@@ -4,7 +4,8 @@ use plc_compiler_core::{
     CodeAction as CoreCodeAction, CompilerCore, CompletionCandidate as CoreCompletionCandidate,
     DiagnosticSeverity as CoreSeverity, DocumentSymbol as CoreDocumentSymbol,
     HoverInfo as CoreHoverInfo, Location as CoreLocation, Position as CorePosition,
-    Range as CoreRange, SourceDocument, SymbolKind as CoreSymbolKind, TextEdit as CoreTextEdit,
+    Range as CoreRange, SignatureInfo as CoreSignatureInfo, SourceDocument,
+    SymbolKind as CoreSymbolKind, TextEdit as CoreTextEdit,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -18,8 +19,9 @@ use tower_lsp::lsp_types::{
     DocumentRangeFormattingParams, DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse,
     GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
     InitializeParams, InitializeResult, Location, MarkupContent, MarkupKind, MessageType, OneOf,
-    Position, Range, ReferenceParams, ServerCapabilities, SymbolKind, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextEdit, Url, WorkspaceEdit,
+    ParameterInformation, ParameterLabel, Position, Range, ReferenceParams, ServerCapabilities,
+    SignatureHelp, SignatureHelpOptions, SignatureHelpParams, SignatureInformation, SymbolKind,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url, WorkspaceEdit,
 };
 use tower_lsp::{Client, LanguageServer};
 
@@ -127,6 +129,48 @@ pub fn hover_for_text(uri: &str, version: i32, text: &str, position: Position) -
         },
     )
     .map(lsp_hover)
+}
+
+/// Convert compiler-core call signature data into LSP signature help.
+pub fn signature_help_for_text(
+    uri: &str,
+    version: i32,
+    text: &str,
+    position: Position,
+) -> Option<SignatureHelp> {
+    let core = CompilerCore;
+    let document = SourceDocument::new(uri, version, text);
+    core.signature_help(
+        &document,
+        CorePosition {
+            line: position.line,
+            character: position.character,
+        },
+    )
+    .map(lsp_signature_help)
+}
+
+fn lsp_signature_help(signature: CoreSignatureInfo) -> SignatureHelp {
+    let active_parameter = signature.active_parameter;
+    let parameters = signature
+        .parameters
+        .into_iter()
+        .map(|parameter| ParameterInformation {
+            label: ParameterLabel::Simple(parameter.label),
+            documentation: None,
+        })
+        .collect();
+
+    SignatureHelp {
+        signatures: vec![SignatureInformation {
+            label: signature.label,
+            documentation: None,
+            parameters: Some(parameters),
+            active_parameter,
+        }],
+        active_signature: Some(0),
+        active_parameter,
+    }
 }
 
 fn lsp_completion_item(candidate: &CoreCompletionCandidate) -> CompletionItem {
@@ -399,6 +443,15 @@ impl LanguageServer for PlcLanguageServer {
         }))
     }
 
+    async fn signature_help(&self, params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+        let documents = self.documents.read().await;
+        Ok(documents.get(&uri).and_then(|snapshot| {
+            signature_help_for_text(uri.as_str(), snapshot.version, &snapshot.text, position)
+        }))
+    }
+
     async fn goto_definition(
         &self,
         params: GotoDefinitionParams,
@@ -468,6 +521,7 @@ pub fn server_capabilities() -> ServerCapabilities {
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         document_symbol_provider: Some(OneOf::Left(true)),
         completion_provider: Some(CompletionOptions::default()),
+        signature_help_provider: Some(SignatureHelpOptions::default()),
         hover_provider: Some(tower_lsp::lsp_types::HoverProviderCapability::Simple(true)),
         definition_provider: Some(OneOf::Left(true)),
         references_provider: Some(OneOf::Left(true)),

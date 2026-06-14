@@ -177,6 +177,20 @@ pub fn lex_source(source: &str) -> LexedSource {
                 }
                 tokens.push(Token::new(TokenKind::NumberLiteral, start, cursor, source));
             }
+            '{' => {
+                // Vendor pragma / brace-delimited metadata (`{attribute 'hide'}`,
+                // `{region}`). Consume through the matching `}` and treat it as
+                // trivia so it does not cascade into the parser.
+                cursor += '{'.len_utf8();
+                while cursor < bytes.len() {
+                    let next = source[cursor..].chars().next().unwrap();
+                    cursor += next.len_utf8();
+                    if next == '}' {
+                        break;
+                    }
+                }
+                tokens.push(Token::new(TokenKind::Comment, start, cursor, source));
+            }
             '%' => {
                 // IEC located variable / direct address (`%IX0.0`, `%MW10`,
                 // `%QB4`). Lex the whole address as one operand token; semantic

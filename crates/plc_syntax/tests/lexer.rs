@@ -135,6 +135,30 @@ fn lexer_handles_dollar_escapes_in_strings() {
 }
 
 #[test]
+fn lexer_consumes_brace_pragmas_as_trivia() {
+    // PLC-77: vendor pragmas / brace metadata are consumed as trivia and must
+    // not cascade as SYN0000.
+    let lexed = lex_source("{attribute 'hide'}\nFUNCTION_BLOCK FB\nEND_FUNCTION_BLOCK\n");
+    assert!(
+        lexed.diagnostics().is_empty(),
+        "unexpected diagnostics: {:?}",
+        lexed.diagnostics()
+    );
+    assert!(
+        lexed
+            .tokens()
+            .iter()
+            .any(|token| token.kind == TokenKind::Comment && token.text == "{attribute 'hide'}")
+    );
+    assert!(
+        !lexed
+            .tokens()
+            .iter()
+            .any(|token| token.kind == TokenKind::Invalid)
+    );
+}
+
+#[test]
 fn lexer_accepts_caret_dereference() {
     // PLC-74: `^` (pointer dereference) lexes as an operator, not SYN0000.
     let lexed = lex_source("ptr^.field := THIS^;");

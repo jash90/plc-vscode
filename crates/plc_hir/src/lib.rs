@@ -11,7 +11,7 @@
 //! Keeping a single typed HIR avoids duplicating program structure in each
 //! backend and gives both a common place to validate lowering.
 
-use plc_syntax::{StatementKind, parse_source};
+use plc_syntax::{PouKind, StatementKind, parse_source};
 
 /// HIR scalar type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,10 +73,31 @@ pub struct HirAssign {
     pub value: HirExpr,
 }
 
+/// The kind of program organization unit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HirPouKind {
+    Program,
+    Function,
+    FunctionBlock,
+    Action,
+}
+
+impl HirPouKind {
+    fn from_syntax(kind: PouKind) -> Self {
+        match kind {
+            PouKind::Program => HirPouKind::Program,
+            PouKind::Function => HirPouKind::Function,
+            PouKind::FunctionBlock => HirPouKind::FunctionBlock,
+            PouKind::Action => HirPouKind::Action,
+        }
+    }
+}
+
 /// A lowered program (POU).
 #[derive(Debug, Clone, PartialEq)]
 pub struct HirProgram {
     pub name: String,
+    pub kind: HirPouKind,
     pub vars: Vec<HirVar>,
     pub body: Vec<HirAssign>,
 }
@@ -119,7 +140,12 @@ pub fn lower_source(text: &str) -> HirModule {
             }
         }
 
-        programs.push(HirProgram { name, vars, body });
+        programs.push(HirProgram {
+            name,
+            kind: HirPouKind::from_syntax(unit.kind),
+            vars,
+            body,
+        });
     }
 
     HirModule { programs }

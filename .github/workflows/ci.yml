@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Lightweight workspace checks across platforms. The LLVM backend crate is
+  # excluded from the workspace, so these jobs need no LLVM toolchain.
+  workspace:
+    name: workspace (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --workspace
+
+  # Isolated LLVM job: builds and tests the native backend crate against a
+  # pinned LLVM 18 toolchain. Kept separate so a toolchain problem never blocks
+  # the lightweight workspace jobs.
+  llvm-backend:
+    name: llvm-backend (LLVM 18)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install LLVM 18
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 18
+          echo "LLVM_SYS_180_PREFIX=$(llvm-config-18 --prefix)" >> "$GITHUB_ENV"
+      - name: Test native backend
+        run: cargo test --manifest-path crates/plc_llvm_backend/Cargo.toml
+
+  # VS Code extension client checks.
+  vscode:
+    name: vscode-client
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm ci || npm install
+      - name: Type-check
+        run: npx tsc --noEmit
+      - name: Test
+        run: npm test

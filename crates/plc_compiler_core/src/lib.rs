@@ -184,6 +184,13 @@ pub struct HoverInfo {
     pub range: Range,
 }
 
+/// Source location (document URI + range) used for navigation features.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Location {
+    pub uri: String,
+    pub range: Range,
+}
+
 /// Shared compiler facade.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CompilerCore;
@@ -227,6 +234,19 @@ impl CompilerCore {
 
     pub fn hover(&self, document: &SourceDocument, position: Position) -> Option<HoverInfo> {
         hover_at_position(document, position)
+    }
+
+    pub fn definition(&self, document: &SourceDocument, position: Position) -> Option<Location> {
+        definition_at_position(document, position)
+    }
+
+    pub fn references(
+        &self,
+        document: &SourceDocument,
+        position: Position,
+        include_declaration: bool,
+    ) -> Vec<Location> {
+        references_at_position(document, position, include_declaration)
     }
 }
 
@@ -413,6 +433,71 @@ fn position_to_byte_offset(text: &str, position: Position) -> Option<usize> {
     } else {
         None
     }
+}
+
+fn identifier_at_position(text: &str, position: Position) -> Option<(String, TextRange)> {
+    let offset = position_to_byte_offset(text, position)?;
+    let parse = parse_source(text);
+    let token = parse
+        .tokens()
+        .iter()
+        .find(|token| token.range.start <= offset && offset <= token.range.end)?;
+    if token.kind != TokenKind::Identifier {
+        return None;
+    }
+    Some((token.text.clone(), token.range))
+}
+
+fn definition_at_position(document: &SourceDocument, position: Position) -> Option<Location> {
+    let (name, _) = identifier_at_position(document.text(), position)?;
+    let semantic = analyze_file(document.uri(), document.text());
+    let symbol = semantic
+        .symbol_index
+        .symbols()
+        .iter()
+        .find(|symbol| symbol.name.eq_ignore_ascii_case(&name))?;
+    Some(Location {
+        uri: document.uri().to_owned(),
+        range: text_range_to_range(document.text(), symbol.range),
+    })
+}
+
+fn references_at_position(
+    document: &SourceDocument,
+    position: Position,
+    include_declaration: bool,
+) -> Vec<Location> {
+    let Some((name, _)) = identifier_at_position(document.text(), position) else {
+        return Vec::new();
+    };
+
+    let parse = parse_source(document.text());
+    let mut locations: Vec<Location> = parse
+        .tokens()
+        .iter()
+        .filter(|token| {
+            token.kind == TokenKind::Identifier && token.text.eq_ignore_ascii_case(&name)
+        })
+        .map(|token| Location {
+            uri: document.uri().to_owned(),
+            range: text_range_to_range(document.text(), token.range),
+        })
+        .collect();
+
+    if !include_declaration {
+        let semantic = analyze_file(document.uri(), document.text());
+        if let Some(symbol) = semantic
+            .symbol_index
+            .symbols()
+            .iter()
+            .find(|symbol| symbol.name.eq_ignore_ascii_case(&name))
+        {
+            let declaration = text_range_to_range(document.text(), symbol.range);
+            locations.retain(|location| location.range != declaration);
+        }
+    }
+
+    locations
 }
 
 fn analyze_text(text: &str) -> Vec<Diagnostic> {

@@ -1,6 +1,68 @@
 use plc_compiler_core::{CompilerCore, DiagnosticSeverity, Position, SourceDocument, SymbolKind};
 
 #[test]
+fn compiler_core_resolves_definition_to_declaration() {
+    let core = CompilerCore::default();
+    let document = SourceDocument::new(
+        "file:///main.st",
+        1,
+        "PROGRAM Main\nVAR\n    Enabled : BOOL;\nEND_VAR\nEnabled := TRUE;\nEND_PROGRAM\n",
+    );
+
+    // Position on the `Enabled` usage in the assignment (line 4).
+    let definition = core
+        .definition(
+            &document,
+            Position {
+                line: 4,
+                character: 2,
+            },
+        )
+        .expect("definition for Enabled");
+
+    assert_eq!(definition.uri, "file:///main.st");
+    // Declaration is on line 2.
+    assert_eq!(definition.range.start.line, 2);
+}
+
+#[test]
+fn compiler_core_finds_references_including_declaration() {
+    let core = CompilerCore::default();
+    let document = SourceDocument::new(
+        "file:///main.st",
+        1,
+        "PROGRAM Main\nVAR\n    Enabled : BOOL;\nEND_VAR\nEnabled := TRUE;\nEND_PROGRAM\n",
+    );
+
+    let references = core.references(
+        &document,
+        Position {
+            line: 4,
+            character: 2,
+        },
+        true,
+    );
+
+    // Declaration occurrence + assignment usage.
+    assert!(references.len() >= 2);
+    assert!(
+        references
+            .iter()
+            .all(|location| location.uri == "file:///main.st")
+    );
+    assert!(
+        references
+            .iter()
+            .any(|location| location.range.start.line == 2)
+    );
+    assert!(
+        references
+            .iter()
+            .any(|location| location.range.start.line == 4)
+    );
+}
+
+#[test]
 fn compiler_core_returns_completion_candidates_for_symbols_and_keywords() {
     let core = CompilerCore::default();
     let document = SourceDocument::new(

@@ -3,8 +3,8 @@
 use plc_compiler_core::{
     CompilerCore, CompletionCandidate as CoreCompletionCandidate,
     DiagnosticSeverity as CoreSeverity, DocumentSymbol as CoreDocumentSymbol,
-    HoverInfo as CoreHoverInfo, Position as CorePosition, Range as CoreRange, SourceDocument,
-    SymbolKind as CoreSymbolKind,
+    HoverInfo as CoreHoverInfo, Location as CoreLocation, Position as CorePosition,
+    Range as CoreRange, SourceDocument, SymbolKind as CoreSymbolKind,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -13,9 +13,10 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::{
     CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse,
     Diagnostic, DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, Hover, HoverContents, HoverParams,
-    InitializeParams, InitializeResult, MarkupContent, MarkupKind, MessageType, OneOf, Position,
-    Range, ServerCapabilities, SymbolKind, TextDocumentSyncCapability, TextDocumentSyncKind, Url,
+    DocumentSymbol, DocumentSymbolParams, DocumentSymbolResponse, GotoDefinitionParams,
+    GotoDefinitionResponse, Hover, HoverContents, HoverParams, InitializeParams, InitializeResult,
+    Location, MarkupContent, MarkupKind, MessageType, OneOf, Position, Range, ReferenceParams,
+    ServerCapabilities, SymbolKind, TextDocumentSyncCapability, TextDocumentSyncKind, Url,
 };
 use tower_lsp::{Client, LanguageServer};
 
@@ -156,6 +157,56 @@ fn lsp_hover(hover: CoreHoverInfo) -> Hover {
     }
 }
 
+/// Resolve a go-to-definition location through compiler-core.
+pub fn definition_for_text(
+    uri: &str,
+    version: i32,
+    text: &str,
+    position: Position,
+) -> Option<Location> {
+    let core = CompilerCore;
+    let document = SourceDocument::new(uri, version, text);
+    core.definition(
+        &document,
+        CorePosition {
+            line: position.line,
+            character: position.character,
+        },
+    )
+    .and_then(lsp_location)
+}
+
+/// Resolve find-references locations through compiler-core.
+pub fn references_for_text(
+    uri: &str,
+    version: i32,
+    text: &str,
+    position: Position,
+    include_declaration: bool,
+) -> Vec<Location> {
+    let core = CompilerCore;
+    let document = SourceDocument::new(uri, version, text);
+    core.references(
+        &document,
+        CorePosition {
+            line: position.line,
+            character: position.character,
+        },
+        include_declaration,
+    )
+    .into_iter()
+    .filter_map(lsp_location)
+    .collect()
+}
+
+fn lsp_location(location: CoreLocation) -> Option<Location> {
+    let uri = Url::parse(&location.uri).ok()?;
+    Some(Location {
+        uri,
+        range: lsp_range(location.range),
+    })
+}
+
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 struct DocumentSnapshot {
@@ -285,6 +336,35 @@ impl LanguageServer for PlcLanguageServer {
             hover_for_text(uri.as_str(), snapshot.version, &snapshot.text, position)
         }))
     }
+
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+        let documents = self.documents.read().await;
+        Ok(documents.get(&uri).and_then(|snapshot| {
+            definition_for_text(uri.as_str(), snapshot.version, &snapshot.text, position)
+                .map(GotoDefinitionResponse::Scalar)
+        }))
+    }
+
+    async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+        let include_declaration = params.context.include_declaration;
+        let documents = self.documents.read().await;
+        Ok(documents.get(&uri).map(|snapshot| {
+            references_for_text(
+                uri.as_str(),
+                snapshot.version,
+                &snapshot.text,
+                position,
+                include_declaration,
+            )
+        }))
+    }
 }
 
 /// Server capabilities helper used by tests and by `initialize`.
@@ -294,6 +374,8 @@ pub fn server_capabilities() -> ServerCapabilities {
         document_symbol_provider: Some(OneOf::Left(true)),
         completion_provider: Some(CompletionOptions::default()),
         hover_provider: Some(tower_lsp::lsp_types::HoverProviderCapability::Simple(true)),
+        definition_provider: Some(OneOf::Left(true)),
+        references_provider: Some(OneOf::Left(true)),
         ..ServerCapabilities::default()
     }
 }

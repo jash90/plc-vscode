@@ -509,6 +509,8 @@ name = "plc_runtime"
 version = "0.1.0"
 dependencies = [
  "plc_syntax",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -3,13 +3,19 @@
 //! The crate owns source-preserving lexical analysis that downstream crates
 //! consume instead of duplicating syntax checks in CLI, LSP, or compiler-core
 //! consumers. A rowan-backed concrete syntax tree preserves trivia and exact
-//! token text; the parser facade is added by a later task.
+//! token text, and an error-tolerant parser facade exposes POU boundaries and
+//! recovers to following units after malformed input.
 
 mod lexer;
+mod parser;
 
 pub mod cst;
 
 pub use lexer::{LexedSource, Token, TokenKind, lex_source};
+pub use parser::{
+    DeclarationBlock, Pou, PouKind, Statement, StatementKind, SyntaxParse, VarBlockKind,
+    VariableDeclaration, parse_source,
+};
 
 /// Byte-based half-open source range.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

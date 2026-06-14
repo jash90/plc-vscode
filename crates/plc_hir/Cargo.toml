@@ -1,0 +1,12 @@
+[package]
+name = "plc_hir"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Backend-agnostic HIR and lowering shared by the VM and native backends."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+plc_syntax = { path = "../plc_syntax" }

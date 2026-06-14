@@ -66,3 +66,21 @@ fn parser_recovers_and_finds_following_pous() {
     assert_eq!(parsed.units()[1].kind, PouKind::FunctionBlock);
     assert_eq!(parsed.units()[1].name.as_deref(), Some("Motor"));
 }
+
+#[test]
+fn parser_accepts_typed_literals_without_invalid_token_diagnostics() {
+    // PLC-62: duration literal in an assignment and BYTE# ranges in a CASE must
+    // not produce SYN0000 invalid-token diagnostics for `#`.
+    let parsed = parse_source(
+        "PROGRAM Main\nVAR\n    Delay : TIME;\nEND_VAR\nDelay := T#20ms;\nCASE Code OF\n    BYTE#9..BYTE#10: Delay := T#0ms;\nEND_CASE\nEND_PROGRAM\n",
+    );
+
+    assert!(
+        !parsed
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.code == "SYN0000"),
+        "unexpected invalid-token diagnostics: {:?}",
+        parsed.diagnostics()
+    );
+}

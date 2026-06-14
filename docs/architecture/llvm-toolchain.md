@@ -12,9 +12,12 @@ target for this repository is:
 
 | Component   | Version            | Notes                                            |
 | ----------- | ------------------ | ------------------------------------------------ |
-| LLVM        | 18.x               | Installed via `brew install llvm` (macOS).       |
-| `inkwell`   | feature `llvm18-1` | Must match the installed LLVM major version.     |
-| `llvm-sys`  | matches LLVM major | Pulled transitively by `inkwell`.                |
+| LLVM        | 18.x (18.1.8)      | Installed via `brew install llvm@18` (macOS).    |
+| `inkwell`   | 0.5, feature `llvm18-0` | Must match the installed LLVM major version. |
+| `llvm-sys`  | 180.x              | Pulled transitively by `inkwell`.                |
+
+> Note: the default `brew install llvm` may install a newer major (e.g. 22) that
+> `inkwell` does not yet support; pin `llvm@18` explicitly.
 
 `inkwell`'s feature flag and the installed LLVM **major** version must agree. A
 mismatch (e.g. `llvm18-1` against an installed LLVM 17) fails at build time in
@@ -26,11 +29,19 @@ mismatch (e.g. `llvm18-1` against an installed LLVM 17) fails at build time in
 linked into `PATH` by default, so the native-backend build expects:
 
 ```bash
-brew install llvm
-export LLVM_SYS_180_PREFIX="$(brew --prefix llvm)"
-# or ensure `$(brew --prefix llvm)/bin` is on PATH so llvm-config resolves
-llvm-config --version   # must print an 18.x version
+brew install llvm@18 zstd
+export LLVM_SYS_180_PREFIX="$(brew --prefix llvm@18)"
+# LLVM 18 links against zstd; expose it (and the LLVM keg) to the linker:
+export LIBRARY_PATH="$(brew --prefix zstd)/lib:$(brew --prefix llvm@18)/lib:$LIBRARY_PATH"
+"$LLVM_SYS_180_PREFIX/bin/llvm-config" --version   # must print an 18.x version
+
+# Build/test the isolated backend crate:
+cargo test --manifest-path crates/plc_llvm_backend/Cargo.toml
 ```
+
+The backend crate is excluded from the default workspace (`exclude` in the root
+`Cargo.toml`), so `cargo test --workspace` stays LLVM-free; only the explicit
+command above builds it.
 
 ## Known failure modes
 

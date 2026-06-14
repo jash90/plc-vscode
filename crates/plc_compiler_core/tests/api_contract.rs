@@ -113,7 +113,7 @@ fn compiler_core_returns_completion_candidates_for_symbols_and_keywords() {
         "PROGRAM Main\nVAR\n    Enabled : BOOL;\nEND_VAR\nEND_PROGRAM\n",
     );
 
-    let completions = core.completions(&document);
+    let completions = core.completions(&document, Position::default());
 
     assert!(
         completions
@@ -125,6 +125,94 @@ fn compiler_core_returns_completion_candidates_for_symbols_and_keywords() {
             .iter()
             .any(|item| item.label == "PROGRAM" && item.kind == SymbolKind::Keyword)
     );
+}
+
+const PROGRAM_WITH_FB_MEMBER: &str = concat!(
+    "FUNCTION_BLOCK Counter\n",
+    "VAR_INPUT\n",
+    "    CU : BOOL;\n",
+    "END_VAR\n",
+    "VAR_OUTPUT\n",
+    "    Q : BOOL;\n",
+    "END_VAR\n",
+    "END_FUNCTION_BLOCK\n",
+    "PROGRAM Main\n",
+    "VAR\n",
+    "    inst : Counter;\n",
+    "END_VAR\n",
+    "inst.\n",
+    "END_PROGRAM\n",
+);
+
+#[test]
+fn compiler_core_completion_includes_standard_functions_and_blocks() {
+    let core = CompilerCore;
+    let document = SourceDocument::new(
+        "file:///main.st",
+        1,
+        "PROGRAM Main\nVAR\nEND_VAR\nEND_PROGRAM\n",
+    );
+
+    let completions = core.completions(&document, Position::default());
+
+    assert!(completions.iter().any(|item| item.label == "MIN"
+        && item.kind == SymbolKind::Function
+        && item.detail.as_deref() == Some("standard function")));
+    assert!(completions.iter().any(|item| item.label == "TON"
+        && item.kind == SymbolKind::FunctionBlock
+        && item.detail.as_deref() == Some("standard function block")));
+}
+
+#[test]
+fn compiler_core_completion_suggests_user_fb_members_on_member_access() {
+    let core = CompilerCore;
+    let document = SourceDocument::new("file:///main.st", 1, PROGRAM_WITH_FB_MEMBER);
+
+    // Cursor right after `inst.` on line 12.
+    let completions = core.completions(
+        &document,
+        Position {
+            line: 12,
+            character: 5,
+        },
+    );
+
+    assert!(
+        completions
+            .iter()
+            .any(|item| item.label == "CU" && item.detail.as_deref() == Some("member of BOOL"))
+    );
+    assert!(completions.iter().any(|item| item.label == "Q"));
+    // Member-access context returns members only — no keywords or POUs.
+    assert!(
+        !completions
+            .iter()
+            .any(|item| item.kind == SymbolKind::Keyword)
+    );
+}
+
+#[test]
+fn compiler_core_completion_suggests_standard_fb_members_on_member_access() {
+    let core = CompilerCore;
+    let document = SourceDocument::new(
+        "file:///main.st",
+        1,
+        "PROGRAM Main\nVAR\n    t : TON;\nEND_VAR\nt.\nEND_PROGRAM\n",
+    );
+
+    // Cursor right after `t.` on line 4.
+    let completions = core.completions(
+        &document,
+        Position {
+            line: 4,
+            character: 2,
+        },
+    );
+
+    let labels: Vec<&str> = completions.iter().map(|item| item.label.as_str()).collect();
+    for member in ["IN", "PT", "Q", "ET"] {
+        assert!(labels.contains(&member), "expected TON member {member}");
+    }
 }
 
 #[test]

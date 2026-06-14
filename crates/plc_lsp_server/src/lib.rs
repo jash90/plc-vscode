@@ -108,13 +108,24 @@ fn lsp_range(range: CoreRange) -> Range {
 }
 
 /// Convert compiler-core completion candidates into LSP completion items.
-pub fn completion_items_for_text(uri: &str, version: i32, text: &str) -> Vec<CompletionItem> {
+pub fn completion_items_for_text(
+    uri: &str,
+    version: i32,
+    text: &str,
+    position: Position,
+) -> Vec<CompletionItem> {
     let core = CompilerCore;
     let document = SourceDocument::new(uri, version, text);
-    core.completions(&document)
-        .iter()
-        .map(lsp_completion_item)
-        .collect()
+    core.completions(
+        &document,
+        CorePosition {
+            line: position.line,
+            character: position.character,
+        },
+    )
+    .iter()
+    .map(lsp_completion_item)
+    .collect()
 }
 
 /// Convert compiler-core hover payloads into LSP hover responses.
@@ -424,12 +435,14 @@ impl LanguageServer for PlcLanguageServer {
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
         let documents = self.documents.read().await;
         Ok(documents.get(&uri).map(|snapshot| {
             CompletionResponse::Array(completion_items_for_text(
                 uri.as_str(),
                 snapshot.version,
                 &snapshot.text,
+                position,
             ))
         }))
     }

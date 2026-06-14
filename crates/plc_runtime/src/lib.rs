@@ -11,12 +11,16 @@ use plc_syntax::{StatementKind, parse_source};
 
 mod bytecode;
 mod clock;
+pub mod counters;
+pub mod edge;
 pub mod stdlib;
 pub mod timers;
 mod value;
 
 pub use bytecode::{BytecodeModule, Instruction};
 pub use clock::VirtualClock;
+pub use counters::{Ctd, Ctu, Ctud};
+pub use edge::{FTrig, RTrig};
 pub use timers::{Tof, Ton, Tp};
 pub use value::Value;
 

@@ -46,15 +46,34 @@ pub fn analyze_workspace(files: &[SourceFile]) -> SemanticAnalysis {
                     continue;
                 };
 
-                if symbol_index
+                let Some(symbol) = symbol_index
                     .find_in_container(container, target)
                     .or_else(|| symbol_index.find_top_level(target))
-                    .is_none()
-                {
+                else {
                     diagnostics.push(SemanticDiagnostic {
                         code: "SEM0001",
                         range: statement.range,
                         message: format!("Unresolved symbol `{target}`"),
+                    });
+                    continue;
+                };
+
+                let Some(expected) = symbol.type_kind.as_ref() else {
+                    continue;
+                };
+                let Some(expression) = statement.expression.as_deref() else {
+                    continue;
+                };
+                let actual = infer_expression_type(expression, &symbol_index, container);
+                if !expected.assignment_compatible(&actual) {
+                    diagnostics.push(SemanticDiagnostic {
+                        code: "SEM0002",
+                        range: statement.range,
+                        message: format!(
+                            "Cannot assign {} expression to {} `{target}`",
+                            actual.display_name(),
+                            expected.display_name()
+                        ),
                     });
                 }
             }
@@ -106,5 +125,32 @@ fn symbol_kind_for_pou(kind: PouKind) -> SymbolKind {
         PouKind::Function => SymbolKind::Function,
         PouKind::FunctionBlock => SymbolKind::FunctionBlock,
         PouKind::Action => SymbolKind::Action,
+    }
+}
+
+fn infer_expression_type(expression: &str, index: &SymbolIndex, container: &str) -> TypeKind {
+    let trimmed = expression.trim();
+    let upper = trimmed.to_ascii_uppercase();
+
+    if trimmed.starts_with('\'') || trimmed.starts_with('"') {
+        TypeKind::String
+    } else if matches!(upper.as_str(), "TRUE" | "FALSE") {
+        TypeKind::Bool
+    } else if upper.starts_with("T#") || upper.starts_with("TIME#") {
+        TypeKind::Time
+    } else if trimmed.parse::<i64>().is_ok() {
+        TypeKind::Integer
+    } else if trimmed.parse::<f64>().is_ok() {
+        TypeKind::Real
+    } else if let Some(symbol) = index
+        .find_in_container(container, trimmed)
+        .or_else(|| index.find_top_level(trimmed))
+    {
+        symbol
+            .type_kind
+            .clone()
+            .unwrap_or_else(|| TypeKind::Unknown(trimmed.to_owned()))
+    } else {
+        TypeKind::Unknown(trimmed.to_owned())
     }
 }

@@ -7,3 +7,7 @@ description = "Shared compiler-core API for PLC VS Code CLI, LSP, runtime and ba
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+plc_semantics = { path = "../plc_semantics" }
+plc_syntax = { path = "../plc_syntax" }

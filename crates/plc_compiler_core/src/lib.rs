@@ -1,9 +1,14 @@
 //! Shared compiler-core API for PLC VS Code.
 //!
 //! This crate defines the stable contract consumed by the CLI, LSP server,
-//! runtime, bytecode VM, and native backend. The first implementation exposes
-//! document analysis and diagnostics; later tasks will replace the placeholder
-//! checks with the real lexer, parser, semantic model, and backend pipeline.
+//! runtime, bytecode VM, and native backend. The implementation keeps syntax
+//! checks behind the `plc_syntax` crate and semantic checks behind the
+//! `plc_semantics` crate so all consumers share the same compiler boundary.
+
+mod execution;
+
+use execution::collect_execution_output;
+use plc_syntax::{TextRange, parse_source};
 
 /// Source document snapshot passed into compiler-core operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -149,122 +154,72 @@ impl CompilerCore {
 }
 
 fn analyze_text(text: &str) -> Vec<Diagnostic> {
-    let mut diagnostics = Vec::new();
-
-    if has_unclosed_block_comment(text) {
-        diagnostics.push(Diagnostic {
+    let parse = parse_source(text);
+    let syntax_diagnostics: Vec<Diagnostic> = parse
+        .diagnostics()
+        .iter()
+        .map(|diagnostic| Diagnostic {
             severity: DiagnosticSeverity::Error,
-            range: Range::at_start(),
-            code: "PLC0001",
-            message: "Unclosed block comment: expected closing *)".to_owned(),
-        });
-        return diagnostics;
+            range: text_range_to_range(text, diagnostic.range),
+            code: diagnostic.code,
+            message: diagnostic.message.clone(),
+        })
+        .collect();
+
+    // An unclosed block comment makes the remainder of the file lexical trivia,
+    // so suppress follow-on parser terminator diagnostics to keep the primary
+    // error stable for CLI and LSP consumers.
+    if syntax_diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.code == "PLC0001")
+    {
+        return syntax_diagnostics
+            .into_iter()
+            .filter(|diagnostic| diagnostic.code == "PLC0001")
+            .collect();
     }
 
-    let upper = text.to_ascii_uppercase();
-    if upper.contains("PROGRAM") && !upper.contains("END_PROGRAM") {
-        diagnostics.push(Diagnostic {
-            severity: DiagnosticSeverity::Error,
-            range: Range::at_start(),
-            code: "PLC0002",
-            message: "PROGRAM declaration is missing END_PROGRAM terminator".to_owned(),
-        });
+    if !syntax_diagnostics.is_empty() {
+        return syntax_diagnostics;
     }
 
+    let mut diagnostics = syntax_diagnostics;
+    diagnostics.extend(
+        plc_semantics::analyze_file("memory://document", text)
+            .diagnostics
+            .into_iter()
+            .map(|diagnostic| Diagnostic {
+                severity: DiagnosticSeverity::Error,
+                range: text_range_to_range(text, diagnostic.range),
+                code: diagnostic.code,
+                message: diagnostic.message,
+            }),
+    );
     diagnostics
 }
 
-fn has_unclosed_block_comment(text: &str) -> bool {
-    let mut remaining = text;
-    let mut depth = 0usize;
-
-    while let Some(open_or_close) = find_next_comment_marker(remaining) {
-        let (idx, marker) = open_or_close;
-        remaining = &remaining[idx + 2..];
-        match marker {
-            "(*" => depth += 1,
-            "*)" => depth = depth.saturating_sub(1),
-            _ => unreachable!("only known comment markers are returned"),
-        }
-    }
-
-    depth > 0
-}
-
-fn find_next_comment_marker(text: &str) -> Option<(usize, &'static str)> {
-    match (text.find("(*"), text.find("*)")) {
-        (Some(open), Some(close)) if open < close => Some((open, "(*")),
-        (Some(_), Some(close)) => Some((close, "*)")),
-        (Some(open), None) => Some((open, "(*")),
-        (None, Some(close)) => Some((close, "*)")),
-        (None, None) => None,
+fn text_range_to_range(text: &str, range: TextRange) -> Range {
+    Range {
+        start: byte_offset_to_position(text, range.start),
+        end: byte_offset_to_position(text, range.end.max(range.start + 1).min(text.len())),
     }
 }
 
-fn collect_execution_output(text: &str) -> Vec<String> {
-    collect_initialized_string_variables(text)
-}
+fn byte_offset_to_position(text: &str, offset: usize) -> Position {
+    let mut line = 0u32;
+    let mut character = 0u32;
 
-fn collect_initialized_string_variables(text: &str) -> Vec<String> {
-    let mut output = Vec::new();
-    let mut in_var_block = false;
-
-    for raw_line in text.lines() {
-        let line = raw_line.trim();
-        let upper = line.to_ascii_uppercase();
-
-        if upper == "VAR" || upper.starts_with("VAR_") {
-            in_var_block = true;
-            continue;
+    for (idx, ch) in text.char_indices() {
+        if idx >= offset {
+            break;
         }
-
-        if upper == "END_VAR" {
-            in_var_block = false;
-            continue;
-        }
-
-        if !in_var_block || line.is_empty() || line.starts_with("//") {
-            continue;
-        }
-
-        if let Some((name, value)) = parse_string_initialization(line) {
-            output.push(format!("{name} = {value}"));
+        if ch == '\n' {
+            line += 1;
+            character = 0;
+        } else {
+            character += 1;
         }
     }
 
-    output
-}
-
-fn parse_string_initialization(line: &str) -> Option<(String, String)> {
-    let (name, rest) = line.split_once(':')?;
-    let name = name.trim();
-    if name.is_empty() || !is_identifier(name) {
-        return None;
-    }
-
-    let (type_name, initializer) = rest.split_once(":=")?;
-    let type_name = type_name.trim().to_ascii_uppercase();
-    if type_name != "STRING" && !type_name.starts_with("STRING[") {
-        return None;
-    }
-
-    let initializer = initializer.trim().trim_end_matches(';').trim();
-    let quote = initializer.chars().next()?;
-    if quote != '\'' && quote != '"' {
-        return None;
-    }
-
-    let after_quote = &initializer[quote.len_utf8()..];
-    let end_quote = after_quote.find(quote)?;
-    Some((name.to_owned(), after_quote[..end_quote].to_owned()))
-}
-
-fn is_identifier(candidate: &str) -> bool {
-    let mut chars = candidate.chars();
-    let Some(first) = chars.next() else {
-        return false;
-    };
-
-    (first == '_' || first.is_ascii_alphabetic())
-        && chars.all(|character| character == '_' || character.is_ascii_alphanumeric())
+    Position { line, character }
 }

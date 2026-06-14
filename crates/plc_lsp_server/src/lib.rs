@@ -5,7 +5,7 @@ use plc_compiler_core::{
     DiagnosticSeverity as CoreSeverity, DocumentSymbol as CoreDocumentSymbol,
     HoverInfo as CoreHoverInfo, Location as CoreLocation, Position as CorePosition,
     Range as CoreRange, SignatureInfo as CoreSignatureInfo, SourceDocument,
-    SymbolKind as CoreSymbolKind, TextEdit as CoreTextEdit,
+    SymbolKind as CoreSymbolKind, TextEdit as CoreTextEdit, WorkspaceSymbol as CoreWorkspaceSymbol,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -20,8 +20,9 @@ use tower_lsp::lsp_types::{
     GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
     InitializeParams, InitializeResult, Location, MarkupContent, MarkupKind, MessageType, OneOf,
     ParameterInformation, ParameterLabel, Position, Range, ReferenceParams, ServerCapabilities,
-    SignatureHelp, SignatureHelpOptions, SignatureHelpParams, SignatureInformation, SymbolKind,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url, WorkspaceEdit,
+    SignatureHelp, SignatureHelpOptions, SignatureHelpParams, SignatureInformation,
+    SymbolInformation, SymbolKind, TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url,
+    WorkspaceEdit, WorkspaceSymbolParams,
 };
 use tower_lsp::{Client, LanguageServer};
 
@@ -62,6 +63,38 @@ pub fn document_symbols_for_text(uri: &str, version: i32, text: &str) -> Vec<Doc
         .iter()
         .map(lsp_document_symbol)
         .collect()
+}
+
+/// Query top-level workspace symbols across `(uri, text)` documents and map them
+/// to LSP `SymbolInformation`. Symbols whose URI fails to parse are skipped.
+pub fn workspace_symbols_for_documents(
+    documents: &[(String, String)],
+    query: &str,
+) -> Vec<SymbolInformation> {
+    let core = CompilerCore;
+    let sources: Vec<SourceDocument> = documents
+        .iter()
+        .map(|(uri, text)| SourceDocument::new(uri.clone(), 0, text.clone()))
+        .collect();
+    core.workspace_symbols(&sources, query)
+        .into_iter()
+        .filter_map(lsp_symbol_information)
+        .collect()
+}
+
+#[allow(deprecated)]
+fn lsp_symbol_information(symbol: CoreWorkspaceSymbol) -> Option<SymbolInformation> {
+    Some(SymbolInformation {
+        name: symbol.name,
+        kind: lsp_symbol_kind(symbol.kind),
+        tags: None,
+        deprecated: None,
+        location: Location {
+            uri: Url::parse(&symbol.location.uri).ok()?,
+            range: lsp_range(symbol.location.range),
+        },
+        container_name: symbol.container_name,
+    })
 }
 
 #[allow(deprecated)]
@@ -433,6 +466,23 @@ impl LanguageServer for PlcLanguageServer {
         }))
     }
 
+    async fn symbol(
+        &self,
+        params: WorkspaceSymbolParams,
+    ) -> Result<Option<Vec<SymbolInformation>>> {
+        let documents: Vec<(String, String)> = self
+            .documents
+            .read()
+            .await
+            .iter()
+            .map(|(uri, snapshot)| (uri.to_string(), snapshot.text.clone()))
+            .collect();
+        Ok(Some(workspace_symbols_for_documents(
+            &documents,
+            &params.query,
+        )))
+    }
+
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
@@ -533,6 +583,7 @@ pub fn server_capabilities() -> ServerCapabilities {
     ServerCapabilities {
         text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         document_symbol_provider: Some(OneOf::Left(true)),
+        workspace_symbol_provider: Some(OneOf::Left(true)),
         completion_provider: Some(CompletionOptions::default()),
         signature_help_provider: Some(SignatureHelpOptions::default()),
         hover_provider: Some(tower_lsp::lsp_types::HoverProviderCapability::Simple(true)),

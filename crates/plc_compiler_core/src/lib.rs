@@ -8,8 +8,8 @@
 mod execution;
 
 use execution::collect_execution_output;
-use plc_semantics::{SymbolKind as SemanticSymbolKind, analyze_file};
-use plc_syntax::{TextRange, parse_source};
+use plc_semantics::{Symbol as SemanticSymbol, SymbolKind as SemanticSymbolKind, analyze_file};
+use plc_syntax::{TextRange, TokenKind, parse_source};
 
 /// Source document snapshot passed into compiler-core operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -169,6 +169,21 @@ impl SymbolAnalysis {
     }
 }
 
+/// Completion candidate exposed by compiler-core to LSP and editor consumers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompletionCandidate {
+    pub label: String,
+    pub detail: Option<String>,
+    pub kind: SymbolKind,
+}
+
+/// Hover payload exposed by compiler-core to LSP and editor consumers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HoverInfo {
+    pub contents: String,
+    pub range: Range,
+}
+
 /// Shared compiler facade.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CompilerCore;
@@ -204,6 +219,14 @@ impl CompilerCore {
             version: document.version(),
             symbols: document_symbols(document),
         }
+    }
+
+    pub fn completions(&self, document: &SourceDocument) -> Vec<CompletionCandidate> {
+        completion_candidates(document)
+    }
+
+    pub fn hover(&self, document: &SourceDocument, position: Position) -> Option<HoverInfo> {
+        hover_at_position(document, position)
     }
 }
 
@@ -261,6 +284,134 @@ fn symbol_kind(kind: SemanticSymbolKind) -> SymbolKind {
         SemanticSymbolKind::Action => SymbolKind::Action,
         SemanticSymbolKind::Variable => SymbolKind::Variable,
         SemanticSymbolKind::Type => SymbolKind::Type,
+    }
+}
+
+fn completion_candidates(document: &SourceDocument) -> Vec<CompletionCandidate> {
+    let semantic = analyze_file(document.uri(), document.text());
+    let mut candidates: Vec<CompletionCandidate> = semantic
+        .symbol_index
+        .symbols()
+        .iter()
+        .map(|symbol| CompletionCandidate {
+            label: symbol.name.clone(),
+            detail: symbol_detail(symbol),
+            kind: symbol_kind(symbol.kind),
+        })
+        .collect();
+
+    candidates.extend(ST_KEYWORDS.iter().map(|keyword| CompletionCandidate {
+        label: (*keyword).to_owned(),
+        detail: Some("Structured Text keyword".to_owned()),
+        kind: SymbolKind::Keyword,
+    }));
+    candidates.sort_by(|left, right| left.label.cmp(&right.label));
+    candidates.dedup_by(|left, right| left.label.eq_ignore_ascii_case(&right.label));
+    candidates
+}
+
+fn hover_at_position(document: &SourceDocument, position: Position) -> Option<HoverInfo> {
+    let offset = position_to_byte_offset(document.text(), position)?;
+    let parse = parse_source(document.text());
+    let token = parse
+        .tokens()
+        .iter()
+        .find(|token| token.range.start <= offset && offset <= token.range.end)?;
+
+    if token.kind == TokenKind::Keyword {
+        return Some(HoverInfo {
+            contents: format!("Structured Text keyword `{}`", token.text),
+            range: text_range_to_range(document.text(), token.range),
+        });
+    }
+
+    if token.kind != TokenKind::Identifier {
+        return None;
+    }
+
+    let semantic = analyze_file(document.uri(), document.text());
+    let symbol = semantic
+        .symbol_index
+        .symbols()
+        .iter()
+        .find(|symbol| symbol.name.eq_ignore_ascii_case(&token.text))?;
+
+    Some(HoverInfo {
+        contents: symbol_hover_contents(symbol),
+        range: text_range_to_range(document.text(), token.range),
+    })
+}
+
+fn symbol_detail(symbol: &SemanticSymbol) -> Option<String> {
+    symbol
+        .type_kind
+        .as_ref()
+        .map(|type_kind| type_kind.display_name().to_owned())
+        .or_else(|| Some(format!("{:?}", symbol.kind)))
+}
+
+fn symbol_hover_contents(symbol: &SemanticSymbol) -> String {
+    if let Some(type_kind) = symbol.type_kind.as_ref() {
+        format!("{}: {}", symbol.name, type_kind.display_name())
+    } else {
+        format!("{} ({:?})", symbol.name, symbol.kind)
+    }
+}
+
+const ST_KEYWORDS: &[&str] = &[
+    "ACTION",
+    "CASE",
+    "END_ACTION",
+    "END_CASE",
+    "END_FOR",
+    "END_FUNCTION",
+    "END_FUNCTION_BLOCK",
+    "END_IF",
+    "END_PROGRAM",
+    "END_REPEAT",
+    "END_VAR",
+    "END_WHILE",
+    "EXIT",
+    "FOR",
+    "FUNCTION",
+    "FUNCTION_BLOCK",
+    "IF",
+    "PROGRAM",
+    "REPEAT",
+    "RETURN",
+    "THEN",
+    "VAR",
+    "VAR_GLOBAL",
+    "VAR_IN_OUT",
+    "VAR_INPUT",
+    "VAR_OUTPUT",
+    "VAR_TEMP",
+    "WHILE",
+];
+
+fn position_to_byte_offset(text: &str, position: Position) -> Option<usize> {
+    let mut line = 0u32;
+    let mut character = 0u32;
+
+    for (idx, ch) in text.char_indices() {
+        if line == position.line && character == position.character {
+            return Some(idx);
+        }
+        if ch == '\n' {
+            line += 1;
+            character = 0;
+            if line == position.line && position.character == 0 {
+                return Some(idx + ch.len_utf8());
+            }
+        } else {
+            character += 1;
+        }
+    }
+
+    if line == position.line && character == position.character {
+        Some(text.len())
+    } else {
+        None
     }
 }
 

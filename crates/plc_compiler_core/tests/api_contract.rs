@@ -1,4 +1,59 @@
-use plc_compiler_core::{CompilerCore, DiagnosticSeverity, SourceDocument};
+use plc_compiler_core::{CompilerCore, DiagnosticSeverity, Position, SourceDocument, SymbolKind};
+
+#[test]
+fn compiler_core_returns_completion_candidates_for_symbols_and_keywords() {
+    let core = CompilerCore::default();
+    let document = SourceDocument::new(
+        "file:///main.st",
+        1,
+        "PROGRAM Main\nVAR\n    Enabled : BOOL;\nEND_VAR\nEND_PROGRAM\n",
+    );
+
+    let completions = core.completions(&document);
+
+    assert!(
+        completions
+            .iter()
+            .any(|item| item.label == "Enabled" && item.detail.as_deref() == Some("BOOL"))
+    );
+    assert!(
+        completions
+            .iter()
+            .any(|item| item.label == "PROGRAM" && item.kind == SymbolKind::Keyword)
+    );
+}
+
+#[test]
+fn compiler_core_returns_hover_for_variable_and_keywords() {
+    let core = CompilerCore::default();
+    let document = SourceDocument::new(
+        "file:///main.st",
+        1,
+        "PROGRAM Main\nVAR\n    Enabled : BOOL;\nEND_VAR\nEnabled := TRUE;\nEND_PROGRAM\n",
+    );
+
+    let variable_hover = core
+        .hover(
+            &document,
+            Position {
+                line: 2,
+                character: 5,
+            },
+        )
+        .expect("variable hover");
+    assert_eq!(variable_hover.contents, "Enabled: BOOL");
+
+    let keyword_hover = core
+        .hover(
+            &document,
+            Position {
+                line: 0,
+                character: 1,
+            },
+        )
+        .expect("keyword hover");
+    assert!(keyword_hover.contents.contains("PROGRAM"));
+}
 
 #[test]
 fn compiler_core_returns_hierarchical_document_symbols() {

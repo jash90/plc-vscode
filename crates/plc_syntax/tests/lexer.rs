@@ -135,6 +135,25 @@ fn lexer_handles_dollar_escapes_in_strings() {
 }
 
 #[test]
+fn lexer_accepts_caret_dereference() {
+    // PLC-74: `^` (pointer dereference) lexes as an operator, not SYN0000.
+    let lexed = lex_source("ptr^.field := THIS^;");
+    assert!(
+        lexed.diagnostics().is_empty(),
+        "unexpected diagnostics: {:?}",
+        lexed.diagnostics()
+    );
+    assert_eq!(
+        lexed
+            .tokens()
+            .iter()
+            .filter(|token| token.kind == TokenKind::Operator && token.text == "^")
+            .count(),
+        2
+    );
+}
+
+#[test]
 fn lexer_reports_unclosed_double_quoted_string() {
     let lexed = lex_source("PROGRAM Main\n\"abc\nEND_PROGRAM\n");
     assert!(

@@ -326,6 +326,7 @@ fn scan_operator(source: &str, cursor: usize) -> Option<usize> {
             | '<'
             | '>'
             | '&'
+            | '^'
     ) {
         Some(cursor + ch.len_utf8())
     } else {

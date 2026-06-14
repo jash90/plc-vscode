@@ -2,7 +2,7 @@ use plc_compiler_core::{CompilerCore, SourceDocument};
 
 #[test]
 fn executes_minimal_program_and_reports_initialized_string_state() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new(
         "file:///hello.st",
         1,
@@ -17,7 +17,7 @@ fn executes_minimal_program_and_reports_initialized_string_state() {
 
 #[test]
 fn execution_returns_diagnostics_instead_of_output_for_invalid_program() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new(
         "file:///bad.st",
         1,

@@ -2,7 +2,7 @@ use plc_compiler_core::{CompilerCore, DiagnosticSeverity, Position, SourceDocume
 
 #[test]
 fn compiler_core_formats_keyword_casing_and_indentation() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new(
         "file:///main.st",
         1,
@@ -19,7 +19,7 @@ fn compiler_core_formats_keyword_casing_and_indentation() {
 
 #[test]
 fn compiler_core_formatting_is_idempotent_for_clean_source() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new(
         "file:///main.st",
         1,
@@ -31,7 +31,7 @@ fn compiler_core_formatting_is_idempotent_for_clean_source() {
 
 #[test]
 fn compiler_core_offers_quick_fix_for_missing_terminator() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new("file:///main.st", 1, "PROGRAM Main\nVAR\nEND_VAR\n");
 
     let actions = core.code_actions(&document);
@@ -44,7 +44,7 @@ fn compiler_core_offers_quick_fix_for_missing_terminator() {
 
 #[test]
 fn compiler_core_resolves_definition_to_declaration() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new(
         "file:///main.st",
         1,
@@ -69,7 +69,7 @@ fn compiler_core_resolves_definition_to_declaration() {
 
 #[test]
 fn compiler_core_finds_references_including_declaration() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new(
         "file:///main.st",
         1,
@@ -106,7 +106,7 @@ fn compiler_core_finds_references_including_declaration() {
 
 #[test]
 fn compiler_core_returns_completion_candidates_for_symbols_and_keywords() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new(
         "file:///main.st",
         1,
@@ -129,7 +129,7 @@ fn compiler_core_returns_completion_candidates_for_symbols_and_keywords() {
 
 #[test]
 fn compiler_core_returns_hover_for_variable_and_keywords() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new(
         "file:///main.st",
         1,
@@ -161,7 +161,7 @@ fn compiler_core_returns_hover_for_variable_and_keywords() {
 
 #[test]
 fn compiler_core_returns_hierarchical_document_symbols() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new(
         "file:///main.st",
         3,
@@ -184,7 +184,7 @@ fn compiler_core_returns_hierarchical_document_symbols() {
 
 #[test]
 fn compiler_core_uses_syntax_ranges_for_diagnostics() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new(
         "file:///main.st",
         1,
@@ -201,7 +201,7 @@ fn compiler_core_uses_syntax_ranges_for_diagnostics() {
 
 #[test]
 fn compiler_core_surfaces_semantic_diagnostics() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new(
         "file:///main.st",
         1,
@@ -217,7 +217,7 @@ fn compiler_core_surfaces_semantic_diagnostics() {
 
 #[test]
 fn compiler_core_analyzes_text_and_returns_versioned_diagnostics() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new("file:///main.st", 7, "PROGRAM Main\nVAR\nEND_VAR\n");
 
     let analysis = core.analyze(&document);
@@ -234,7 +234,7 @@ fn compiler_core_analyzes_text_and_returns_versioned_diagnostics() {
 
 #[test]
 fn compiler_core_returns_no_diagnostics_for_minimal_program() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new(
         "file:///main.st",
         1,
@@ -248,7 +248,7 @@ fn compiler_core_returns_no_diagnostics_for_minimal_program() {
 
 #[test]
 fn compiler_core_detects_unclosed_block_comments() {
-    let core = CompilerCore::default();
+    let core = CompilerCore;
     let document = SourceDocument::new(
         "file:///main.st",
         1,

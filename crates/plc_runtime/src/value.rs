@@ -57,6 +57,8 @@ impl Value {
         }
     }
 
+    // Named operations over two operands; not the `std::ops` traits.
+    #[allow(clippy::should_implement_trait)]
     pub fn add(left: Value, right: Value) -> Value {
         match (left, right) {
             (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
@@ -68,6 +70,7 @@ impl Value {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn sub(left: Value, right: Value) -> Value {
         match (left, right) {
             (Value::Int(a), Value::Int(b)) => Value::Int(a - b),

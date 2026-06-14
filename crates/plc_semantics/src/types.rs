@@ -1,4 +1,5 @@
 use plc_syntax::TextRange;
+use std::collections::HashMap;
 
 /// Source file snapshot analyzed by the semantic layer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,10 +123,19 @@ pub struct Symbol {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SymbolIndex {
     symbols: Vec<Symbol>,
+    /// Lowercased symbol name -> indices into `symbols`, in insertion order, so
+    /// name lookups are O(1) instead of a linear scan. Resolving every
+    /// assignment against a linear index made analysis O(assignments × symbols)
+    /// and timed out symbol-heavy files (PLC-80).
+    by_name: HashMap<String, Vec<usize>>,
 }
 
 impl SymbolIndex {
     pub fn insert(&mut self, symbol: Symbol) {
+        self.by_name
+            .entry(symbol.name.to_ascii_lowercase())
+            .or_default()
+            .push(self.symbols.len());
         self.symbols.push(symbol);
     }
 
@@ -134,19 +144,24 @@ impl SymbolIndex {
     }
 
     pub fn find_in_container(&self, container: &str, name: &str) -> Option<&Symbol> {
-        self.symbols.iter().find(|symbol| {
-            symbol.name.eq_ignore_ascii_case(name)
-                && symbol
+        self.by_name
+            .get(&name.to_ascii_lowercase())?
+            .iter()
+            .map(|&index| &self.symbols[index])
+            .find(|symbol| {
+                symbol
                     .container
                     .as_deref()
                     .is_some_and(|scope| scope.eq_ignore_ascii_case(container))
-        })
+            })
     }
 
     pub fn find_top_level(&self, name: &str) -> Option<&Symbol> {
-        self.symbols
+        self.by_name
+            .get(&name.to_ascii_lowercase())?
             .iter()
-            .find(|symbol| symbol.name.eq_ignore_ascii_case(name) && symbol.container.is_none())
+            .map(|&index| &self.symbols[index])
+            .find(|symbol| symbol.container.is_none())
     }
 }
 

@@ -1,0 +1,13 @@
+[package]
+name = "plc_llvm_backend"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "LLVM IR backend prototype (via inkwell) for PLC VS Code."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+plc_hir = { path = "../plc_hir" }
+inkwell = { version = "0.5", features = ["llvm18-0"] }

@@ -1,0 +1,12 @@
+[package]
+name = "plc_runtime"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Deterministic PLC scan-cycle runtime and simulator for PLC VS Code."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+plc_syntax = { path = "../plc_syntax" }

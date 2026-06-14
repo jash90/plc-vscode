@@ -90,6 +90,11 @@
             "type": "string"
           },
           "description": "Arguments prepended before the current file path when running Structured Text."
+        },
+        "plcVscode.autoRunOnOpen": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically run a Structured Text file when it is opened. Intended for demos and smoke tests."
         }
       }
     }

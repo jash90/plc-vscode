@@ -79,6 +79,21 @@ async function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('plc-vscode.runCurrentFile', async () => {
         await runCurrentStructuredTextFile(context);
     }));
+    if (vscode.workspace.getConfiguration('plcVscode').get('autoRunOnOpen', false)) {
+        const activeEditor = vscode.window.activeTextEditor;
+        if (activeEditor && activeEditor.document.languageId === 'structured-text') {
+            setTimeout(() => {
+                void runCurrentStructuredTextFile(context);
+            }, 1000);
+        }
+    }
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => {
+        if (editor &&
+            editor.document.languageId === 'structured-text' &&
+            vscode.workspace.getConfiguration('plcVscode').get('autoRunOnOpen', false)) {
+            void runCurrentStructuredTextFile(context);
+        }
+    }));
     const clientOptions = {
         documentSelector: [{ scheme: 'file', language: 'structured-text' }],
         synchronize: {

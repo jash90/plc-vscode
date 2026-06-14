@@ -306,6 +306,35 @@ fn compiler_core_surfaces_semantic_diagnostics() {
 }
 
 #[test]
+fn compiler_core_semantic_tokens_scale_to_large_files() {
+    use std::time::{Duration, Instant};
+
+    // Synthetic ~480 KB ST file. Guards against the O(n^2) offset->position
+    // mapping regression in semantic tokens / document symbols (PLC-80, PLC-82):
+    // the linear scan per token made large files hang for tens of seconds.
+    let mut source = String::from("PROGRAM Big\nVAR\n    Acc : INT;\nEND_VAR\n");
+    for _ in 0..30_000 {
+        source.push_str("Acc := Acc + 1;\n");
+    }
+    source.push_str("END_PROGRAM\n");
+
+    let core = CompilerCore;
+    let document = SourceDocument::new("file:///big.st", 1, source);
+
+    let started = Instant::now();
+    let tokens = core.semantic_tokens(&document);
+    let symbols = core.document_symbols(&document);
+    let elapsed = started.elapsed();
+
+    assert!(!tokens.is_empty());
+    assert!(!symbols.symbols().is_empty());
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "providers on a large file took {elapsed:?} (possible O(n^2) regression)"
+    );
+}
+
+#[test]
 fn compiler_core_does_not_flag_named_call_arguments_as_unresolved() {
     // PLC-79: named call arguments (`RIGHT(IN := s, L := 3)`) must not be
     // treated as assignment statements, so their parameter names do not produce

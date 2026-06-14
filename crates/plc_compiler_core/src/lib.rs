@@ -519,6 +519,7 @@ fn is_block_closer(first: &str) -> bool {
 
 fn document_symbols(document: &SourceDocument) -> Vec<DocumentSymbol> {
     let semantic = analyze_file(document.uri(), document.text());
+    let lines = LineIndex::new(document.text());
     let mut symbols = Vec::new();
 
     for symbol in semantic
@@ -544,8 +545,8 @@ fn document_symbols(document: &SourceDocument) -> Vec<DocumentSymbol> {
                     .as_ref()
                     .map(|type_kind| type_kind.display_name().to_owned()),
                 kind: symbol_kind(child.kind),
-                range: text_range_to_range(document.text(), child.range),
-                selection_range: text_range_to_range(document.text(), child.range),
+                range: lines.range(document.text(), child.range),
+                selection_range: lines.range(document.text(), child.range),
                 children: Vec::new(),
             })
             .collect();
@@ -554,8 +555,8 @@ fn document_symbols(document: &SourceDocument) -> Vec<DocumentSymbol> {
             name: symbol.name.clone(),
             detail: None,
             kind: symbol_kind(symbol.kind),
-            range: text_range_to_range(document.text(), symbol.range),
-            selection_range: text_range_to_range(document.text(), symbol.range),
+            range: lines.range(document.text(), symbol.range),
+            selection_range: lines.range(document.text(), symbol.range),
             children,
         });
     }
@@ -599,14 +600,15 @@ fn semantic_tokens(document: &SourceDocument) -> Vec<SemanticToken> {
     let text = document.text();
     let parse = parse_source(text);
     let semantic = analyze_file(document.uri(), text);
+    let lines = LineIndex::new(text);
 
     parse
         .tokens()
         .iter()
         .filter_map(|token| {
             let kind = classify_semantic_token(token, &semantic)?;
-            let start = byte_offset_to_position(text, token.range.start);
-            let end = byte_offset_to_position(text, token.range.end);
+            let start = lines.position(text, token.range.start);
+            let end = lines.position(text, token.range.end);
             // Skip multi-line and empty tokens; single-line tokens encode cleanly.
             if start.line != end.line || end.character <= start.character {
                 return None;
@@ -1294,12 +1296,13 @@ fn references_at_position(
 
 fn analyze_text(text: &str) -> Vec<Diagnostic> {
     let parse = parse_source(text);
+    let lines = LineIndex::new(text);
     let syntax_diagnostics: Vec<Diagnostic> = parse
         .diagnostics()
         .iter()
         .map(|diagnostic| Diagnostic {
             severity: DiagnosticSeverity::Error,
-            range: text_range_to_range(text, diagnostic.range),
+            range: lines.range(text, diagnostic.range),
             code: diagnostic.code,
             message: diagnostic.message.clone(),
         })
@@ -1329,7 +1332,7 @@ fn analyze_text(text: &str) -> Vec<Diagnostic> {
             .into_iter()
             .map(|diagnostic| Diagnostic {
                 severity: DiagnosticSeverity::Error,
-                range: text_range_to_range(text, diagnostic.range),
+                range: lines.range(text, diagnostic.range),
                 code: diagnostic.code,
                 message: diagnostic.message,
             }),
@@ -1341,6 +1344,51 @@ fn text_range_to_range(text: &str, range: TextRange) -> Range {
     Range {
         start: byte_offset_to_position(text, range.start),
         end: byte_offset_to_position(text, range.end.max(range.start + 1).min(text.len())),
+    }
+}
+
+/// Precomputed line-start byte offsets. Building is O(n); each `position`
+/// lookup is O(log lines + chars-on-line) instead of the O(offset) linear scan
+/// `byte_offset_to_position` performs. Reusing one index across all tokens /
+/// symbols of a document keeps `semantic_tokens`, `document_symbols`, and
+/// diagnostics linear instead of quadratic on large files (PLC-80 / PLC-82).
+struct LineIndex {
+    line_starts: Vec<usize>,
+}
+
+impl LineIndex {
+    fn new(text: &str) -> Self {
+        let mut line_starts = Vec::with_capacity(text.len() / 24 + 1);
+        line_starts.push(0);
+        for (idx, byte) in text.bytes().enumerate() {
+            if byte == b'\n' {
+                line_starts.push(idx + 1);
+            }
+        }
+        Self { line_starts }
+    }
+
+    fn position(&self, text: &str, offset: usize) -> Position {
+        let line = self
+            .line_starts
+            .partition_point(|&start| start <= offset)
+            .saturating_sub(1);
+        let line_start = self.line_starts[line].min(text.len());
+        let character = text[line_start..]
+            .char_indices()
+            .take_while(|(idx, _)| line_start + idx < offset)
+            .count() as u32;
+        Position {
+            line: line as u32,
+            character,
+        }
+    }
+
+    fn range(&self, text: &str, range: TextRange) -> Range {
+        Range {
+            start: self.position(text, range.start),
+            end: self.position(text, range.end.max(range.start + 1).min(text.len())),
+        }
     }
 }
 

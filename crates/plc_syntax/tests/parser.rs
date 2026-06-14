@@ -68,6 +68,23 @@ fn parser_recovers_and_finds_following_pous() {
 }
 
 #[test]
+fn parser_ignores_brace_pragmas() {
+    // PLC-77: a leading `{attribute …}` pragma must not break POU parsing.
+    let parsed = parse_source("{attribute 'hide'}\nFUNCTION_BLOCK Motor\nEND_FUNCTION_BLOCK\n");
+
+    assert!(
+        !parsed
+            .diagnostics()
+            .iter()
+            .any(|diagnostic| diagnostic.code == "SYN0000"),
+        "unexpected invalid-token diagnostics: {:?}",
+        parsed.diagnostics()
+    );
+    assert_eq!(parsed.units().len(), 1);
+    assert_eq!(parsed.units()[0].name.as_deref(), Some("Motor"));
+}
+
+#[test]
 fn parser_accepts_wstring_declarations() {
     // PLC-76: a WSTRING declaration with a double-quoted initializer and a `$N`
     // escape must parse without invalid-token/unclosed diagnostics.

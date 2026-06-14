@@ -11,6 +11,7 @@ use plc_syntax::{StatementKind, parse_source};
 
 mod bytecode;
 mod clock;
+pub mod stdlib;
 mod value;
 
 pub use bytecode::{BytecodeModule, Instruction};

@@ -45,6 +45,25 @@ impl VariableTable {
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
     }
+
+    /// Deterministically ordered (lowercased name, value) entries.
+    pub fn entries(&self) -> Vec<(String, Value)> {
+        let mut entries: Vec<(String, Value)> = self
+            .values
+            .iter()
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        entries.sort_by(|left, right| left.0.cmp(&right.0));
+        entries
+    }
+}
+
+/// Inspection record for a single runtime variable.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VariableSnapshot {
+    pub name: String,
+    pub value: Value,
+    pub forced: bool,
 }
 
 /// One assignment extracted from the parsed program (target := expression).
@@ -63,6 +82,7 @@ pub struct Runtime {
     outputs: Vec<String>,
     scan_count: u64,
     clock: VirtualClock,
+    forces: VariableTable,
 }
 
 impl Runtime {
@@ -113,7 +133,38 @@ impl Runtime {
             outputs,
             scan_count: 0,
             clock: VirtualClock::default(),
+            forces: VariableTable::default(),
         }
+    }
+
+    /// Force a variable to a fixed value that overrides logic-scan writes until
+    /// released. Forces are re-applied at the end of every logic scan.
+    pub fn force(&mut self, name: &str, value: Value) {
+        self.forces.set(name, value.clone());
+        self.state.set(name, value);
+    }
+
+    /// Release a previously forced variable.
+    pub fn unforce(&mut self, name: &str) {
+        self.forces.values.remove(&name.to_ascii_lowercase());
+    }
+
+    /// Whether a variable is currently forced.
+    pub fn is_forced(&self, name: &str) -> bool {
+        self.forces.get(name).is_some()
+    }
+
+    /// Inspect the full retained state, including which variables are forced.
+    pub fn inspect(&self) -> Vec<VariableSnapshot> {
+        self.state
+            .entries()
+            .into_iter()
+            .map(|(name, value)| VariableSnapshot {
+                forced: self.forces.get(&name).is_some(),
+                name,
+                value,
+            })
+            .collect()
     }
 
     /// Current virtual time in milliseconds.
@@ -164,6 +215,7 @@ impl Runtime {
         self.clock.tick();
         self.scan_phase(ScanPhase::Input);
         self.scan_phase(ScanPhase::Logic);
+        self.apply_forces();
         let snapshot = self.scan_phase_output();
         self.scan_count += 1;
         snapshot
@@ -199,6 +251,18 @@ impl Runtime {
                 }
             }
             ScanPhase::Output => {}
+        }
+    }
+
+    fn apply_forces(&mut self) {
+        let forced: Vec<(String, Value)> = self
+            .forces
+            .values
+            .iter()
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect();
+        for (name, value) in forced {
+            self.state.values.insert(name, value);
         }
     }
 

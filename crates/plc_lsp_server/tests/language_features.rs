@@ -17,7 +17,15 @@ fn lsp_server_advertises_completion_and_hover_support() {
 
 #[test]
 fn lsp_server_maps_completion_items() {
-    let completions = completion_items_for_text("file:///main.st", 1, SOURCE);
+    let completions = completion_items_for_text(
+        "file:///main.st",
+        1,
+        SOURCE,
+        Position {
+            line: 0,
+            character: 0,
+        },
+    );
 
     assert!(completions.iter().any(|item| {
         item.label == "Enabled"
@@ -29,6 +37,58 @@ fn lsp_server_maps_completion_items() {
             item.label == "PROGRAM" && item.kind == Some(CompletionItemKind::KEYWORD)
         })
     );
+}
+
+const FB_MEMBER_SOURCE: &str = concat!(
+    "FUNCTION_BLOCK Counter\n",
+    "VAR_INPUT\n",
+    "    CU : BOOL;\n",
+    "END_VAR\n",
+    "VAR_OUTPUT\n",
+    "    Q : BOOL;\n",
+    "END_VAR\n",
+    "END_FUNCTION_BLOCK\n",
+    "PROGRAM Main\n",
+    "VAR\n",
+    "    inst : Counter;\n",
+    "END_VAR\n",
+    "inst.\n",
+    "END_PROGRAM\n",
+);
+
+#[test]
+fn lsp_server_completion_includes_standard_functions() {
+    let completions = completion_items_for_text(
+        "file:///main.st",
+        1,
+        SOURCE,
+        Position {
+            line: 0,
+            character: 0,
+        },
+    );
+
+    assert!(
+        completions
+            .iter()
+            .any(|item| { item.label == "MIN" && item.kind == Some(CompletionItemKind::FUNCTION) })
+    );
+}
+
+#[test]
+fn lsp_server_completion_suggests_fb_members() {
+    let completions = completion_items_for_text(
+        "file:///main.st",
+        1,
+        FB_MEMBER_SOURCE,
+        Position {
+            line: 12,
+            character: 5,
+        },
+    );
+
+    assert!(completions.iter().any(|item| item.label == "CU"));
+    assert!(completions.iter().any(|item| item.label == "Q"));
 }
 
 #[test]

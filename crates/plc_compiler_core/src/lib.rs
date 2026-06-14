@@ -9,7 +9,7 @@ mod execution;
 
 use execution::collect_execution_output;
 use plc_semantics::{Symbol as SemanticSymbol, SymbolKind as SemanticSymbolKind, analyze_file};
-use plc_syntax::{Pou, PouKind, TextRange, TokenKind, VarBlockKind, parse_source};
+use plc_syntax::{Pou, PouKind, TextRange, Token, TokenKind, VarBlockKind, parse_source};
 
 /// Source document snapshot passed into compiler-core operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -256,8 +256,12 @@ impl CompilerCore {
         }
     }
 
-    pub fn completions(&self, document: &SourceDocument) -> Vec<CompletionCandidate> {
-        completion_candidates(document)
+    pub fn completions(
+        &self,
+        document: &SourceDocument,
+        position: Position,
+    ) -> Vec<CompletionCandidate> {
+        completion_candidates(document, position)
     }
 
     pub fn hover(&self, document: &SourceDocument, position: Position) -> Option<HoverInfo> {
@@ -519,7 +523,18 @@ fn symbol_kind(kind: SemanticSymbolKind) -> SymbolKind {
     }
 }
 
-fn completion_candidates(document: &SourceDocument) -> Vec<CompletionCandidate> {
+fn completion_candidates(
+    document: &SourceDocument,
+    position: Position,
+) -> Vec<CompletionCandidate> {
+    // Member-access context (`inst.`) yields the instance's members only.
+    if let Some(members) = member_access_candidates(document.text(), position) {
+        return members;
+    }
+    global_candidates(document)
+}
+
+fn global_candidates(document: &SourceDocument) -> Vec<CompletionCandidate> {
     let semantic = analyze_file(document.uri(), document.text());
     let mut candidates: Vec<CompletionCandidate> = semantic
         .symbol_index
@@ -537,10 +552,202 @@ fn completion_candidates(document: &SourceDocument) -> Vec<CompletionCandidate> 
         detail: Some("Structured Text keyword".to_owned()),
         kind: SymbolKind::Keyword,
     }));
+    candidates.extend(
+        STANDARD_FUNCTION_NAMES
+            .iter()
+            .map(|name| CompletionCandidate {
+                label: (*name).to_owned(),
+                detail: Some("standard function".to_owned()),
+                kind: SymbolKind::Function,
+            }),
+    );
+    candidates.extend(
+        STANDARD_FUNCTION_BLOCKS
+            .iter()
+            .map(|(name, _)| CompletionCandidate {
+                label: (*name).to_owned(),
+                detail: Some("standard function block".to_owned()),
+                kind: SymbolKind::FunctionBlock,
+            }),
+    );
     candidates.sort_by(|left, right| left.label.cmp(&right.label));
     candidates.dedup_by(|left, right| left.label.eq_ignore_ascii_case(&right.label));
     candidates
 }
+
+/// When the cursor sits on a member access (`base.` or `base.partial`), return
+/// the members of `base`'s function-block type. Returns `None` when the cursor
+/// is not in a member-access context (so the caller falls back to the global
+/// list); returns `Some(vec)` — possibly empty — once a `base.` context is
+/// detected, so the global list is suppressed after a dot.
+fn member_access_candidates(text: &str, position: Position) -> Option<Vec<CompletionCandidate>> {
+    let offset = position_to_byte_offset(text, position)?;
+    let parse = parse_source(text);
+    let tokens: Vec<&Token> = parse
+        .tokens()
+        .iter()
+        .filter(|token| !token.is_trivia())
+        .collect();
+    let base = member_access_base(&tokens, offset)?;
+    Some(fb_member_candidates(parse.units(), &base))
+}
+
+/// Identify the base identifier of a member access ending at `offset`, matching
+/// either `base.` or `base.partial` immediately before the cursor.
+fn member_access_base(tokens: &[&Token], offset: usize) -> Option<String> {
+    let last = tokens
+        .iter()
+        .rposition(|token| token.range.start < offset)?;
+    let dot = match tokens[last].kind {
+        TokenKind::Operator if tokens[last].text == "." => last,
+        TokenKind::Identifier => {
+            let previous = last.checked_sub(1)?;
+            if tokens[previous].kind == TokenKind::Operator && tokens[previous].text == "." {
+                previous
+            } else {
+                return None;
+            }
+        }
+        _ => return None,
+    };
+
+    let base = tokens.get(dot.checked_sub(1)?)?;
+    (base.kind == TokenKind::Identifier).then(|| base.text.clone())
+}
+
+fn fb_member_candidates(units: &[Pou], base: &str) -> Vec<CompletionCandidate> {
+    let Some(type_name) = variable_type_name(units, base) else {
+        return Vec::new();
+    };
+
+    if let Some(unit) = units
+        .iter()
+        .find(|unit| unit.kind == PouKind::FunctionBlock && pou_named(unit, &type_name))
+    {
+        return unit
+            .declaration_blocks
+            .iter()
+            .filter(|block| {
+                matches!(
+                    block.kind,
+                    VarBlockKind::Input | VarBlockKind::Output | VarBlockKind::InOut
+                )
+            })
+            .flat_map(|block| block.declarations.iter())
+            .map(|declaration| CompletionCandidate {
+                label: declaration.name.clone(),
+                detail: Some(format!("member of {}", declaration.type_name)),
+                kind: SymbolKind::Variable,
+            })
+            .collect();
+    }
+
+    standard_fb_members(&type_name)
+        .map(|members| {
+            members
+                .iter()
+                .map(|(name, type_name)| CompletionCandidate {
+                    label: (*name).to_owned(),
+                    detail: Some(format!("member of {type_name}")),
+                    kind: SymbolKind::Variable,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn standard_fb_members(name: &str) -> Option<&'static [(&'static str, &'static str)]> {
+    let upper = name.to_ascii_uppercase();
+    STANDARD_FUNCTION_BLOCKS
+        .iter()
+        .find(|(candidate, _)| *candidate == upper)
+        .map(|(_, members)| *members)
+}
+
+/// MVP standard functions surfaced in completion. Mirrors
+/// `plc_runtime::stdlib::STANDARD_FUNCTIONS` (kept self-contained so compiler-core
+/// stays free of a runtime dependency) — keep the two sets in sync.
+const STANDARD_FUNCTION_NAMES: &[&str] = &[
+    "ABS",
+    "SQRT",
+    "MIN",
+    "MAX",
+    "LIMIT",
+    "SEL",
+    "LEN",
+    "CONCAT",
+    "INT_TO_REAL",
+    "REAL_TO_INT",
+    "BOOL_TO_INT",
+    "INT_TO_STRING",
+];
+
+/// MVP standard function blocks and their public members (name, type). Mirrors
+/// the `plc_runtime` timer/counter/edge surface — keep in sync with that crate.
+const STANDARD_FUNCTION_BLOCKS: &[(&str, &[(&str, &str)])] = &[
+    (
+        "TON",
+        &[
+            ("IN", "BOOL"),
+            ("PT", "TIME"),
+            ("Q", "BOOL"),
+            ("ET", "TIME"),
+        ],
+    ),
+    (
+        "TOF",
+        &[
+            ("IN", "BOOL"),
+            ("PT", "TIME"),
+            ("Q", "BOOL"),
+            ("ET", "TIME"),
+        ],
+    ),
+    (
+        "TP",
+        &[
+            ("IN", "BOOL"),
+            ("PT", "TIME"),
+            ("Q", "BOOL"),
+            ("ET", "TIME"),
+        ],
+    ),
+    (
+        "CTU",
+        &[
+            ("CU", "BOOL"),
+            ("R", "BOOL"),
+            ("PV", "INT"),
+            ("Q", "BOOL"),
+            ("CV", "INT"),
+        ],
+    ),
+    (
+        "CTD",
+        &[
+            ("CD", "BOOL"),
+            ("LD", "BOOL"),
+            ("PV", "INT"),
+            ("Q", "BOOL"),
+            ("CV", "INT"),
+        ],
+    ),
+    (
+        "CTUD",
+        &[
+            ("CU", "BOOL"),
+            ("CD", "BOOL"),
+            ("R", "BOOL"),
+            ("LD", "BOOL"),
+            ("PV", "INT"),
+            ("QU", "BOOL"),
+            ("QD", "BOOL"),
+            ("CV", "INT"),
+        ],
+    ),
+    ("R_TRIG", &[("CLK", "BOOL"), ("Q", "BOOL")]),
+    ("F_TRIG", &[("CLK", "BOOL"), ("Q", "BOOL")]),
+];
 
 fn hover_at_position(document: &SourceDocument, position: Position) -> Option<HoverInfo> {
     let offset = position_to_byte_offset(document.text(), position)?;

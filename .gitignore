@@ -9,3 +9,5 @@
 
 **/node_modules/
 **/*.vsix
+# Bundled server binaries (produced by the release workflow)
+editors/vscode/server/

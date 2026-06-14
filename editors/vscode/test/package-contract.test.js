@@ -24,4 +24,20 @@ const grammarJson = JSON.parse(fs.readFileSync(grammarPath, 'utf8'));
 assert.strictEqual(grammarJson.scopeName, 'source.st');
 assert.ok(Array.isArray(grammarJson.patterns) && grammarJson.patterns.length > 0);
 
+// Production bundling: the compiled binary-path helper must resolve under
+// server/ and be platform-aware.
+const { bundledBinaryRelativePath, SERVER_BINARY } = require(path.join(root, 'dist', 'bundled.js'));
+assert.strictEqual(
+  bundledBinaryRelativePath(SERVER_BINARY, 'linux'),
+  path.join('server', 'plc-lsp-server'),
+);
+assert.strictEqual(
+  bundledBinaryRelativePath(SERVER_BINARY, 'win32'),
+  path.join('server', 'plc-lsp-server.exe'),
+);
+
+// server/ must not be excluded from the package.
+const vscodeignore = fs.readFileSync(path.join(root, '.vscodeignore'), 'utf8');
+assert.ok(!/^server(\/|\b)/m.test(vscodeignore), 'server/ must be packaged, not ignored');
+
 console.log('package contract ok');

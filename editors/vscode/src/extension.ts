@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { spawn } from 'node:child_process';
 import * as vscode from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node';
+import { CLI_BINARY, SERVER_BINARY, bundledBinaryRelativePath } from './bundled';
 
 let client: LanguageClient | undefined;
 let outputChannel: vscode.OutputChannel | undefined;
@@ -10,7 +11,22 @@ function workspaceRoot(context: vscode.ExtensionContext): string {
   return path.resolve(context.extensionPath, '..', '..');
 }
 
+/** Installed (Marketplace) extensions run in Production mode. */
+function isProduction(context: vscode.ExtensionContext): boolean {
+  return context.extensionMode === vscode.ExtensionMode.Production;
+}
+
 function serverOptions(context: vscode.ExtensionContext): ServerOptions {
+  // Installed extension: run the bundled, platform-specific server binary so
+  // end users need neither the repository nor a Rust toolchain.
+  if (isProduction(context)) {
+    return {
+      command: context.asAbsolutePath(bundledBinaryRelativePath(SERVER_BINARY)),
+      args: [],
+    };
+  }
+
+  // Development: build/run the server from the Rust workspace via cargo.
   const config = vscode.workspace.getConfiguration('plcVscode');
   const command = config.get<string>('serverCommand', 'cargo');
   const args = config.get<string[]>('serverArgs', [
@@ -120,16 +136,31 @@ async function runCurrentStructuredTextFile(context: vscode.ExtensionContext): P
   }
 
   const config = vscode.workspace.getConfiguration('plcVscode');
-  const repositoryRoot = config.get<string>('repositoryRoot', '') || workspaceRoot(context);
-  const command = config.get<string>('cliCommand', 'cargo');
-  const args = [...config.get<string[]>('cliArgs', ['run', '--quiet', '--package', 'plc_cli', '--', 'run']), editor.document.uri.fsPath];
+
+  let command: string;
+  let args: string[];
+  let spawnOptions: { cwd?: string };
+  if (isProduction(context)) {
+    // Installed extension: execute via the bundled CLI binary.
+    command = context.asAbsolutePath(bundledBinaryRelativePath(CLI_BINARY));
+    args = ['run', editor.document.uri.fsPath];
+    spawnOptions = {};
+  } else {
+    const repositoryRoot = config.get<string>('repositoryRoot', '') || workspaceRoot(context);
+    command = config.get<string>('cliCommand', 'cargo');
+    args = [
+      ...config.get<string[]>('cliArgs', ['run', '--quiet', '--package', 'plc_cli', '--', 'run']),
+      editor.document.uri.fsPath,
+    ];
+    spawnOptions = { cwd: repositoryRoot };
+  }
 
   outputChannel?.clear();
   outputChannel?.appendLine(`$ ${command} ${args.join(' ')}`);
   outputChannel?.show(true);
 
   await new Promise<void>((resolve) => {
-    const child = spawn(command, args, { cwd: repositoryRoot });
+    const child = spawn(command, args, spawnOptions);
     child.stdout.on('data', (chunk: Buffer) => outputChannel?.append(chunk.toString()));
     child.stderr.on('data', (chunk: Buffer) => outputChannel?.append(chunk.toString()));
     child.on('error', async (error: Error) => {

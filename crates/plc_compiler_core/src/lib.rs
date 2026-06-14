@@ -9,7 +9,7 @@ mod execution;
 
 use execution::collect_execution_output;
 use plc_semantics::{Symbol as SemanticSymbol, SymbolKind as SemanticSymbolKind, analyze_file};
-use plc_syntax::{TextRange, TokenKind, parse_source};
+use plc_syntax::{Pou, PouKind, TextRange, TokenKind, VarBlockKind, parse_source};
 
 /// Source document snapshot passed into compiler-core operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -184,6 +184,20 @@ pub struct HoverInfo {
     pub range: Range,
 }
 
+/// A single parameter of a call signature exposed to IDE consumers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParameterInfo {
+    pub label: String,
+}
+
+/// Call signature payload exposed by compiler-core for signature help.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureInfo {
+    pub label: String,
+    pub parameters: Vec<ParameterInfo>,
+    pub active_parameter: Option<u32>,
+}
+
 /// Source location (document URI + range) used for navigation features.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Location {
@@ -248,6 +262,14 @@ impl CompilerCore {
 
     pub fn hover(&self, document: &SourceDocument, position: Position) -> Option<HoverInfo> {
         hover_at_position(document, position)
+    }
+
+    pub fn signature_help(
+        &self,
+        document: &SourceDocument,
+        position: Position,
+    ) -> Option<SignatureInfo> {
+        signature_help_at_position(document, position)
     }
 
     pub fn definition(&self, document: &SourceDocument, position: Position) -> Option<Location> {
@@ -550,6 +572,179 @@ fn hover_at_position(document: &SourceDocument, position: Position) -> Option<Ho
         contents: symbol_hover_contents(symbol),
         range: text_range_to_range(document.text(), token.range),
     })
+}
+
+/// Resolved call signature: the name to display plus its ordered parameters.
+struct ResolvedSignature {
+    display_name: String,
+    parameters: Vec<ParameterInfo>,
+}
+
+fn signature_help_at_position(
+    document: &SourceDocument,
+    position: Position,
+) -> Option<SignatureInfo> {
+    let text = document.text();
+    let offset = position_to_byte_offset(text, position)?;
+    let (callee, active_parameter) = enclosing_call(text, offset)?;
+    let resolved = resolve_callee(text, &callee)?;
+
+    let active_parameter = if resolved.parameters.is_empty() {
+        None
+    } else {
+        Some(active_parameter.min(resolved.parameters.len() as u32 - 1))
+    };
+
+    Some(SignatureInfo {
+        label: signature_label(&resolved.display_name, &resolved.parameters),
+        parameters: resolved.parameters,
+        active_parameter,
+    })
+}
+
+/// Locate the call enclosing `offset`, returning the callee name and the
+/// zero-based index of the argument the cursor sits in. Walks the token stream
+/// keeping a stack of open parentheses; only parentheses immediately preceded by
+/// an identifier are treated as calls (others are grouping parentheses).
+fn enclosing_call(text: &str, offset: usize) -> Option<(String, u32)> {
+    struct CallFrame {
+        name: Option<String>,
+        active_parameter: u32,
+    }
+
+    let parse = parse_source(text);
+    let mut stack: Vec<CallFrame> = Vec::new();
+    let mut previous_identifier: Option<String> = None;
+
+    for token in parse
+        .tokens()
+        .iter()
+        .filter(|token| token.range.start < offset && !token.is_trivia())
+    {
+        if token.kind == TokenKind::Operator {
+            match token.text.as_str() {
+                "(" => stack.push(CallFrame {
+                    name: previous_identifier.clone(),
+                    active_parameter: 0,
+                }),
+                ")" => {
+                    stack.pop();
+                }
+                "," => {
+                    if let Some(frame) = stack.last_mut() {
+                        frame.active_parameter += 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        previous_identifier = (token.kind == TokenKind::Identifier).then(|| token.text.clone());
+    }
+
+    stack.iter().rev().find_map(|frame| {
+        frame
+            .name
+            .clone()
+            .map(|name| (name, frame.active_parameter))
+    })
+}
+
+fn resolve_callee(text: &str, name: &str) -> Option<ResolvedSignature> {
+    standard_signature(name).or_else(|| user_signature(text, name))
+}
+
+/// Declarative signatures for the MVP standard functions. Mirrors
+/// `plc_runtime::stdlib::STANDARD_FUNCTIONS` (kept self-contained so compiler-core
+/// stays free of a runtime dependency) — keep the two sets in sync.
+fn standard_signature(name: &str) -> Option<ResolvedSignature> {
+    let upper = name.to_ascii_uppercase();
+    let parameters: &[(&str, &str)] = match upper.as_str() {
+        "ABS" => &[("IN", "ANY_NUM")],
+        "SQRT" => &[("IN", "ANY_NUM")],
+        "MIN" => &[("IN1", "ANY_NUM"), ("IN2", "ANY_NUM")],
+        "MAX" => &[("IN1", "ANY_NUM"), ("IN2", "ANY_NUM")],
+        "LIMIT" => &[("MN", "ANY_NUM"), ("IN", "ANY_NUM"), ("MX", "ANY_NUM")],
+        "SEL" => &[("G", "BOOL"), ("IN0", "ANY"), ("IN1", "ANY")],
+        "LEN" => &[("IN", "STRING")],
+        "CONCAT" => &[("IN1", "STRING"), ("IN2", "STRING")],
+        "INT_TO_REAL" => &[("IN", "INT")],
+        "REAL_TO_INT" => &[("IN", "REAL")],
+        "BOOL_TO_INT" => &[("IN", "BOOL")],
+        "INT_TO_STRING" => &[("IN", "INT")],
+        _ => return None,
+    };
+
+    Some(ResolvedSignature {
+        parameters: parameters
+            .iter()
+            .map(|(parameter_name, type_name)| ParameterInfo {
+                label: format!("{parameter_name} : {type_name}"),
+            })
+            .collect(),
+        display_name: upper,
+    })
+}
+
+/// Resolve a user-declared `FUNCTION`/`FUNCTION_BLOCK` call. Matches the callee
+/// against a POU name directly, then falls back to a function-block instance
+/// whose declared type names a function block.
+fn user_signature(text: &str, name: &str) -> Option<ResolvedSignature> {
+    let parse = parse_source(text);
+    let units = parse.units();
+
+    if let Some(unit) = units.iter().find(|unit| {
+        matches!(unit.kind, PouKind::Function | PouKind::FunctionBlock) && pou_named(unit, name)
+    }) {
+        return Some(ResolvedSignature {
+            display_name: unit.name.clone().unwrap_or_else(|| name.to_owned()),
+            parameters: input_parameters(unit),
+        });
+    }
+
+    let type_name = variable_type_name(units, name)?;
+    let function_block = units
+        .iter()
+        .find(|unit| unit.kind == PouKind::FunctionBlock && pou_named(unit, &type_name))?;
+    Some(ResolvedSignature {
+        display_name: function_block.name.clone().unwrap_or(type_name),
+        parameters: input_parameters(function_block),
+    })
+}
+
+fn pou_named(unit: &Pou, name: &str) -> bool {
+    unit.name
+        .as_deref()
+        .is_some_and(|unit_name| unit_name.eq_ignore_ascii_case(name))
+}
+
+fn input_parameters(unit: &Pou) -> Vec<ParameterInfo> {
+    unit.declaration_blocks
+        .iter()
+        .filter(|block| matches!(block.kind, VarBlockKind::Input | VarBlockKind::InOut))
+        .flat_map(|block| block.declarations.iter())
+        .map(|declaration| ParameterInfo {
+            label: format!("{} : {}", declaration.name, declaration.type_name),
+        })
+        .collect()
+}
+
+fn variable_type_name(units: &[Pou], name: &str) -> Option<String> {
+    units
+        .iter()
+        .flat_map(|unit| unit.declaration_blocks.iter())
+        .flat_map(|block| block.declarations.iter())
+        .find(|declaration| declaration.name.eq_ignore_ascii_case(name))
+        .map(|declaration| declaration.type_name.clone())
+}
+
+fn signature_label(name: &str, parameters: &[ParameterInfo]) -> String {
+    let joined = parameters
+        .iter()
+        .map(|parameter| parameter.label.as_str())
+        .collect::<Vec<_>>()
+        .join("; ");
+    format!("{name}({joined})")
 }
 
 fn symbol_detail(symbol: &SemanticSymbol) -> Option<String> {

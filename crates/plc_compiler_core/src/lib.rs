@@ -8,7 +8,10 @@
 mod execution;
 
 use execution::collect_execution_output;
-use plc_semantics::{Symbol as SemanticSymbol, SymbolKind as SemanticSymbolKind, analyze_file};
+use plc_semantics::{
+    SourceFile, Symbol as SemanticSymbol, SymbolKind as SemanticSymbolKind, analyze_file,
+    analyze_workspace,
+};
 use plc_syntax::{Pou, PouKind, TextRange, Token, TokenKind, VarBlockKind, parse_source};
 
 /// Source document snapshot passed into compiler-core operations.
@@ -205,6 +208,15 @@ pub struct Location {
     pub range: Range,
 }
 
+/// Flat workspace symbol exposed by compiler-core for `workspace/symbol`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceSymbol {
+    pub name: String,
+    pub kind: SymbolKind,
+    pub location: Location,
+    pub container_name: Option<String>,
+}
+
 /// Text edit (range replacement) used by formatting and code actions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TextEdit {
@@ -254,6 +266,17 @@ impl CompilerCore {
             version: document.version(),
             symbols: document_symbols(document),
         }
+    }
+
+    /// Query top-level declarations across all supplied documents. An empty
+    /// `query` returns every top-level symbol; otherwise names are matched
+    /// case-insensitively as a substring.
+    pub fn workspace_symbols(
+        &self,
+        documents: &[SourceDocument],
+        query: &str,
+    ) -> Vec<WorkspaceSymbol> {
+        workspace_symbols(documents, query)
     }
 
     pub fn completions(
@@ -510,6 +533,38 @@ fn document_symbols(document: &SourceDocument) -> Vec<DocumentSymbol> {
     }
 
     symbols
+}
+
+fn workspace_symbols(documents: &[SourceDocument], query: &str) -> Vec<WorkspaceSymbol> {
+    let files: Vec<SourceFile> = documents
+        .iter()
+        .map(|document| SourceFile::new(document.uri(), document.text()))
+        .collect();
+    let semantic = analyze_workspace(&files);
+    let needle = query.to_ascii_lowercase();
+
+    semantic
+        .symbol_index
+        .symbols()
+        .iter()
+        .filter(|symbol| symbol.container.is_none())
+        .filter(|symbol| needle.is_empty() || symbol.name.to_ascii_lowercase().contains(&needle))
+        .filter_map(|symbol| {
+            let text = documents
+                .iter()
+                .find(|document| document.uri() == symbol.uri)
+                .map(SourceDocument::text)?;
+            Some(WorkspaceSymbol {
+                name: symbol.name.clone(),
+                kind: symbol_kind(symbol.kind),
+                location: Location {
+                    uri: symbol.uri.clone(),
+                    range: text_range_to_range(text, symbol.range),
+                },
+                container_name: symbol.container.clone(),
+            })
+        })
+        .collect()
 }
 
 fn symbol_kind(kind: SemanticSymbolKind) -> SymbolKind {

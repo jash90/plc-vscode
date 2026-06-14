@@ -493,3 +493,60 @@ fn compiler_core_returns_no_signature_outside_call() {
         .is_none()
     );
 }
+
+#[test]
+fn compiler_core_returns_workspace_symbols_across_files() {
+    let core = CompilerCore;
+    let documents = [
+        SourceDocument::new("file:///a.st", 1, "PROGRAM Main\nEND_PROGRAM\n"),
+        SourceDocument::new(
+            "file:///b.st",
+            1,
+            "FUNCTION_BLOCK Motor\nEND_FUNCTION_BLOCK\n",
+        ),
+    ];
+
+    let all = core.workspace_symbols(&documents, "");
+    assert!(
+        all.iter()
+            .any(|symbol| symbol.name == "Main" && symbol.kind == SymbolKind::Program)
+    );
+    assert!(all.iter().any(|symbol| symbol.name == "Motor"
+        && symbol.kind == SymbolKind::FunctionBlock
+        && symbol.location.uri == "file:///b.st"));
+}
+
+#[test]
+fn compiler_core_filters_workspace_symbols_by_query() {
+    let core = CompilerCore;
+    let documents = [
+        SourceDocument::new("file:///a.st", 1, "PROGRAM Main\nEND_PROGRAM\n"),
+        SourceDocument::new(
+            "file:///b.st",
+            1,
+            "FUNCTION_BLOCK Motor\nEND_FUNCTION_BLOCK\n",
+        ),
+    ];
+
+    let filtered = core.workspace_symbols(&documents, "mot");
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0].name, "Motor");
+}
+
+#[test]
+fn compiler_core_workspace_symbols_are_top_level_only() {
+    let core = CompilerCore;
+    let documents = [SourceDocument::new(
+        "file:///main.st",
+        1,
+        "PROGRAM Main\nVAR\n    Enabled : BOOL;\nEND_VAR\nEND_PROGRAM\n",
+    )];
+
+    assert!(
+        core.workspace_symbols(&documents, "Main")
+            .iter()
+            .any(|symbol| symbol.name == "Main")
+    );
+    // Member variables are not top-level workspace symbols.
+    assert!(core.workspace_symbols(&documents, "Enabled").is_empty());
+}

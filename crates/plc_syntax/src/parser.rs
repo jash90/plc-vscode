@@ -45,6 +45,10 @@ pub enum VarBlockKind {
 pub struct VariableDeclaration {
     pub name: String,
     pub type_name: String,
+    /// Sized/dimension clause spelling for `STRING[80]` / `ARRAY[1..3]`
+    /// (`Some("[80]")`), or `None` for an unsized type. `type_name` keeps the
+    /// base type so semantic type mapping is unaffected.
+    pub type_size: Option<String>,
     pub initializer: Option<String>,
     pub range: TextRange,
 }
@@ -303,6 +307,43 @@ fn parse_declaration(
     }
 
     let mut next = colon_index + 2;
+
+    // Optional sized/dimension clause: `STRING[80]`, `ARRAY[1..3]`. Consume the
+    // balanced brackets so the `:=` initializer below is found regardless, and
+    // record the clause spelling for hover/symbol fidelity.
+    let mut type_size = None;
+    if tokens.get(next).is_some_and(|(_, token)| token.text == "[") {
+        let size_start = next;
+        let mut depth = 0u32;
+        while let Some((_, token)) = tokens.get(next) {
+            match token.text.as_str() {
+                "[" => depth += 1,
+                "]" => depth = depth.saturating_sub(1),
+                _ => {}
+            }
+            next += 1;
+            if depth == 0 {
+                break;
+            }
+        }
+        type_size = Some(concat_token_text(&tokens[size_start..next]));
+    }
+
+    // Optional `OF <element-type>` for ARRAY declarations. The element type is
+    // skipped here (element-type modeling is out of scope); skipping it lets the
+    // `:=` initializer be captured.
+    if tokens
+        .get(next)
+        .is_some_and(|(_, token)| token.text.eq_ignore_ascii_case("OF"))
+    {
+        next += 1;
+        if tokens.get(next).is_some_and(|(_, token)| {
+            matches!(token.kind, TokenKind::Identifier | TokenKind::Keyword)
+        }) {
+            next += 1;
+        }
+    }
+
     let mut initializer = None;
     if tokens
         .get(next)
@@ -329,6 +370,7 @@ fn parse_declaration(
         VariableDeclaration {
             name: name.text.clone(),
             type_name: type_token.text.clone(),
+            type_size,
             initializer,
             range: TextRange::new(name.range.start, end),
         },
@@ -439,6 +481,15 @@ fn join_token_text(tokens: &[(usize, &Token)]) -> String {
         .map(|(_, token)| token.text.as_str())
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Concatenate token texts without separators, for compact clauses such as a
+/// `STRING[80]` / `ARRAY[1..3]` size where spacing would distort the spelling.
+fn concat_token_text(tokens: &[(usize, &Token)]) -> String {
+    tokens
+        .iter()
+        .map(|(_, token)| token.text.as_str())
+        .collect()
 }
 
 fn var_block_kind(token: &Token) -> Option<VarBlockKind> {

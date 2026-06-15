@@ -45,6 +45,63 @@ fn parser_does_not_treat_named_call_arguments_as_assignments() {
 }
 
 #[test]
+fn parser_captures_sized_string_initializer() {
+    // PLC-87: a sized-type declaration must keep both its `[n]` clause and its
+    // initializer, which the old code dropped because the `:=` check landed on
+    // `[` and skipped to `;`.
+    let parsed = parse_source(concat!(
+        "PROGRAM Main\n",
+        "VAR\n",
+        "    s : STRING[20] := 'Jan';\n",
+        "    log : STRING[80];\n",
+        "END_VAR\n",
+        "END_PROGRAM\n",
+    ));
+
+    let declarations = &parsed.units()[0].declaration_blocks[0].declarations;
+    let s = declarations
+        .iter()
+        .find(|declaration| declaration.name == "s")
+        .expect("declaration `s`");
+    assert_eq!(s.type_name, "STRING");
+    assert_eq!(s.type_size.as_deref(), Some("[20]"));
+    assert_eq!(s.initializer.as_deref(), Some("'Jan'"));
+
+    let log = declarations
+        .iter()
+        .find(|declaration| declaration.name == "log")
+        .expect("declaration `log`");
+    assert_eq!(log.type_name, "STRING");
+    assert_eq!(log.type_size.as_deref(), Some("[80]"));
+    assert_eq!(log.initializer, None);
+}
+
+#[test]
+fn parser_captures_array_initializer_after_of_clause() {
+    // PLC-87: `ARRAY[1..3] OF INT := [...]` must record the dimension clause and
+    // still capture the initializer past the `OF <element-type>` clause.
+    let parsed = parse_source(concat!(
+        "PROGRAM Main\n",
+        "VAR\n",
+        "    a : ARRAY[1..3] OF INT := [1, 2, 3];\n",
+        "END_VAR\n",
+        "END_PROGRAM\n",
+    ));
+
+    let a = &parsed.units()[0].declaration_blocks[0].declarations[0];
+    assert_eq!(a.name, "a");
+    assert_eq!(a.type_name, "ARRAY");
+    assert_eq!(a.type_size.as_deref(), Some("[1..3]"));
+    assert!(
+        a.initializer
+            .as_deref()
+            .is_some_and(|init| init.contains('1') && init.contains('2') && init.contains('3')),
+        "got initializer: {:?}",
+        a.initializer
+    );
+}
+
+#[test]
 fn parser_recognizes_core_pou_program() {
     let parsed = parse_source("PROGRAM Main\nVAR\nEND_VAR\nEND_PROGRAM\n");
 

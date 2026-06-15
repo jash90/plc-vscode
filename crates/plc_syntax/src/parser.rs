@@ -361,7 +361,15 @@ fn parse_statements(tokens: &[(usize, &Token)]) -> Vec<Statement> {
             continue;
         }
 
+        // A target preceded by `.`, `]`, or `^` is a member/index/dereference
+        // access (`obj.field`, `arr[i].field`, `ptr^.field`), not a simple
+        // assignable name; the MVP analyzer cannot resolve qualified targets, so
+        // do not capture the trailing member as an assignment.
+        let preceded_by_access =
+            cursor > 0 && matches!(tokens[cursor - 1].1.text.as_str(), "." | "]" | "^");
+
         if paren_depth == 0
+            && !preceded_by_access
             && token.kind == TokenKind::Identifier
             && tokens
                 .get(cursor + 1)

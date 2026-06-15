@@ -1,6 +1,29 @@
 use plc_syntax::{PouKind, Statement, StatementKind, VarBlockKind, parse_source};
 
 #[test]
+fn parser_does_not_treat_member_access_targets_as_simple_assignments() {
+    // PLC-79: qualified targets `obj.field := x` / `arr[i].field := x` must not be
+    // captured as a simple assignment to the trailing member name, which the
+    // analyzer cannot resolve and would flag as a spurious SEM0001.
+    let parsed = parse_source(concat!(
+        "PROGRAM Main\n",
+        "VAR\n    obj : T;\nEND_VAR\n",
+        "obj.field := 1;\n",
+        "arr[2].state := 3;\n",
+        "END_PROGRAM\n",
+    ));
+
+    let targets: Vec<&str> = parsed.units()[0]
+        .statements
+        .iter()
+        .filter(|statement| statement.kind == StatementKind::Assignment)
+        .filter_map(|statement| statement.target.as_deref())
+        .collect();
+    assert!(!targets.contains(&"field"), "got targets: {targets:?}");
+    assert!(!targets.contains(&"state"), "got targets: {targets:?}");
+}
+
+#[test]
 fn parser_does_not_treat_named_call_arguments_as_assignments() {
     // PLC-79: named call arguments `f(IN := x, L := y)` must NOT be parsed as
     // assignment statements. Previously every named argument became a spurious

@@ -35,6 +35,8 @@ pub enum TypeKind {
     Time,
     String,
     WString,
+    /// IEC bit-string type (BYTE/WORD/DWORD/LWORD), tagged by width in bits.
+    BitString(u8),
     Array,
     Struct,
     Enum,
@@ -56,6 +58,10 @@ impl TypeKind {
             "TIME" | "DATE" | "TIME_OF_DAY" | "TOD" | "DATE_AND_TIME" | "DT" => Self::Time,
             "STRING" => Self::String,
             "WSTRING" => Self::WString,
+            "BYTE" => Self::BitString(8),
+            "WORD" => Self::BitString(16),
+            "DWORD" => Self::BitString(32),
+            "LWORD" => Self::BitString(64),
             "ARRAY" => Self::Array,
             "STRUCT" => Self::Struct,
             "ENUM" => Self::Enum,
@@ -74,6 +80,11 @@ impl TypeKind {
             Self::Time => "time/date",
             Self::String => "STRING",
             Self::WString => "WSTRING",
+            Self::BitString(8) => "BYTE",
+            Self::BitString(16) => "WORD",
+            Self::BitString(32) => "DWORD",
+            Self::BitString(64) => "LWORD",
+            Self::BitString(_) => "bit string",
             Self::Array => "ARRAY",
             Self::Struct => "STRUCT",
             Self::Enum => "ENUM",
@@ -84,16 +95,25 @@ impl TypeKind {
     }
 
     pub fn assignment_compatible(&self, value: &Self) -> bool {
-        matches!(
-            (self, value),
+        if matches!(value, Self::Unknown(_)) {
+            return true;
+        }
+        match (self, value) {
             (Self::Integer, Self::Integer)
-                | (Self::Real, Self::Real)
-                | (Self::Real, Self::Integer)
-                | (Self::Bool, Self::Bool)
-                | (Self::String, Self::String)
-                | (Self::WString, Self::String)
-                | (Self::Time, Self::Time)
-        ) || matches!(value, Self::Unknown(_))
+            | (Self::Real, Self::Real)
+            | (Self::Real, Self::Integer)
+            | (Self::Bool, Self::Bool)
+            | (Self::String, Self::String)
+            | (Self::WString, Self::String)
+            | (Self::Time, Self::Time) => true,
+            // Bit-string (BYTE/WORD/DWORD/LWORD): same width or widening, plus
+            // integer values/literals, which CODESYS/IEC accept implicitly.
+            (Self::BitString(target), Self::BitString(source)) => source <= target,
+            (Self::BitString(_), Self::Integer) => true,
+            // Same-named derived/user types (enum := enum, struct := struct, alias).
+            (Self::Derived(a), Self::Derived(b)) => a.eq_ignore_ascii_case(b),
+            _ => false,
+        }
     }
 }
 

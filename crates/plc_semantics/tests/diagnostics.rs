@@ -33,3 +33,30 @@ fn accepts_assignment_between_compatible_variables() {
 
     assert!(analysis.diagnostics.is_empty());
 }
+
+#[test]
+fn accepts_same_type_bit_string_assignment() {
+    // PLC-85: WORD := WORD (and integer literal into WORD) must not be flagged.
+    let analysis = analyze_file(
+        "file:///main.st",
+        "PROGRAM Main\nVAR\n    a : WORD;\n    b : WORD;\nEND_VAR\nb := a;\nb := 15;\nEND_PROGRAM\n",
+    );
+
+    assert!(
+        analysis.diagnostics.is_empty(),
+        "unexpected diagnostics: {:?}",
+        analysis.diagnostics
+    );
+}
+
+#[test]
+fn still_reports_real_into_bit_string_mismatch() {
+    // PLC-85 guard: relaxing bit-string rules must not silence a genuine mismatch.
+    let analysis = analyze_file(
+        "file:///main.st",
+        "PROGRAM Main\nVAR\n    w : WORD;\n    r : REAL;\nEND_VAR\nw := r;\nEND_PROGRAM\n",
+    );
+
+    assert_eq!(analysis.diagnostics.len(), 1);
+    assert_eq!(analysis.diagnostics[0].code, "SEM0002");
+}

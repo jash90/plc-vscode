@@ -102,6 +102,31 @@ fn parser_captures_array_initializer_after_of_clause() {
 }
 
 #[test]
+fn parser_resets_paren_depth_at_statement_boundaries() {
+    // PLC-88: an unbalanced `(` in one statement must not suppress recognition
+    // of the following statements. Before the fix, paren_depth stayed > 0 for
+    // the rest of the body and every later `name := expr` was skipped.
+    let parsed = parse_source(concat!(
+        "PROGRAM Main\n",
+        "VAR\n    a : INT;\n    b : INT;\nEND_VAR\n",
+        "a := (1;\n",
+        "b := 2;\n",
+        "END_PROGRAM\n",
+    ));
+
+    let targets: Vec<&str> = parsed.units()[0]
+        .statements
+        .iter()
+        .filter(|statement| statement.kind == StatementKind::Assignment)
+        .filter_map(|statement| statement.target.as_deref())
+        .collect();
+    assert!(
+        targets.contains(&"b"),
+        "statement after an unbalanced paren was dropped; got targets: {targets:?}"
+    );
+}
+
+#[test]
 fn parser_recognizes_core_pou_program() {
     let parsed = parse_source("PROGRAM Main\nVAR\nEND_VAR\nEND_PROGRAM\n");
 

@@ -390,6 +390,15 @@ fn parse_statements(tokens: &[(usize, &Token)]) -> Vec<Statement> {
         }
 
         let token = tokens[cursor].1;
+        // A `;` terminates a statement and never appears inside parentheses in
+        // ST, so reset the depth here. Without this, one unbalanced parenthesis
+        // would desynchronise paren_depth and silently suppress every following
+        // statement in the body.
+        if token.text == ";" {
+            paren_depth = 0;
+            cursor += 1;
+            continue;
+        }
         // Track call/grouping parenthesis depth so named arguments (`p := v`)
         // inside a call are not mistaken for statement-level assignments.
         if token.text == "(" {

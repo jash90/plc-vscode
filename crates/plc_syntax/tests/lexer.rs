@@ -135,6 +135,27 @@ fn lexer_handles_dollar_escapes_in_strings() {
 }
 
 #[test]
+fn lexer_accepts_at_prefixed_annotations() {
+    // PLC-84: `@EXTERNAL`-style annotations lex as one identifier, not SYN0000,
+    // and the following declaration still tokenizes cleanly.
+    let lexed = lex_source("@EXTERNAL FUNCTION F : INT\nEND_FUNCTION\n");
+    assert!(
+        lexed.diagnostics().is_empty(),
+        "unexpected diagnostics: {:?}",
+        lexed.diagnostics()
+    );
+    assert!(
+        lexed
+            .tokens()
+            .iter()
+            .any(|token| token.kind == TokenKind::Identifier && token.text == "@EXTERNAL")
+    );
+
+    // A bare `@` (no following identifier) remains an invalid token.
+    assert_eq!(lex_source("@ ").diagnostics().len(), 1);
+}
+
+#[test]
 fn lexer_accepts_siemens_scl_local_refs() {
     // PLC-75: Siemens SCL hash-prefixed locals (`#Enable`) lex as one identifier
     // token, not SYN0000. A stray `#` not followed by a name still errors.

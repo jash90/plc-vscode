@@ -198,6 +198,25 @@ pub fn lex_source(source: &str) -> LexedSource {
                 }
                 tokens.push(Token::new(TokenKind::Identifier, start, cursor, source));
             }
+            // `@`-prefixed external/attribute annotation (`@EXTERNAL`). Lex the
+            // annotation as one identifier-like token so it does not cascade; a
+            // bare `@` still falls through to an invalid-token diagnostic.
+            '@' if source[cursor + '@'.len_utf8()..]
+                .chars()
+                .next()
+                .is_some_and(is_identifier_start) =>
+            {
+                cursor += '@'.len_utf8();
+                while cursor < bytes.len() {
+                    let next = source[cursor..].chars().next().unwrap();
+                    if is_identifier_continue(next) {
+                        cursor += next.len_utf8();
+                    } else {
+                        break;
+                    }
+                }
+                tokens.push(Token::new(TokenKind::Identifier, start, cursor, source));
+            }
             '{' => {
                 // Vendor pragma / brace-delimited metadata (`{attribute 'hide'}`,
                 // `{region}`). Consume through the matching `}` and treat it as

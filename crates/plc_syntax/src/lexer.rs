@@ -161,15 +161,7 @@ pub fn lex_source(source: &str) -> LexedSource {
                 }
             }
             c if c.is_ascii_digit() => {
-                cursor += c.len_utf8();
-                while cursor < bytes.len() {
-                    let next = source[cursor..].chars().next().unwrap();
-                    if next.is_ascii_alphanumeric() || matches!(next, '_' | '.') {
-                        cursor += next.len_utf8();
-                    } else {
-                        break;
-                    }
-                }
+                cursor = scan_decimal_number(source, start);
                 // A `#` after a number starts an IEC base/radix literal (`16#FF`,
                 // `2#1010_0110`); absorb it into the same literal token.
                 if source[cursor..].starts_with('#') {
@@ -355,8 +347,49 @@ fn scan_typed_literal_body(source: &str, start: usize) -> usize {
     cursor
 }
 
+/// Scan a decimal integer or real literal starting at the first digit. Consumes
+/// integer digits (with `_` separators), an optional fractional part (a single
+/// `.` followed by digits — never `..`, which is the range operator, and never
+/// `.<letter>`, which is member access), and an optional signed decimal exponent
+/// (`e`/`E` then optional `+`/`-` then digits). The IEC radix/typed `#` form
+/// (`16#FF`) is consumed separately by the caller. All matched characters are
+/// ASCII, so byte indexing stays on char boundaries.
+fn scan_decimal_number(source: &str, start: usize) -> usize {
+    let bytes = source.as_bytes();
+    let is_digit_or_sep = |b: u8| b.is_ascii_digit() || b == b'_';
+    let mut cursor = start;
+
+    while cursor < bytes.len() && is_digit_or_sep(bytes[cursor]) {
+        cursor += 1;
+    }
+
+    // Fractional part: a single `.` immediately followed by a digit.
+    if cursor + 1 < bytes.len() && bytes[cursor] == b'.' && bytes[cursor + 1].is_ascii_digit() {
+        cursor += 1;
+        while cursor < bytes.len() && is_digit_or_sep(bytes[cursor]) {
+            cursor += 1;
+        }
+    }
+
+    // Exponent: `e`/`E`, optional sign, then at least one digit.
+    if cursor < bytes.len() && (bytes[cursor] == b'e' || bytes[cursor] == b'E') {
+        let mut exponent = cursor + 1;
+        if exponent < bytes.len() && (bytes[exponent] == b'+' || bytes[exponent] == b'-') {
+            exponent += 1;
+        }
+        if exponent < bytes.len() && bytes[exponent].is_ascii_digit() {
+            cursor = exponent;
+            while cursor < bytes.len() && is_digit_or_sep(bytes[cursor]) {
+                cursor += 1;
+            }
+        }
+    }
+
+    cursor
+}
+
 fn scan_operator(source: &str, cursor: usize) -> Option<usize> {
-    for op in [":=", "<=", ">=", "<>", "..", "=>"] {
+    for op in [":=", "<=", ">=", "<>", "..", "=>", "**"] {
         if source[cursor..].starts_with(op) {
             return Some(cursor + op.len());
         }

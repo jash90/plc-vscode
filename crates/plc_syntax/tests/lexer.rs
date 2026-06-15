@@ -264,6 +264,88 @@ fn lexer_accepts_located_variable_addresses() {
     assert_eq!(single_address("%B6"), "%B6");
 }
 
+fn significant(source: &str) -> Vec<(TokenKind, String)> {
+    let lexed = lex_source(source);
+    assert!(
+        lexed.diagnostics().is_empty(),
+        "unexpected diagnostics for {source:?}: {:?}",
+        lexed.diagnostics()
+    );
+    lexed
+        .tokens()
+        .iter()
+        .filter(|token| !token.is_trivia())
+        .map(|token| (token.kind, token.text.clone()))
+        .collect()
+}
+
+#[test]
+fn lexer_lexes_power_operator_as_single_token() {
+    // PLC-86: `**` (exponentiation) must be one operator token, not two `*`.
+    assert_eq!(
+        significant("2.0 ** 10.0"),
+        vec![
+            (TokenKind::NumberLiteral, "2.0".to_owned()),
+            (TokenKind::Operator, "**".to_owned()),
+            (TokenKind::NumberLiteral, "10.0".to_owned()),
+        ]
+    );
+    assert_eq!(
+        significant("a ** b"),
+        vec![
+            (TokenKind::Identifier, "a".to_owned()),
+            (TokenKind::Operator, "**".to_owned()),
+            (TokenKind::Identifier, "b".to_owned()),
+        ]
+    );
+}
+
+#[test]
+fn lexer_splits_range_after_bare_decimal() {
+    // PLC-86: `1..10` must split into `1` `..` `10`, not glue as one literal.
+    assert_eq!(
+        significant("1..10"),
+        vec![
+            (TokenKind::NumberLiteral, "1".to_owned()),
+            (TokenKind::Operator, "..".to_owned()),
+            (TokenKind::NumberLiteral, "10".to_owned()),
+        ]
+    );
+    assert_eq!(
+        significant("ARRAY[0..255]"),
+        vec![
+            (TokenKind::Keyword, "ARRAY".to_owned()),
+            (TokenKind::Operator, "[".to_owned()),
+            (TokenKind::NumberLiteral, "0".to_owned()),
+            (TokenKind::Operator, "..".to_owned()),
+            (TokenKind::NumberLiteral, "255".to_owned()),
+            (TokenKind::Operator, "]".to_owned()),
+        ]
+    );
+}
+
+#[test]
+fn lexer_lexes_signed_exponent_real_literals() {
+    // PLC-86: a signed decimal exponent stays part of the REAL literal.
+    assert_eq!(single_literal("1.0e-3"), "1.0e-3");
+    assert_eq!(single_literal("1.0E+3"), "1.0E+3");
+    assert_eq!(single_literal("1.5E3"), "1.5E3");
+    assert_eq!(single_literal("2.5e10"), "2.5e10");
+}
+
+#[test]
+fn lexer_does_not_glue_member_access_after_decimal_point() {
+    // PLC-86: `5.x` is `5` `.` `x` (a malformed/member form), not one literal.
+    assert_eq!(
+        significant("5.x"),
+        vec![
+            (TokenKind::NumberLiteral, "5".to_owned()),
+            (TokenKind::Operator, ".".to_owned()),
+            (TokenKind::Identifier, "x".to_owned()),
+        ]
+    );
+}
+
 #[test]
 fn lexer_splits_typed_literal_case_ranges() {
     // `BYTE#9..BYTE#10` must keep the `..` range operator separate.

@@ -1,27 +1,46 @@
-PROPRIETARY SOFTWARE LICENSE
+PROPRIETARY SOFTWARE LICENSE (Free to Use — Source Reserved)
 
 Copyright (c) 2026 Raccoon Software. All rights reserved.
 
 This software, including its source code, binaries, and accompanying materials
-(collectively, the "Software"), is the proprietary and confidential property of
-Raccoon Software (the "Owner").
+(collectively, the "Software"), is the proprietary property of Raccoon Software
+(the "Owner"). The Software is licensed, not sold.
 
-NO LICENSE OR RIGHT IS GRANTED. No person or entity may use, copy, reproduce,
-execute, run, modify, adapt, translate, merge, publish, distribute, sublicense,
-sell, rent, lease, transmit, reverse engineer, decompile, disassemble, or create
-derivative works of the Software, in whole or in part, by any means or in any
-form, without the prior written permission of the Owner.
+1. PERMITTED USE. The Owner grants you a worldwide, non-exclusive,
+   non-transferable, revocable, royalty-free license to download, install, and
+   use the Software in its distributed, packaged form (for example, the
+   published VS Code extension) for its intended purpose, free of charge, for
+   both personal and commercial use. You may make a reasonable number of backup
+   copies of the packaged build for your own use.
 
-The Software may be published in a public repository and/or distributed as a
-packaged build for reference and evaluation only. Viewing or receiving the
-Software does not grant any license or right to use it, and all rights not
-expressly granted in writing are reserved by the Owner.
+2. RESERVED RIGHTS. All rights not expressly granted in Section 1 are reserved
+   by the Owner. Except as Section 1 permits, you may NOT, without the Owner's
+   prior written permission:
+   (a) copy, reproduce, or republish the Software's source code;
+   (b) modify, adapt, translate, or create derivative works of the Software;
+   (c) reverse engineer, decompile, or disassemble the Software, or otherwise
+       attempt to derive its source code, except to the extent this restriction
+       is prohibited by applicable law;
+   (d) redistribute, sublicense, sell, rent, lease, lend, or otherwise transfer
+       the Software, or make it available to any third party as a service; or
+   (e) reuse the source code, in whole or in part, in any other project or
+       product.
 
-To request permission, contact the Owner at https://github.com/jash90.
+3. OWNERSHIP. The Owner retains all right, title, and interest in and to the
+   Software, including all intellectual property rights. This license grants no
+   rights to the Owner's trademarks, service marks, or branding.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE OWNER BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
-CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+4. TERMINATION. This license terminates automatically if you breach any of its
+   terms. On termination you must stop using the Software and destroy your
+   copies, except that backup copies may be retained as required by law.
+
+5. PERMISSION REQUESTS. To request rights beyond this license (for example, to
+   reuse or redistribute the source code), contact the Owner at
+   https://github.com/jash90.
+
+6. NO WARRANTY. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+   EVENT SHALL THE OWNER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+   WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+   IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

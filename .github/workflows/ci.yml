@@ -13,15 +13,23 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  # Lightweight workspace checks across platforms. The LLVM backend crate is
-  # excluded from the workspace, so these jobs need no LLVM toolchain.
+  # Lightweight workspace checks. The LLVM backend crate is excluded from the
+  # workspace, so these jobs need no LLVM toolchain.
+  #
+  # Cost control on a PRIVATE repo (macOS = 10x billed minutes, Windows = 2x,
+  # Linux = 1x):
+  #   - pull_request : ubuntu-latest ONLY -> 1x  (fast, cheap iteration feedback)
+  #   - push to main : full 3-OS matrix   -> 13x (cross-platform check, once,
+  #                                               right before the change lands)
+  # The conditional matrix uses fromJSON: on a PR it expands to one entry, on a
+  # push to main it expands to all three.
   workspace:
     name: workspace (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ github.event_name == 'pull_request' && fromJSON('["ubuntu-latest"]') || fromJSON('["ubuntu-latest", "macos-latest", "windows-latest"]') }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust
@@ -36,12 +44,20 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
-  # Isolated LLVM job: builds and tests the native backend crate against a
-  # pinned LLVM 18 toolchain. Kept separate so a toolchain problem never blocks
-  # the lightweight workspace jobs.
+  # Isolated LLVM job: builds and tests the native backend crate against a pinned
+  # LLVM 18 toolchain. Kept separate so a toolchain problem never blocks the
+  # lightweight workspace jobs.
+  #
+  # Gated so it neither burns minutes nor blocks every PR (the backend has a
+  # known pre-existing Polly linker failure on the hosted runner):
+  #   - runs on push to main (pre-merge validation)
+  #   - on a PR, runs ONLY when the PR carries the `llvm-check` label
+  # `continue-on-error` keeps the known-red result non-blocking even when it runs.
   llvm-backend:
     name: llvm-backend (LLVM 18)
+    if: ${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'llvm-check') }}
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust
@@ -56,7 +72,7 @@ jobs:
       - name: Test native backend
         run: cargo test --manifest-path crates/plc_llvm_backend/Cargo.toml
 
-  # VS Code extension client checks.
+  # VS Code extension client checks (ubuntu only, fast feedback on every run).
   vscode:
     name: vscode-client
     runs-on: ubuntu-latest

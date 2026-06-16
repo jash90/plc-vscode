@@ -498,10 +498,7 @@ impl<'a> StmtParser<'a> {
 
     fn parse_case_labels(&mut self) -> Vec<CaseLabel> {
         let mut labels = Vec::new();
-        loop {
-            let Some(first) = self.parse_int_constant() else {
-                break;
-            };
+        while let Some(first) = self.parse_int_constant() {
             if self.eat_text("..") {
                 let second = self.parse_int_constant().unwrap_or(first);
                 labels.push(CaseLabel::Range(first, second));

@@ -1,0 +1,9 @@
+[package]
+name = "plc_api"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Backend-agnostic ports (LanguageService, ExecutionEngine) and shared DTOs for PLC VS Code. Implement these traits to plug in your own analyzer/LSP backend or compiler/runtime."
+
+[lib]
+path = "src/lib.rs"

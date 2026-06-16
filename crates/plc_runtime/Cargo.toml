@@ -2,7 +2,8 @@
 name = "plc_runtime"
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license-file = "../../LICENSE"
+publish = false
 description = "Deterministic PLC scan-cycle runtime and simulator for PLC VS Code."
 
 [lib]

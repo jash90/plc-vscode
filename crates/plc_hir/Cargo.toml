@@ -2,7 +2,8 @@
 name = "plc_hir"
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license-file = "../../LICENSE"
+publish = false
 description = "Backend-agnostic HIR and lowering shared by the VM and native backends."
 
 [lib]

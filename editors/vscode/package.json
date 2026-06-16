@@ -14,7 +14,10 @@
   "activationEvents": [
     "onLanguage:structured-text",
     "onCommand:plc-vscode.showStatus",
-    "onCommand:plc-vscode.runCurrentFile"
+    "onCommand:plc-vscode.runCurrentFile",
+    "onCommand:plc-vscode.debugCurrentFile",
+    "onDebugResolve:plc-st",
+    "onDebugDynamicConfigurations:plc-st"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -41,6 +44,58 @@
         "path": "./syntaxes/structured-text.tmLanguage.json"
       }
     ],
+    "breakpoints": [
+      {
+        "language": "structured-text"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "plc-st",
+        "label": "PLC Structured Text",
+        "languages": [
+          "structured-text"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to the Structured Text file to debug.",
+                "default": "${file}"
+              },
+              "scans": {
+                "type": "number",
+                "description": "Number of scan cycles to execute.",
+                "default": 25
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "plc-st",
+            "request": "launch",
+            "name": "PLC: Debug Structured Text",
+            "program": "${file}",
+            "scans": 25
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "PLC: Debug Structured Text",
+            "description": "Debug the current Structured Text file",
+            "body": {
+              "type": "plc-st",
+              "request": "launch",
+              "name": "PLC: Debug Structured Text",
+              "program": "^\"\\${file}\"",
+              "scans": 25
+            }
+          }
+        ]
+      }
+    ],
     "commands": [
       {
         "command": "plc-vscode.showStatus",
@@ -49,8 +104,50 @@
       {
         "command": "plc-vscode.runCurrentFile",
         "title": "PLC VS Code: Run Current Structured Text File"
+      },
+      {
+        "command": "plc-vscode.debugCurrentFile",
+        "title": "PLC VS Code: Debug Current Structured Text File"
       }
     ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "plc-vscode.runCurrentFile",
+          "group": "navigation@0",
+          "when": "resourceLangId == structured-text"
+        },
+        {
+          "command": "plc-vscode.debugCurrentFile",
+          "group": "navigation@1",
+          "when": "resourceLangId == structured-text"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "plc-vscode.runCurrentFile",
+          "group": "navigation@10",
+          "when": "editorLangId == structured-text"
+        },
+        {
+          "command": "plc-vscode.debugCurrentFile",
+          "group": "navigation@11",
+          "when": "editorLangId == structured-text"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "plc-vscode.runCurrentFile",
+          "group": "navigation@10",
+          "when": "resourceLangId == structured-text"
+        },
+        {
+          "command": "plc-vscode.debugCurrentFile",
+          "group": "navigation@11",
+          "when": "resourceLangId == structured-text"
+        }
+      ]
+    },
     "configuration": {
       "title": "PLC VS Code",
       "properties": {

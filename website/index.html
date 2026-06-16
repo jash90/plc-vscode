@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PLC VS Code — Structured Text for Visual Studio Code</title>
+  <meta name="description" content="Structured Text (IEC 61131-3) support for VS Code: language server, a bundled compiler/runtime, and a full stepping debugger. Nothing extra to download." />
+  <style>
+    :root {
+      --bg: #1e1e1e;
+      --bg-alt: #252526;
+      --panel: #2d2d30;
+      --border: #3c3c3c;
+      --fg: #d4d4d4;
+      --muted: #9da3ab;
+      --accent: #3794ff;
+      --accent-strong: #0e639c;
+      --green: #4ec9b0;
+      --radius: 10px;
+      --mono: "SF Mono", "Cascadia Code", Consolas, "Liberation Mono", monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+    header.hero {
+      text-align: center;
+      padding: 80px 24px 56px;
+      background: radial-gradient(900px 400px at 50% -10%, rgba(55,148,255,0.18), transparent 70%);
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      width: 76px; height: 76px; border-radius: 18px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 38px; font-weight: 800; color: #fff; margin-bottom: 20px;
+      box-shadow: 0 8px 30px rgba(14,99,156,0.35);
+    }
+    h1 { font-size: 2.6rem; margin: 0 0 10px; letter-spacing: -0.02em; }
+    .tagline { font-size: 1.2rem; color: var(--muted); max-width: 640px; margin: 0 auto 28px; }
+    .badges { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 30px; }
+    .badge {
+      font-size: 0.8rem; color: var(--muted); background: var(--panel);
+      border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px;
+    }
+    .cta {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: var(--accent-strong); color: #fff; font-weight: 600; font-size: 1.05rem;
+      padding: 13px 26px; border-radius: var(--radius); border: 1px solid var(--accent);
+      transition: background .15s ease, transform .15s ease;
+    }
+    .cta:hover { background: var(--accent); text-decoration: none; transform: translateY(-1px); }
+    .cta small { font-weight: 400; opacity: 0.85; }
+    .cta-sub { display: block; margin-top: 12px; font-size: 0.85rem; color: var(--muted); }
+    section { padding: 56px 0; border-bottom: 1px solid var(--border); }
+    h2 { font-size: 1.7rem; margin: 0 0 24px; letter-spacing: -0.01em; }
+    .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+    .card {
+      background: var(--bg-alt); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 22px;
+    }
+    .card .ico { font-size: 1.5rem; margin-bottom: 8px; }
+    .card h3 { margin: 0 0 8px; font-size: 1.1rem; }
+    .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+    table.dl { width: 100%; border-collapse: collapse; background: var(--bg-alt); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    table.dl th, table.dl td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    table.dl th { color: var(--muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    table.dl tr:last-child td { border-bottom: none; }
+    table.dl tr.match td { background: rgba(55,148,255,0.10); }
+    .dlbtn { display: inline-block; background: var(--panel); border: 1px solid var(--border); border-radius: 7px; padding: 6px 14px; color: var(--fg); font-weight: 600; font-size: 0.9rem; }
+    .dlbtn:hover { border-color: var(--accent); color: var(--accent); text-decoration: none; }
+    .tag { font-size: 0.72rem; color: var(--green); border: 1px solid var(--green); border-radius: 999px; padding: 1px 8px; margin-left: 8px; vertical-align: middle; }
+    pre {
+      background: #161616; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 16px 18px; overflow-x: auto; font-family: var(--mono); font-size: 0.9rem; color: var(--fg);
+    }
+    .steps { counter-reset: step; padding: 0; list-style: none; }
+    .steps li { position: relative; padding: 0 0 18px 44px; }
+    .steps li::before {
+      counter-increment: step; content: counter(step);
+      position: absolute; left: 0; top: 0; width: 28px; height: 28px;
+      background: var(--accent-strong); color: #fff; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem;
+    }
+    .note { background: rgba(255,193,7,0.08); border: 1px solid rgba(255,193,7,0.35); border-radius: var(--radius); padding: 14px 18px; color: var(--fg); font-size: 0.92rem; }
+    footer { text-align: center; padding: 40px 24px; color: var(--muted); font-size: 0.9rem; }
+    footer a { margin: 0 8px; }
+    @media (max-width: 600px) { h1 { font-size: 2rem; } table.dl th:nth-child(2), table.dl td:nth-child(2) { display: none; } }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <div class="logo">PLC</div>
+      <h1>PLC VS&nbsp;Code</h1>
+      <p class="tagline">Structured Text (IEC&nbsp;61131-3) for Visual Studio Code — language intelligence, a bundled compiler/runtime, and a full stepping debugger. <strong>Nothing extra to download.</strong></p>
+      <div class="badges">
+        <span class="badge">IEC 61131-3 Structured Text</span>
+        <span class="badge">LSP-powered</span>
+        <span class="badge">Stepping debugger</span>
+        <span class="badge" id="version-badge">v0.1.0</span>
+      </div>
+      <a class="cta" id="primary-download" href="#downloads">
+        <span>⬇ Download</span><small id="primary-platform">— pick your platform</small>
+      </a>
+      <span class="cta-sub" id="detect-note">Detecting your platform…</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="wrap">
+      <h2>What you get</h2>
+      <div class="features">
+        <div class="card">
+          <div class="ico">💡</div>
+          <h3>Language intelligence</h3>
+          <p>Completions, hover, signature help, diagnostics, document &amp; workspace symbols, and semantic highlighting — via the bundled <code>plc-lsp-server</code>.</p>
+        </div>
+        <div class="card">
+          <div class="ico">▶️</div>
+          <h3>Run Structured Text</h3>
+          <p>Execute a <code>.st</code> file from the command, the editor title ▶ button, or a right-click — through the bundled scan-cycle runtime.</p>
+        </div>
+        <div class="card">
+          <div class="ico">🐞</div>
+          <h3>Full stepping debugger</h3>
+          <p>Breakpoints, step over/into/out, live <strong>Variables</strong> (scalars + function-block outputs) and Call Stack. <code>F5</code> just works; right-click Debug too.</p>
+        </div>
+        <div class="card">
+          <div class="ico">📦</div>
+          <h3>Self-contained</h3>
+          <p>Each platform package bundles the native compiler + language server. No Rust toolchain, no separate downloads — install and go.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="downloads">
+    <div class="wrap">
+      <h2>Download</h2>
+      <table class="dl">
+        <thead>
+          <tr><th>Platform</th><th>Architecture</th><th>Package</th></tr>
+        </thead>
+        <tbody id="dl-rows"><!-- filled by JS --></tbody>
+      </table>
+      <p style="color:var(--muted); font-size:0.88rem; margin-top:14px;">
+        Always the latest release. Browse all versions on the
+        <a href="https://github.com/jash90/plc-vscode/releases">releases page</a>.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Install</h2>
+      <ol class="steps">
+        <li>Download the package for your platform above.</li>
+        <li>From a terminal:
+          <pre>code --install-extension plc-vscode-&lt;platform&gt;.vsix</pre>
+          …or in VS Code: <strong>Extensions</strong> view → <strong>⋯</strong> → <strong>Install from VSIX…</strong>
+        </li>
+        <li>Open any <code>.st</code> / <code>.iecst</code> / <code>.plcst</code> file. Press <strong>F5</strong> to debug, or right-click → <strong>Run</strong>.</li>
+      </ol>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <p>
+        <a href="https://github.com/jash90/plc-vscode">GitHub</a> ·
+        <a href="https://github.com/jash90/plc-vscode/releases/latest">Latest release</a> ·
+        <a href="https://github.com/jash90/plc-vscode/releases">All releases</a>
+      </p>
+      <p>MIT-licensed. Built with a Rust language server, compiler/runtime, and a Debug Adapter Protocol backend.</p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var REPO = "jash90/plc-vscode";
+      var BASE = "https://github.com/" + REPO + "/releases/latest/download/";
+      // [vsce target, OS label, arch label, OS key, arch key]
+      var TARGETS = [
+        ["darwin-arm64", "macOS", "Apple Silicon", "darwin", "arm64"],
+        ["darwin-x64",   "macOS", "Intel",         "darwin", "x64"],
+        ["linux-x64",    "Linux", "x64",           "linux",  "x64"],
+        ["linux-arm64",  "Linux", "arm64",         "linux",  "arm64"],
+        ["win32-x64",    "Windows", "x64",         "win32",  "x64"],
+        ["win32-arm64",  "Windows", "arm64",       "win32",  "arm64"]
+      ];
+
+      function fileFor(t) { return "plc-vscode-" + t + ".vsix"; }
+
+      function render(matchKey) {
+        var tbody = document.getElementById("dl-rows");
+        tbody.innerHTML = "";
+        TARGETS.forEach(function (t) {
+          var key = t[3] + "-" + t[4];
+          var tr = document.createElement("tr");
+          if (key === matchKey) tr.className = "match";
+          var rec = key === matchKey ? '<span class="tag">recommended</span>' : "";
+          tr.innerHTML =
+            "<td>" + t[1] + rec + "</td>" +
+            "<td>" + t[2] + "</td>" +
+            '<td><a class="dlbtn" href="' + BASE + fileFor(t[0]) + '" download>⬇ ' + fileFor(t[0]) + "</a></td>";
+          tbody.appendChild(tr);
+        });
+      }
+
+      function setPrimary(matchKey) {
+        var t = TARGETS.filter(function (x) { return x[3] + "-" + x[4] === matchKey; })[0];
+        var btn = document.getElementById("primary-download");
+        var lbl = document.getElementById("primary-platform");
+        var note = document.getElementById("detect-note");
+        if (t) {
+          btn.href = BASE + fileFor(t[0]);
+          btn.setAttribute("download", "");
+          lbl.textContent = "— " + t[1] + " (" + t[2] + ")";
+          note.textContent = "Auto-detected: " + t[1] + " · " + t[2] + ". Not right? Pick another below.";
+        } else {
+          lbl.textContent = "— pick your platform";
+          note.textContent = "Choose your platform below.";
+        }
+      }
+
+      function detectOsKey() {
+        var ua = navigator.userAgent || "";
+        var plat = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "").toLowerCase();
+        if (/win/.test(plat) || /windows/i.test(ua)) return "win32";
+        if (/mac/.test(plat) || /mac os x|macintosh/i.test(ua)) return "darwin";
+        return "linux";
+      }
+
+      function detectArchSync(osKey) {
+        var ua = navigator.userAgent || "";
+        if (/arm64|aarch64/i.test(ua)) return "arm64";
+        // Apple Silicon often masks as Intel in the UA; default macOS to arm64
+        // (most current Macs), refined asynchronously below where supported.
+        if (osKey === "darwin") return "arm64";
+        return "x64";
+      }
+
+      var osKey = detectOsKey();
+      var match = osKey + "-" + detectArchSync(osKey);
+      render(match);
+      setPrimary(match);
+
+      // Refine architecture using high-entropy client hints where available.
+      if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+        navigator.userAgentData.getHighEntropyValues(["architecture"]).then(function (h) {
+          if (!h || !h.architecture) return;
+          var arch = /arm/i.test(h.architecture) ? "arm64" : "x64";
+          var refined = osKey + "-" + arch;
+          if (refined !== match) { match = refined; render(match); setPrimary(match); }
+        }).catch(function () {});
+      }
+    })();
+  </script>
+</body>
+</html>

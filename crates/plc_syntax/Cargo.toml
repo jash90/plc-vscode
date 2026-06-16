@@ -2,7 +2,8 @@
 name = "plc_syntax"
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license-file = "../../LICENSE"
+publish = false
 description = "Structured Text lexer, parser facade, and syntax diagnostics for PLC VS Code."
 
 [lib]

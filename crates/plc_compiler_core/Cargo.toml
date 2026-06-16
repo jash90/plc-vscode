@@ -2,7 +2,8 @@
 name = "plc_compiler_core"
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license-file = "../../LICENSE"
+publish = false
 description = "Shared compiler-core API for PLC VS Code CLI, LSP, runtime and backends."
 
 [lib]

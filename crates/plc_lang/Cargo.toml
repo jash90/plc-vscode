@@ -2,7 +2,8 @@
 name = "plc_lang"
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license-file = "../../LICENSE"
+publish = false
 description = "Language-plugin registry and canonical-IR (plc_hir) conversion hub for PLC VS Code. Implement LanguageFrontend to add a PLC language; convert between languages via the IR."
 
 [lib]

@@ -2,7 +2,8 @@
 name = "plc_lsp_server"
 version = "0.1.0"
 edition = "2024"
-license = "MIT"
+license-file = "../../LICENSE"
+publish = false
 description = "Language server for PLC VS Code Structured Text support."
 
 [dependencies]

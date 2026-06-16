@@ -3,11 +3,12 @@
 use plc_compiler_core::{
     CodeAction as CoreCodeAction, CompilerCore, CompletionCandidate as CoreCompletionCandidate,
     DiagnosticSeverity as CoreSeverity, DocumentSymbol as CoreDocumentSymbol,
-    HoverInfo as CoreHoverInfo, Location as CoreLocation, Position as CorePosition,
-    Range as CoreRange, SemanticTokenKind as CoreSemanticTokenKind,
+    HoverInfo as CoreHoverInfo, LanguageService, Location as CoreLocation,
+    Position as CorePosition, Range as CoreRange, SemanticTokenKind as CoreSemanticTokenKind,
     SignatureInfo as CoreSignatureInfo, SourceDocument, SymbolKind as CoreSymbolKind,
     TextEdit as CoreTextEdit, WorkspaceSymbol as CoreWorkspaceSymbol,
 };
+use plc_lang::LanguageRegistry;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -32,7 +33,16 @@ use tower_lsp::{Client, LanguageServer};
 
 /// Convert compiler-core analysis into LSP diagnostics.
 pub fn diagnostics_for_text(uri: &str, version: i32, text: &str) -> Vec<Diagnostic> {
-    let core = CompilerCore;
+    diagnostics_with(&CompilerCore, uri, version, text)
+}
+
+/// Backend-parameterized core of [`diagnostics_for_text`]; works with any `LanguageService`.
+fn diagnostics_with(
+    core: &dyn LanguageService,
+    uri: &str,
+    version: i32,
+    text: &str,
+) -> Vec<Diagnostic> {
     let document = SourceDocument::new(uri, version, text);
     core.analyze(&document)
         .diagnostics()
@@ -60,7 +70,16 @@ pub fn diagnostics_for_text(uri: &str, version: i32, text: &str) -> Vec<Diagnost
 
 /// Convert compiler-core document symbols into LSP nested document symbols.
 pub fn document_symbols_for_text(uri: &str, version: i32, text: &str) -> Vec<DocumentSymbol> {
-    let core = CompilerCore;
+    document_symbols_with(&CompilerCore, uri, version, text)
+}
+
+/// Backend-parameterized core of [`document_symbols_for_text`]; works with any `LanguageService`.
+fn document_symbols_with(
+    core: &dyn LanguageService,
+    uri: &str,
+    version: i32,
+    text: &str,
+) -> Vec<DocumentSymbol> {
     let document = SourceDocument::new(uri, version, text);
     core.document_symbols(&document)
         .symbols()
@@ -75,7 +94,15 @@ pub fn workspace_symbols_for_documents(
     documents: &[(String, String)],
     query: &str,
 ) -> Vec<SymbolInformation> {
-    let core = CompilerCore;
+    workspace_symbols_with(&CompilerCore, documents, query)
+}
+
+/// Backend-parameterized core of [`workspace_symbols_for_documents`]; works with any `LanguageService`.
+fn workspace_symbols_with(
+    core: &dyn LanguageService,
+    documents: &[(String, String)],
+    query: &str,
+) -> Vec<SymbolInformation> {
     let sources: Vec<SourceDocument> = documents
         .iter()
         .map(|(uri, text)| SourceDocument::new(uri.clone(), 0, text.clone()))
@@ -138,7 +165,16 @@ fn semantic_token_type_index(kind: CoreSemanticTokenKind) -> u32 {
 /// Build delta-encoded LSP semantic tokens for a document. Compiler-core yields
 /// single-line tokens in source order, so encoding is a straight delta pass.
 pub fn semantic_tokens_for_text(uri: &str, version: i32, text: &str) -> SemanticTokens {
-    let core = CompilerCore;
+    semantic_tokens_with(&CompilerCore, uri, version, text)
+}
+
+/// Backend-parameterized core of [`semantic_tokens_for_text`]; works with any `LanguageService`.
+fn semantic_tokens_with(
+    core: &dyn LanguageService,
+    uri: &str,
+    version: i32,
+    text: &str,
+) -> SemanticTokens {
     let document = SourceDocument::new(uri, version, text);
 
     let mut data = Vec::new();
@@ -224,7 +260,17 @@ pub fn completion_items_for_text(
     text: &str,
     position: Position,
 ) -> Vec<CompletionItem> {
-    let core = CompilerCore;
+    completion_items_with(&CompilerCore, uri, version, text, position)
+}
+
+/// Backend-parameterized core of [`completion_items_for_text`]; works with any `LanguageService`.
+fn completion_items_with(
+    core: &dyn LanguageService,
+    uri: &str,
+    version: i32,
+    text: &str,
+    position: Position,
+) -> Vec<CompletionItem> {
     let document = SourceDocument::new(uri, version, text);
     core.completions(
         &document,
@@ -240,7 +286,17 @@ pub fn completion_items_for_text(
 
 /// Convert compiler-core hover payloads into LSP hover responses.
 pub fn hover_for_text(uri: &str, version: i32, text: &str, position: Position) -> Option<Hover> {
-    let core = CompilerCore;
+    hover_with(&CompilerCore, uri, version, text, position)
+}
+
+/// Backend-parameterized core of [`hover_for_text`]; works with any `LanguageService`.
+fn hover_with(
+    core: &dyn LanguageService,
+    uri: &str,
+    version: i32,
+    text: &str,
+    position: Position,
+) -> Option<Hover> {
     let document = SourceDocument::new(uri, version, text);
     core.hover(
         &document,
@@ -259,7 +315,17 @@ pub fn signature_help_for_text(
     text: &str,
     position: Position,
 ) -> Option<SignatureHelp> {
-    let core = CompilerCore;
+    signature_help_with(&CompilerCore, uri, version, text, position)
+}
+
+/// Backend-parameterized core of [`signature_help_for_text`]; works with any `LanguageService`.
+fn signature_help_with(
+    core: &dyn LanguageService,
+    uri: &str,
+    version: i32,
+    text: &str,
+    position: Position,
+) -> Option<SignatureHelp> {
     let document = SourceDocument::new(uri, version, text);
     core.signature_help(
         &document,
@@ -332,7 +398,17 @@ pub fn definition_for_text(
     text: &str,
     position: Position,
 ) -> Option<Location> {
-    let core = CompilerCore;
+    definition_with(&CompilerCore, uri, version, text, position)
+}
+
+/// Backend-parameterized core of [`definition_for_text`]; works with any `LanguageService`.
+fn definition_with(
+    core: &dyn LanguageService,
+    uri: &str,
+    version: i32,
+    text: &str,
+    position: Position,
+) -> Option<Location> {
     let document = SourceDocument::new(uri, version, text);
     core.definition(
         &document,
@@ -352,7 +428,25 @@ pub fn references_for_text(
     position: Position,
     include_declaration: bool,
 ) -> Vec<Location> {
-    let core = CompilerCore;
+    references_with(
+        &CompilerCore,
+        uri,
+        version,
+        text,
+        position,
+        include_declaration,
+    )
+}
+
+/// Backend-parameterized core of [`references_for_text`]; works with any `LanguageService`.
+fn references_with(
+    core: &dyn LanguageService,
+    uri: &str,
+    version: i32,
+    text: &str,
+    position: Position,
+    include_declaration: bool,
+) -> Vec<Location> {
     let document = SourceDocument::new(uri, version, text);
     core.references(
         &document,
@@ -377,7 +471,16 @@ fn lsp_location(location: CoreLocation) -> Option<Location> {
 
 /// Produce whole-document formatting edits through compiler-core.
 pub fn formatting_edits_for_text(uri: &str, version: i32, text: &str) -> Vec<TextEdit> {
-    let core = CompilerCore;
+    formatting_edits_with(&CompilerCore, uri, version, text)
+}
+
+/// Backend-parameterized core of [`formatting_edits_for_text`]; works with any `LanguageService`.
+fn formatting_edits_with(
+    core: &dyn LanguageService,
+    uri: &str,
+    version: i32,
+    text: &str,
+) -> Vec<TextEdit> {
     let document = SourceDocument::new(uri, version, text);
     core.formatting(&document)
         .into_iter()
@@ -392,7 +495,17 @@ pub fn range_formatting_edits_for_text(
     text: &str,
     range: Range,
 ) -> Vec<TextEdit> {
-    let core = CompilerCore;
+    range_formatting_edits_with(&CompilerCore, uri, version, text, range)
+}
+
+/// Backend-parameterized core of [`range_formatting_edits_for_text`]; works with any `LanguageService`.
+fn range_formatting_edits_with(
+    core: &dyn LanguageService,
+    uri: &str,
+    version: i32,
+    text: &str,
+    range: Range,
+) -> Vec<TextEdit> {
     let document = SourceDocument::new(uri, version, text);
     core.formatting_range(
         &document,
@@ -445,18 +558,59 @@ struct DocumentSnapshot {
 pub struct PlcLanguageServer {
     client: Client,
     documents: Arc<RwLock<HashMap<Url, DocumentSnapshot>>>,
+    /// Pluggable analysis backend. Defaults to `CompilerCore`; swap via
+    /// [`PlcLanguageServer::with_service`] to bring your own.
+    service: Arc<dyn LanguageService + Send + Sync>,
+    /// Optional language registry. When set, the analyzer is chosen per document
+    /// by file extension (multi-language). `None` => always use `service`.
+    registry: Option<Arc<LanguageRegistry>>,
 }
 
 impl PlcLanguageServer {
+    /// Construct a server backed by the default `CompilerCore` analyzer.
     pub fn new(client: Client) -> Self {
+        Self::with_service(client, Arc::new(CompilerCore))
+    }
+
+    /// Construct a server backed by any [`LanguageService`] — bring your own
+    /// analyzer/compiler frontend behind the provided tower-lsp host.
+    pub fn with_service(client: Client, service: Arc<dyn LanguageService + Send + Sync>) -> Self {
         Self {
             client,
             documents: Arc::new(RwLock::new(HashMap::new())),
+            service,
+            registry: None,
         }
     }
 
+    /// Construct a language-aware server: the analyzer is selected per document
+    /// by file extension from `registry` (e.g. `.st` -> CompilerCore, `.il` ->
+    /// IL diagnostics), falling back to `CompilerCore` for unknown languages.
+    pub fn with_registry(client: Client, registry: Arc<LanguageRegistry>) -> Self {
+        Self {
+            client,
+            documents: Arc::new(RwLock::new(HashMap::new())),
+            service: Arc::new(CompilerCore),
+            registry: Some(registry),
+        }
+    }
+
+    /// Resolve the analysis backend for a document URI: the per-language service
+    /// from the registry if one is set, otherwise the fixed `service`.
+    fn service_for(&self, uri: &str) -> Arc<dyn LanguageService + Send + Sync> {
+        self.registry
+            .as_ref()
+            .and_then(|registry| registry.language_service_for_uri(uri))
+            .unwrap_or_else(|| Arc::clone(&self.service))
+    }
+
     async fn publish_for(&self, uri: Url, version: i32, text: &str) {
-        let diagnostics = diagnostics_for_text(uri.as_str(), version, text);
+        let diagnostics = diagnostics_with(
+            self.service_for(uri.as_str()).as_ref(),
+            uri.as_str(),
+            version,
+            text,
+        );
         self.client
             .publish_diagnostics(
                 uri,
@@ -535,7 +689,8 @@ impl LanguageServer for PlcLanguageServer {
         let uri = params.text_document.uri;
         let documents = self.documents.read().await;
         Ok(documents.get(&uri).map(|snapshot| {
-            DocumentSymbolResponse::Nested(document_symbols_for_text(
+            DocumentSymbolResponse::Nested(document_symbols_with(
+                self.service_for(uri.as_str()).as_ref(),
                 uri.as_str(),
                 snapshot.version,
                 &snapshot.text,
@@ -550,7 +705,8 @@ impl LanguageServer for PlcLanguageServer {
         let uri = params.text_document.uri;
         let documents = self.documents.read().await;
         Ok(documents.get(&uri).map(|snapshot| {
-            SemanticTokensResult::Tokens(semantic_tokens_for_text(
+            SemanticTokensResult::Tokens(semantic_tokens_with(
+                self.service_for(uri.as_str()).as_ref(),
                 uri.as_str(),
                 snapshot.version,
                 &snapshot.text,
@@ -569,7 +725,8 @@ impl LanguageServer for PlcLanguageServer {
             .iter()
             .map(|(uri, snapshot)| (uri.to_string(), snapshot.text.clone()))
             .collect();
-        Ok(Some(workspace_symbols_for_documents(
+        Ok(Some(workspace_symbols_with(
+            self.service.as_ref(),
             &documents,
             &params.query,
         )))
@@ -580,7 +737,8 @@ impl LanguageServer for PlcLanguageServer {
         let position = params.text_document_position.position;
         let documents = self.documents.read().await;
         Ok(documents.get(&uri).map(|snapshot| {
-            CompletionResponse::Array(completion_items_for_text(
+            CompletionResponse::Array(completion_items_with(
+                self.service_for(uri.as_str()).as_ref(),
                 uri.as_str(),
                 snapshot.version,
                 &snapshot.text,
@@ -594,7 +752,13 @@ impl LanguageServer for PlcLanguageServer {
         let position = params.text_document_position_params.position;
         let documents = self.documents.read().await;
         Ok(documents.get(&uri).and_then(|snapshot| {
-            hover_for_text(uri.as_str(), snapshot.version, &snapshot.text, position)
+            hover_with(
+                self.service_for(uri.as_str()).as_ref(),
+                uri.as_str(),
+                snapshot.version,
+                &snapshot.text,
+                position,
+            )
         }))
     }
 
@@ -603,7 +767,13 @@ impl LanguageServer for PlcLanguageServer {
         let position = params.text_document_position_params.position;
         let documents = self.documents.read().await;
         Ok(documents.get(&uri).and_then(|snapshot| {
-            signature_help_for_text(uri.as_str(), snapshot.version, &snapshot.text, position)
+            signature_help_with(
+                self.service_for(uri.as_str()).as_ref(),
+                uri.as_str(),
+                snapshot.version,
+                &snapshot.text,
+                position,
+            )
         }))
     }
 
@@ -615,8 +785,14 @@ impl LanguageServer for PlcLanguageServer {
         let position = params.text_document_position_params.position;
         let documents = self.documents.read().await;
         Ok(documents.get(&uri).and_then(|snapshot| {
-            definition_for_text(uri.as_str(), snapshot.version, &snapshot.text, position)
-                .map(GotoDefinitionResponse::Scalar)
+            definition_with(
+                self.service_for(uri.as_str()).as_ref(),
+                uri.as_str(),
+                snapshot.version,
+                &snapshot.text,
+                position,
+            )
+            .map(GotoDefinitionResponse::Scalar)
         }))
     }
 
@@ -626,7 +802,8 @@ impl LanguageServer for PlcLanguageServer {
         let include_declaration = params.context.include_declaration;
         let documents = self.documents.read().await;
         Ok(documents.get(&uri).map(|snapshot| {
-            references_for_text(
+            references_with(
+                self.service_for(uri.as_str()).as_ref(),
                 uri.as_str(),
                 snapshot.version,
                 &snapshot.text,
@@ -640,7 +817,12 @@ impl LanguageServer for PlcLanguageServer {
         let uri = params.text_document.uri;
         let documents = self.documents.read().await;
         Ok(documents.get(&uri).map(|snapshot| {
-            formatting_edits_for_text(uri.as_str(), snapshot.version, &snapshot.text)
+            formatting_edits_with(
+                self.service_for(uri.as_str()).as_ref(),
+                uri.as_str(),
+                snapshot.version,
+                &snapshot.text,
+            )
         }))
     }
 
@@ -652,7 +834,13 @@ impl LanguageServer for PlcLanguageServer {
         let range = params.range;
         let documents = self.documents.read().await;
         Ok(documents.get(&uri).map(|snapshot| {
-            range_formatting_edits_for_text(uri.as_str(), snapshot.version, &snapshot.text, range)
+            range_formatting_edits_with(
+                self.service_for(uri.as_str()).as_ref(),
+                uri.as_str(),
+                snapshot.version,
+                &snapshot.text,
+                range,
+            )
         }))
     }
 
@@ -660,7 +848,7 @@ impl LanguageServer for PlcLanguageServer {
         let uri = params.text_document.uri;
         let documents = self.documents.read().await;
         Ok(documents.get(&uri).map(|snapshot| {
-            let core = CompilerCore;
+            let core = self.service_for(uri.as_str());
             let document = SourceDocument::new(uri.as_str(), snapshot.version, &snapshot.text);
             core.code_actions(&document)
                 .into_iter()

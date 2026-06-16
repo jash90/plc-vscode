@@ -24,6 +24,11 @@ impl Ton {
         }
     }
 
+    /// Update the preset time. In ST, `PT` is an input read on every call.
+    pub fn set_pt_ms(&mut self, pt_ms: i64) {
+        self.pt_ms = pt_ms;
+    }
+
     pub fn update(&mut self, input: bool, now_ms: i64) -> bool {
         if input {
             let start = *self.start_ms.get_or_insert(now_ms);
@@ -63,6 +68,11 @@ impl Tof {
             q: false,
             et_ms: 0,
         }
+    }
+
+    /// Update the preset time. In ST, `PT` is an input read on every call.
+    pub fn set_pt_ms(&mut self, pt_ms: i64) {
+        self.pt_ms = pt_ms;
     }
 
     pub fn update(&mut self, input: bool, now_ms: i64) -> bool {
@@ -110,6 +120,11 @@ impl Tp {
             q: false,
             et_ms: 0,
         }
+    }
+
+    /// Update the preset time. In ST, `PT` is an input read on every call.
+    pub fn set_pt_ms(&mut self, pt_ms: i64) {
+        self.pt_ms = pt_ms;
     }
 
     pub fn update(&mut self, input: bool, now_ms: i64) -> bool {

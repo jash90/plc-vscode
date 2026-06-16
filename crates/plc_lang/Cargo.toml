@@ -1,0 +1,23 @@
+[package]
+name = "plc_lang"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Language-plugin registry and canonical-IR (plc_hir) conversion hub for PLC VS Code. Implement LanguageFrontend to add a PLC language; convert between languages via the IR."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+plc_api = { path = "../plc_api" }
+plc_hir = { path = "../plc_hir" }
+# Optional: the ST frontend delegates analysis/IDE features to CompilerCore.
+# Activated by the default `st` feature; the IR-only/convert path and the IL
+# frontend never pull it in, so `plc_lang` stays runtime-free.
+plc_compiler_core = { path = "../plc_compiler_core", optional = true }
+plc_syntax = { path = "../plc_syntax", optional = true }
+
+[features]
+default = ["st", "il"]
+st = ["dep:plc_compiler_core", "dep:plc_syntax"]
+il = []

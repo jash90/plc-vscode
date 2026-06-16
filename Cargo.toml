@@ -12,8 +12,9 @@ members = [
     "crates/plc_compiler_core",
     "crates/plc_cli",
 ]
-# The LLVM backend is isolated from the default workspace build so the rest of
-# the suite stays fast and LLVM-free. Build/test it explicitly with an LLVM 18
-# toolchain (see docs/architecture/llvm-toolchain.md):
-#   cargo test --manifest-path crates/plc_llvm_backend/Cargo.toml
-exclude = ["crates/plc_llvm_backend"]
+# These crates carry heavyweight native toolchains and are isolated from the
+# default workspace build so the rest of the suite stays fast and dependency-light.
+# Build/test them explicitly with their manifest:
+#   cargo test --manifest-path crates/plc_llvm_backend/Cargo.toml   (needs LLVM 18; see docs/architecture/llvm-toolchain.md)
+#   cargo test --manifest-path crates/plc_cpdev_vm/Cargo.toml       (needs a C++ toolchain; vendors the CPDev VM)
+exclude = ["crates/plc_llvm_backend", "crates/plc_cpdev_vm"]

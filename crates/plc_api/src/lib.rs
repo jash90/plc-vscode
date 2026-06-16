@@ -364,6 +364,21 @@ pub trait ExecutionEngine {
     /// reference engine assumes the caller already ran the [`LanguageService`]
     /// diagnostics gate and returns `Ok(())`.
     fn load(&mut self, document: &SourceDocument) -> Result<(), Vec<Diagnostic>>;
+    /// Load a pre-built artifact (e.g. compiled bytecode) supplied as raw bytes,
+    /// with `uri` identifying its origin (so an engine can locate sidecar files).
+    ///
+    /// Defaulted to "unsupported" so existing engines need no change: only an
+    /// engine that consumes prebuilt binaries (e.g. a bytecode VM loading a
+    /// compiled image) overrides this. Object-safe like the rest of the port.
+    fn load_artifact(&mut self, bytes: &[u8], uri: &str) -> Result<(), Vec<Diagnostic>> {
+        let _ = (bytes, uri);
+        Err(vec![Diagnostic {
+            severity: DiagnosticSeverity::Error,
+            range: Range::at_start(),
+            code: "E_ARTIFACT_UNSUPPORTED",
+            message: "this execution engine does not support loading prebuilt artifacts".to_owned(),
+        }])
+    }
     fn set_scan_interval_ms(&mut self, scan_interval_ms: i64);
     fn run_scans(&mut self, cycles: u64);
     /// Stage an input value (parsed from its textual form) for the next scan.

@@ -66,7 +66,10 @@
       background: var(--bg-alt); border: 1px solid var(--border); border-radius: var(--radius);
       padding: 22px;
     }
-    .card .ico { font-size: 1.5rem; margin-bottom: 8px; }
+    .card .ico { margin-bottom: 12px; color: var(--accent); line-height: 0; }
+    .card .ico svg { width: 30px; height: 30px; }
+    .cta svg { width: 18px; height: 18px; vertical-align: -3px; }
+    .dlbtn svg { width: 14px; height: 14px; vertical-align: -2px; margin-right: 5px; }
     .card h3 { margin: 0 0 8px; font-size: 1.1rem; }
     .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
     table.dl { width: 100%; border-collapse: collapse; background: var(--bg-alt); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
@@ -108,7 +111,7 @@
         <span class="badge" id="version-badge">v0.1.0</span>
       </div>
       <a class="cta" id="primary-download" href="#downloads">
-        <span>⬇ Download</span><small id="primary-platform">— pick your platform</small>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</span><small id="primary-platform">— pick your platform</small>
       </a>
       <span class="cta-sub" id="detect-note">Detecting your platform…</span>
     </div>
@@ -119,22 +122,22 @@
       <h2>What you get</h2>
       <div class="features">
         <div class="card">
-          <div class="ico">💡</div>
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg></div>
           <h3>Language intelligence</h3>
           <p>Completions, hover, signature help, diagnostics, document &amp; workspace symbols, and semantic highlighting — via the bundled <code>plc-lsp-server</code>.</p>
         </div>
         <div class="card">
-          <div class="ico">▶️</div>
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></div>
           <h3>Run Structured Text</h3>
-          <p>Execute a <code>.st</code> file from the command, the editor title ▶ button, or a right-click — through the bundled scan-cycle runtime.</p>
+          <p>Execute a <code>.st</code> file from the command, the editor title-bar Run button, or a right-click — through the bundled scan-cycle runtime.</p>
         </div>
         <div class="card">
-          <div class="ico">🐞</div>
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3 3 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/></svg></div>
           <h3>Full stepping debugger</h3>
           <p>Breakpoints, step over/into/out, live <strong>Variables</strong> (scalars + function-block outputs) and Call Stack. <code>F5</code> just works; right-click Debug too.</p>
         </div>
         <div class="card">
-          <div class="ico">📦</div>
+          <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
           <h3>Self-contained</h3>
           <p>Each platform package bundles the native compiler + language server. No Rust toolchain, no separate downloads — install and go.</p>
         </div>
@@ -187,6 +190,7 @@
     (function () {
       var REPO = "jash90/plc-vscode";
       var BASE = "https://github.com/" + REPO + "/releases/latest/download/";
+      var DL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
       // [vsce target, OS label, arch label, OS key, arch key]
       var TARGETS = [
         ["darwin-arm64", "macOS", "Apple Silicon", "darwin", "arm64"],
@@ -210,7 +214,7 @@
           tr.innerHTML =
             "<td>" + t[1] + rec + "</td>" +
             "<td>" + t[2] + "</td>" +
-            '<td><a class="dlbtn" href="' + BASE + fileFor(t[0]) + '" download>⬇ ' + fileFor(t[0]) + "</a></td>";
+            '<td><a class="dlbtn" href="' + BASE + fileFor(t[0]) + '" download>' + DL_ICON + fileFor(t[0]) + "</a></td>";
           tbody.appendChild(tr);
         });
       }

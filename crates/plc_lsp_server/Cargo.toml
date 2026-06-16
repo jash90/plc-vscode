@@ -6,7 +6,9 @@ license = "MIT"
 description = "Language server for PLC VS Code Structured Text support."
 
 [dependencies]
+plc_api = { path = "../plc_api" }
 plc_compiler_core = { path = "../plc_compiler_core" }
+plc_lang = { path = "../plc_lang" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
 tower-lsp = "0.20"
 

@@ -1,7 +1,14 @@
+use plc_cli::{DEFAULT_SCANS, run_with};
 use plc_compiler_core::{CompilerCore, SourceDocument};
+use plc_lang::LanguageRegistry;
+use plc_runtime::ScanRuntimeEngine;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+mod dap;
+
+const USAGE: &str = "usage:\n  plc run <file.st> [scans]\n  plc convert <from-id> <to-id> <file>   (ids: plc languages)\n  plc debug                              (Debug Adapter Protocol over stdio)";
 
 fn main() {
     if let Err(error) = run() {
@@ -17,32 +24,67 @@ fn run() -> Result<(), String> {
             let path = args
                 .next()
                 .map(PathBuf::from)
-                .ok_or_else(|| "usage: plc run <file.st>".to_owned())?;
-            run_file(path)
+                .ok_or_else(|| USAGE.to_owned())?;
+            // Optional scan-count override (e.g. `plc run file.st 1`).
+            let scans = args
+                .next()
+                .and_then(|value| value.parse::<u64>().ok())
+                .unwrap_or(DEFAULT_SCANS);
+            run_file(path, scans)
         }
-        _ => Err("usage: plc run <file.st>".to_owned()),
+        Some("convert") => {
+            let from = args.next().ok_or_else(|| USAGE.to_owned())?;
+            let to = args.next().ok_or_else(|| USAGE.to_owned())?;
+            let path = args
+                .next()
+                .map(PathBuf::from)
+                .ok_or_else(|| USAGE.to_owned())?;
+            convert_file(&from, &to, path)
+        }
+        Some("languages") => {
+            for id in LanguageRegistry::with_builtins().ids() {
+                println!("{id}");
+            }
+            Ok(())
+        }
+        // Debug Adapter Protocol server over stdio; the program path arrives in
+        // the DAP `launch` request, so no file argument here.
+        Some("debug") => dap::run(),
+        _ => Err(USAGE.to_owned()),
     }
 }
 
-fn run_file(path: PathBuf) -> Result<(), String> {
+fn run_file(path: PathBuf, scans: u64) -> Result<(), String> {
     let text = read_source(&path)?;
     let document = SourceDocument::new(format!("file://{}", path.display()), 0, text);
-    let result = CompilerCore.execute(&document);
 
-    if !result.diagnostics().is_empty() {
-        for diagnostic in result.diagnostics() {
+    // Default wiring: the CompilerCore analyzer + the scan-cycle runtime engine.
+    // Both are pluggable — `run_with` accepts any LanguageService/ExecutionEngine.
+    let service = CompilerCore;
+    let mut engine = ScanRuntimeEngine::default();
+    run_with(&service, &mut engine, &document, scans)
+}
+
+/// `plc convert <from-id> <to-id> <file>`: transpile one PLC language into
+/// another through the canonical-IR hub, printing the converted source to stdout
+/// and any fidelity notes / diagnostics to stderr.
+fn convert_file(from: &str, to: &str, path: PathBuf) -> Result<(), String> {
+    let text = read_source(&path)?;
+    let document = SourceDocument::new(format!("file://{}", path.display()), 0, text);
+
+    let registry = LanguageRegistry::with_builtins();
+    let result = registry.convert(from, to, &document);
+
+    for note in &result.fidelity {
+        eprintln!("note: {note}");
+    }
+    if let Some(error) = result.error {
+        for diagnostic in &result.diagnostics {
             eprintln!("{}: {}", diagnostic.code, diagnostic.message);
         }
-        return Err("execution failed due to diagnostics".to_owned());
+        return Err(format!("conversion {from} -> {to} failed: {error:?}"));
     }
-
-    if result.output().is_empty() {
-        println!("(no output)");
-    } else {
-        for line in result.output() {
-            println!("{line}");
-        }
-    }
+    print!("{}", result.text);
     Ok(())
 }
 

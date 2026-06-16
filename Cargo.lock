@@ -487,7 +487,12 @@ version = "0.1.0"
 name = "plc_cli"
 version = "0.1.0"
 dependencies = [
+ "plc_api",
  "plc_compiler_core",
+ "plc_lang",
+ "plc_runtime",
+ "serde",
+ "serde_json",
  "tempfile",
 ]
 
@@ -495,6 +500,7 @@ dependencies = [
 name = "plc_compiler_core"
 version = "0.1.0"
 dependencies = [
+ "plc_api",
  "plc_semantics",
  "plc_syntax",
 ]
@@ -507,10 +513,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "plc_lang"
+version = "0.1.0"
+dependencies = [
+ "plc_api",
+ "plc_compiler_core",
+ "plc_hir",
+ "plc_syntax",
+]
+
+[[package]]
 name = "plc_lsp_server"
 version = "0.1.0"
 dependencies = [
+ "plc_api",
  "plc_compiler_core",
+ "plc_lang",
  "tokio",
  "tower-lsp",
 ]
@@ -519,6 +537,7 @@ dependencies = [
 name = "plc_runtime"
 version = "0.1.0"
 dependencies = [
+ "plc_api",
  "plc_compiler_core",
  "plc_hir",
  "plc_syntax",

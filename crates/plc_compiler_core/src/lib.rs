@@ -15,243 +15,15 @@ use plc_semantics::{
 use plc_syntax::{Pou, PouKind, TextRange, Token, TokenKind, VarBlockKind, parse_source};
 use std::collections::HashMap;
 
-/// Source document snapshot passed into compiler-core operations.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceDocument {
-    uri: String,
-    version: i32,
-    text: String,
-}
-
-impl SourceDocument {
-    pub fn new(uri: impl Into<String>, version: i32, text: impl Into<String>) -> Self {
-        Self {
-            uri: uri.into(),
-            version,
-            text: text.into(),
-        }
-    }
-
-    pub fn uri(&self) -> &str {
-        &self.uri
-    }
-
-    pub fn version(&self) -> i32 {
-        self.version
-    }
-
-    pub fn text(&self) -> &str {
-        &self.text
-    }
-}
-
-/// Compiler analysis result for a single source document snapshot.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Analysis {
-    uri: String,
-    version: i32,
-    diagnostics: Vec<Diagnostic>,
-}
-
-impl Analysis {
-    pub fn uri(&self) -> &str {
-        &self.uri
-    }
-
-    pub fn version(&self) -> i32 {
-        self.version
-    }
-
-    pub fn diagnostics(&self) -> &[Diagnostic] {
-        &self.diagnostics
-    }
-}
-
-/// Result of executing a Structured Text document with the development runtime.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExecutionResult {
-    diagnostics: Vec<Diagnostic>,
-    output: Vec<String>,
-}
-
-impl ExecutionResult {
-    pub fn diagnostics(&self) -> &[Diagnostic] {
-        &self.diagnostics
-    }
-
-    pub fn output(&self) -> &[String] {
-        &self.output
-    }
-}
-
-/// Diagnostic severity that can be mapped to LSP, CLI, or editor output.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DiagnosticSeverity {
-    Error,
-    Warning,
-    Information,
-    Hint,
-}
-
-/// Zero-based source position.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Position {
-    pub line: u32,
-    pub character: u32,
-}
-
-/// Half-open source range.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Range {
-    pub start: Position,
-    pub end: Position,
-}
-
-impl Range {
-    pub fn at_start() -> Self {
-        Self {
-            start: Position::default(),
-            end: Position {
-                line: 0,
-                character: 1,
-            },
-        }
-    }
-}
-
-/// Compiler diagnostic with stable fields for all consumers.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Diagnostic {
-    pub severity: DiagnosticSeverity,
-    pub range: Range,
-    pub code: &'static str,
-    pub message: String,
-}
-
-/// Stable symbol kind exposed by compiler-core to IDE consumers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SymbolKind {
-    Program,
-    Function,
-    FunctionBlock,
-    Action,
-    Variable,
-    Type,
-    Keyword,
-}
-
-/// Hierarchical document symbol used by LSP and future editor consumers.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocumentSymbol {
-    pub name: String,
-    pub detail: Option<String>,
-    pub kind: SymbolKind,
-    pub range: Range,
-    pub selection_range: Range,
-    pub children: Vec<DocumentSymbol>,
-}
-
-/// Document symbol analysis result for a source snapshot.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SymbolAnalysis {
-    uri: String,
-    version: i32,
-    symbols: Vec<DocumentSymbol>,
-}
-
-impl SymbolAnalysis {
-    pub fn uri(&self) -> &str {
-        &self.uri
-    }
-
-    pub fn version(&self) -> i32 {
-        self.version
-    }
-
-    pub fn symbols(&self) -> &[DocumentSymbol] {
-        &self.symbols
-    }
-}
-
-/// Completion candidate exposed by compiler-core to LSP and editor consumers.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CompletionCandidate {
-    pub label: String,
-    pub detail: Option<String>,
-    pub kind: SymbolKind,
-}
-
-/// Hover payload exposed by compiler-core to LSP and editor consumers.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HoverInfo {
-    pub contents: String,
-    pub range: Range,
-}
-
-/// A single parameter of a call signature exposed to IDE consumers.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParameterInfo {
-    pub label: String,
-}
-
-/// Call signature payload exposed by compiler-core for signature help.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SignatureInfo {
-    pub label: String,
-    pub parameters: Vec<ParameterInfo>,
-    pub active_parameter: Option<u32>,
-}
-
-/// Source location (document URI + range) used for navigation features.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Location {
-    pub uri: String,
-    pub range: Range,
-}
-
-/// Flat workspace symbol exposed by compiler-core for `workspace/symbol`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorkspaceSymbol {
-    pub name: String,
-    pub kind: SymbolKind,
-    pub location: Location,
-    pub container_name: Option<String>,
-}
-
-/// Semantic token category exposed by compiler-core for syntax highlighting.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SemanticTokenKind {
-    Keyword,
-    Type,
-    Variable,
-    Function,
-    FunctionBlock,
-    Number,
-    String,
-    Comment,
-    Operator,
-}
-
-/// A classified, single-line semantic token with its source range.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SemanticToken {
-    pub range: Range,
-    pub kind: SemanticTokenKind,
-}
-
-/// Text edit (range replacement) used by formatting and code actions.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextEdit {
-    pub range: Range,
-    pub new_text: String,
-}
-
-/// Code action (quick fix) with a title and the edits it applies.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CodeAction {
-    pub title: String,
-    pub edits: Vec<TextEdit>,
-}
+// DTOs and ports now live in the backend-agnostic `plc_api` crate. They are
+// re-exported here so existing `use plc_compiler_core::{Diagnostic, ...}` paths
+// keep resolving to the same types (back-compat seam).
+pub use plc_api::{
+    Analysis, CodeAction, CompletionCandidate, Diagnostic, DiagnosticSeverity, DocumentSymbol,
+    ExecutionEngine, ExecutionResult, HoverInfo, LanguageService, Location, ParameterInfo,
+    Position, Range, SemanticToken, SemanticTokenKind, SignatureInfo, SourceDocument,
+    SymbolAnalysis, SymbolKind, TextEdit, WorkspaceSymbol,
+};
 
 /// Shared compiler facade.
 #[derive(Debug, Default, Clone, Copy)]
@@ -260,34 +32,24 @@ pub struct CompilerCore;
 impl CompilerCore {
     pub fn analyze(&self, document: &SourceDocument) -> Analysis {
         let diagnostics = analyze_text(document.text());
-        Analysis {
-            uri: document.uri().to_owned(),
-            version: document.version(),
-            diagnostics,
-        }
+        Analysis::new(document.uri().to_owned(), document.version(), diagnostics)
     }
 
     pub fn execute(&self, document: &SourceDocument) -> ExecutionResult {
         let analysis = self.analyze(document);
         if !analysis.diagnostics().is_empty() {
-            return ExecutionResult {
-                diagnostics: analysis.diagnostics().to_vec(),
-                output: Vec::new(),
-            };
+            return ExecutionResult::new(analysis.diagnostics().to_vec(), Vec::new());
         }
 
-        ExecutionResult {
-            diagnostics: Vec::new(),
-            output: collect_execution_output(document.text()),
-        }
+        ExecutionResult::new(Vec::new(), collect_execution_output(document.text()))
     }
 
     pub fn document_symbols(&self, document: &SourceDocument) -> SymbolAnalysis {
-        SymbolAnalysis {
-            uri: document.uri().to_owned(),
-            version: document.version(),
-            symbols: document_symbols(document),
-        }
+        SymbolAnalysis::new(
+            document.uri().to_owned(),
+            document.version(),
+            document_symbols(document),
+        )
     }
 
     /// Query top-level declarations across all supplied documents. An empty
@@ -883,16 +645,31 @@ fn standard_fb_members(name: &str) -> Option<&'static [(&'static str, &'static s
 const STANDARD_FUNCTION_NAMES: &[&str] = &[
     "ABS",
     "SQRT",
+    "EXPT",
     "MIN",
     "MAX",
     "LIMIT",
     "SEL",
+    "SHL",
+    "SHR",
     "LEN",
     "CONCAT",
+    "LEFT",
+    "RIGHT",
+    "MID",
     "INT_TO_REAL",
     "REAL_TO_INT",
     "BOOL_TO_INT",
     "INT_TO_STRING",
+    "DINT_TO_STRING",
+    "REAL_TO_STRING",
+    "LREAL_TO_STRING",
+    "BOOL_TO_STRING",
+    "WORD_TO_STRING",
+    "BYTE_TO_STRING",
+    "DWORD_TO_STRING",
+    "TIME_TO_STRING",
+    "TO_STRING",
 ];
 
 /// MVP standard function blocks and their public members (name, type). Mirrors
@@ -1082,16 +859,27 @@ fn standard_signature(name: &str) -> Option<ResolvedSignature> {
     let parameters: &[(&str, &str)] = match upper.as_str() {
         "ABS" => &[("IN", "ANY_NUM")],
         "SQRT" => &[("IN", "ANY_NUM")],
+        "EXPT" => &[("IN1", "ANY_NUM"), ("IN2", "ANY_NUM")],
         "MIN" => &[("IN1", "ANY_NUM"), ("IN2", "ANY_NUM")],
         "MAX" => &[("IN1", "ANY_NUM"), ("IN2", "ANY_NUM")],
         "LIMIT" => &[("MN", "ANY_NUM"), ("IN", "ANY_NUM"), ("MX", "ANY_NUM")],
         "SEL" => &[("G", "BOOL"), ("IN0", "ANY"), ("IN1", "ANY")],
+        "SHL" => &[("IN", "ANY_BIT"), ("N", "ANY_INT")],
+        "SHR" => &[("IN", "ANY_BIT"), ("N", "ANY_INT")],
         "LEN" => &[("IN", "STRING")],
         "CONCAT" => &[("IN1", "STRING"), ("IN2", "STRING")],
+        "LEFT" => &[("IN", "STRING"), ("L", "ANY_INT")],
+        "RIGHT" => &[("IN", "STRING"), ("L", "ANY_INT")],
+        "MID" => &[("IN", "STRING"), ("L", "ANY_INT"), ("P", "ANY_INT")],
         "INT_TO_REAL" => &[("IN", "INT")],
         "REAL_TO_INT" => &[("IN", "REAL")],
         "BOOL_TO_INT" => &[("IN", "BOOL")],
-        "INT_TO_STRING" => &[("IN", "INT")],
+        "INT_TO_STRING" | "DINT_TO_STRING" => &[("IN", "ANY_INT")],
+        "REAL_TO_STRING" | "LREAL_TO_STRING" => &[("IN", "ANY_REAL")],
+        "BOOL_TO_STRING" => &[("IN", "BOOL")],
+        "WORD_TO_STRING" | "BYTE_TO_STRING" | "DWORD_TO_STRING" => &[("IN", "ANY_BIT")],
+        "TIME_TO_STRING" => &[("IN", "TIME")],
+        "TO_STRING" => &[("IN", "ANY")],
         _ => return None,
     };
 
@@ -1420,4 +1208,64 @@ fn byte_offset_to_position(text: &str, offset: usize) -> Position {
     }
 
     Position { line, character }
+}
+
+/// Forwarding [`LanguageService`] implementation so the LSP server (and any
+/// other frontend) can hold a `dyn LanguageService` backed by `CompilerCore`.
+/// Each method delegates to the inherent method of the same name; inherent
+/// methods keep priority at direct call sites, so existing `core.analyze(..)`
+/// usage is unchanged.
+impl LanguageService for CompilerCore {
+    fn analyze(&self, document: &SourceDocument) -> Analysis {
+        CompilerCore::analyze(self, document)
+    }
+    fn execute(&self, document: &SourceDocument) -> ExecutionResult {
+        CompilerCore::execute(self, document)
+    }
+    fn document_symbols(&self, document: &SourceDocument) -> SymbolAnalysis {
+        CompilerCore::document_symbols(self, document)
+    }
+    fn workspace_symbols(&self, documents: &[SourceDocument], query: &str) -> Vec<WorkspaceSymbol> {
+        CompilerCore::workspace_symbols(self, documents, query)
+    }
+    fn semantic_tokens(&self, document: &SourceDocument) -> Vec<SemanticToken> {
+        CompilerCore::semantic_tokens(self, document)
+    }
+    fn completions(
+        &self,
+        document: &SourceDocument,
+        position: Position,
+    ) -> Vec<CompletionCandidate> {
+        CompilerCore::completions(self, document, position)
+    }
+    fn hover(&self, document: &SourceDocument, position: Position) -> Option<HoverInfo> {
+        CompilerCore::hover(self, document, position)
+    }
+    fn signature_help(
+        &self,
+        document: &SourceDocument,
+        position: Position,
+    ) -> Option<SignatureInfo> {
+        CompilerCore::signature_help(self, document, position)
+    }
+    fn definition(&self, document: &SourceDocument, position: Position) -> Option<Location> {
+        CompilerCore::definition(self, document, position)
+    }
+    fn references(
+        &self,
+        document: &SourceDocument,
+        position: Position,
+        include_declaration: bool,
+    ) -> Vec<Location> {
+        CompilerCore::references(self, document, position, include_declaration)
+    }
+    fn formatting(&self, document: &SourceDocument) -> Vec<TextEdit> {
+        CompilerCore::formatting(self, document)
+    }
+    fn formatting_range(&self, document: &SourceDocument, range: Range) -> Vec<TextEdit> {
+        CompilerCore::formatting_range(self, document, range)
+    }
+    fn code_actions(&self, document: &SourceDocument) -> Vec<CodeAction> {
+        CompilerCore::code_actions(self, document)
+    }
 }

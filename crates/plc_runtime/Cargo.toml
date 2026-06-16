@@ -9,6 +9,7 @@ description = "Deterministic PLC scan-cycle runtime and simulator for PLC VS Cod
 path = "src/lib.rs"
 
 [dependencies]
+plc_api = { path = "../plc_api" }
 plc_syntax = { path = "../plc_syntax" }
 plc_hir = { path = "../plc_hir" }
 serde = { version = "1", features = ["derive"] }

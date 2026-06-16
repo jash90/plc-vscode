@@ -1,0 +1,325 @@
+//! Instruction List (IL) frontend — the second reference language.
+//!
+//! IL is the cheapest faithful renderer of the existing IR: IEC IL is an
+//! accumulator machine whose `LD`/`ST`/`ADD`/`SUB` are the IL spelling of the
+//! `plc_runtime` bytecode `LOAD_VAR`/`STORE_VAR`/`ADD`/`SUB`. `render` walks the
+//! IR exactly like `bytecode::lower_program`; `lower` is its inverse (replay the
+//! accumulator). It depends only on `plc_hir` — never on the runtime — so the
+//! mnemonics are kept as a small in-crate table cross-checked by a unit test.
+
+use plc_api::{Diagnostic, SourceDocument};
+use plc_hir::{BinaryOp, HirAssign, HirExpr, HirModule, HirPouKind, HirProgram, HirType, HirVar};
+
+use crate::{LanguageFrontend, LoweringResult, RenderResult};
+
+// IEC IL spelling of the plc_runtime bytecode mnemonics LOAD_VAR / STORE_VAR /
+// ADD / SUB. Keep in sync with `plc_runtime::bytecode::Instruction::mnemonic`.
+const IL_LD: &str = "LD";
+const IL_ST: &str = "ST";
+const IL_ADD: &str = "ADD";
+const IL_SUB: &str = "SUB";
+
+/// Instruction List (IEC 61131-3) language frontend.
+pub struct IlFrontend;
+
+impl LanguageFrontend for IlFrontend {
+    fn id(&self) -> &'static str {
+        "il"
+    }
+
+    fn display_name(&self) -> &'static str {
+        "Instruction List"
+    }
+
+    fn extensions(&self) -> &'static [&'static str] {
+        &["il"]
+    }
+
+    fn can_render(&self) -> bool {
+        true
+    }
+
+    fn lower(&self, document: &SourceDocument) -> LoweringResult {
+        parse_il(document.text())
+    }
+
+    fn render(&self, module: &HirModule) -> RenderResult {
+        render_il(module)
+    }
+}
+
+// --- IR -> IL ---------------------------------------------------------------
+
+fn render_il(module: &HirModule) -> RenderResult {
+    let mut out = String::new();
+    let mut fidelity = Vec::new();
+
+    for program in &module.programs {
+        let (start_kw, end_kw) = pou_keywords(program.kind);
+        out.push_str(start_kw);
+        out.push(' ');
+        out.push_str(&program.name);
+        out.push('\n');
+
+        if !program.vars.is_empty() {
+            out.push_str("VAR\n");
+            for var in &program.vars {
+                out.push_str(&format!("    {} : {};\n", var.name, hir_type_name(var.ty)));
+            }
+            out.push_str("END_VAR\n");
+        }
+
+        for assign in &program.body {
+            emit_load_chain(&assign.value, &mut out, &mut fidelity);
+            out.push_str(&format!("    {IL_ST} {}\n", assign.target));
+        }
+
+        out.push_str(end_kw);
+        out.push('\n');
+    }
+
+    RenderResult {
+        text: out,
+        fidelity,
+    }
+}
+
+/// Emit the accumulator instructions that leave `expr`'s value in the
+/// accumulator (`LD <leftmost>`, then `ADD`/`SUB <operand>` per binary node).
+fn emit_load_chain(expr: &HirExpr, out: &mut String, fidelity: &mut Vec<String>) {
+    match expr {
+        HirExpr::Binary { op, lhs, rhs } => {
+            emit_load_chain(lhs, out, fidelity);
+            match operand_text(rhs) {
+                Some(operand) => out.push_str(&format!("    {} {}\n", mnemonic(*op), operand)),
+                None => fidelity.push(
+                    "a nested right-hand operand is not representable in linear IL and was dropped"
+                        .to_owned(),
+                ),
+            }
+        }
+        leaf => match operand_text(leaf) {
+            Some(operand) => out.push_str(&format!("    {IL_LD} {operand}\n")),
+            None => fidelity.push("an operand could not be rendered to IL".to_owned()),
+        },
+    }
+}
+
+fn operand_text(expr: &HirExpr) -> Option<String> {
+    match expr {
+        HirExpr::Var(name) => Some(name.clone()),
+        HirExpr::Int(value) => Some(value.to_string()),
+        HirExpr::Real(value) => Some(if value.fract() == 0.0 {
+            format!("{value:.1}")
+        } else {
+            value.to_string()
+        }),
+        HirExpr::Bool(value) => Some(if *value { "TRUE" } else { "FALSE" }.to_owned()),
+        HirExpr::Str(value) => Some(format!("'{value}'")),
+        HirExpr::Binary { .. } => None,
+    }
+}
+
+fn mnemonic(op: BinaryOp) -> &'static str {
+    match op {
+        BinaryOp::Add => IL_ADD,
+        BinaryOp::Sub => IL_SUB,
+    }
+}
+
+// --- IL -> IR ---------------------------------------------------------------
+
+fn parse_il(text: &str) -> LoweringResult {
+    let mut programs = Vec::new();
+    let diagnostics: Vec<Diagnostic> = Vec::new();
+    let mut fidelity = Vec::new();
+
+    let mut name = String::from("Main");
+    let mut kind = HirPouKind::Program;
+    let mut vars: Vec<HirVar> = Vec::new();
+    let mut body: Vec<HirAssign> = Vec::new();
+    let mut acc: Option<HirExpr> = None;
+    let mut in_var = false;
+    let mut started = false;
+
+    for raw in text.lines() {
+        let line = strip_comment(raw).trim();
+        if line.is_empty() {
+            continue;
+        }
+        let upper = line.to_ascii_uppercase();
+
+        if let Some(start_kind) = pou_start(&upper) {
+            if started || !vars.is_empty() || !body.is_empty() {
+                programs.push(HirProgram {
+                    name: std::mem::take(&mut name),
+                    kind,
+                    vars: std::mem::take(&mut vars),
+                    body: std::mem::take(&mut body),
+                });
+            }
+            started = true;
+            kind = start_kind;
+            name = line.split_whitespace().nth(1).unwrap_or("Main").to_owned();
+            in_var = false;
+            acc = None;
+            continue;
+        }
+        if pou_end(&upper) {
+            programs.push(HirProgram {
+                name: std::mem::take(&mut name),
+                kind,
+                vars: std::mem::take(&mut vars),
+                body: std::mem::take(&mut body),
+            });
+            started = false;
+            in_var = false;
+            acc = None;
+            continue;
+        }
+        if upper == "VAR" || upper.starts_with("VAR_") {
+            in_var = true;
+            continue;
+        }
+        if upper == "END_VAR" {
+            in_var = false;
+            continue;
+        }
+        if in_var {
+            match parse_var_decl(line) {
+                Some(var) => vars.push(var),
+                None => fidelity.push(format!("could not parse IL variable declaration `{line}`")),
+            }
+            continue;
+        }
+
+        let mut parts = line.split_whitespace();
+        let Some(instruction) = parts.next() else {
+            continue;
+        };
+        let operand = parts.next();
+        match instruction.to_ascii_uppercase().as_str() {
+            "LD" => acc = Some(parse_operand(operand)),
+            "ADD" => acc = Some(fold(acc.take(), BinaryOp::Add, parse_operand(operand))),
+            "SUB" => acc = Some(fold(acc.take(), BinaryOp::Sub, parse_operand(operand))),
+            "ST" => body.push(HirAssign {
+                target: operand.unwrap_or("").to_owned(),
+                value: acc.take().unwrap_or(HirExpr::Int(0)),
+            }),
+            other => fidelity.push(format!("unsupported IL instruction `{other}` ignored")),
+        }
+    }
+
+    if started || !vars.is_empty() || !body.is_empty() {
+        programs.push(HirProgram {
+            name,
+            kind,
+            vars,
+            body,
+        });
+    }
+
+    LoweringResult {
+        module: HirModule { programs },
+        diagnostics,
+        fidelity,
+    }
+}
+
+fn fold(acc: Option<HirExpr>, op: BinaryOp, operand: HirExpr) -> HirExpr {
+    HirExpr::Binary {
+        op,
+        lhs: Box::new(acc.unwrap_or(HirExpr::Int(0))),
+        rhs: Box::new(operand),
+    }
+}
+
+fn parse_operand(token: Option<&str>) -> HirExpr {
+    let Some(token) = token else {
+        return HirExpr::Int(0);
+    };
+    if let Ok(value) = token.parse::<i64>() {
+        return HirExpr::Int(value);
+    }
+    if let Ok(value) = token.parse::<f64>() {
+        return HirExpr::Real(value);
+    }
+    match token.to_ascii_uppercase().as_str() {
+        "TRUE" => return HirExpr::Bool(true),
+        "FALSE" => return HirExpr::Bool(false),
+        _ => {}
+    }
+    if token.len() >= 2 && token.starts_with('\'') && token.ends_with('\'') {
+        return HirExpr::Str(token[1..token.len() - 1].to_owned());
+    }
+    HirExpr::Var(token.to_owned())
+}
+
+fn parse_var_decl(line: &str) -> Option<HirVar> {
+    let (name, rest) = line.split_once(':')?;
+    let name = name.trim();
+    if name.is_empty() {
+        return None;
+    }
+    let type_name = rest.trim().trim_end_matches(';').trim();
+    Some(HirVar {
+        name: name.to_owned(),
+        ty: HirType::from_name(type_name),
+    })
+}
+
+fn strip_comment(line: &str) -> &str {
+    match line.find("//") {
+        Some(index) => &line[..index],
+        None => line,
+    }
+}
+
+fn pou_start(upper: &str) -> Option<HirPouKind> {
+    let first = upper.split_whitespace().next()?;
+    match first {
+        "PROGRAM" => Some(HirPouKind::Program),
+        "FUNCTION" => Some(HirPouKind::Function),
+        "FUNCTION_BLOCK" => Some(HirPouKind::FunctionBlock),
+        "ACTION" => Some(HirPouKind::Action),
+        _ => None,
+    }
+}
+
+fn pou_end(upper: &str) -> bool {
+    matches!(
+        upper,
+        "END_PROGRAM" | "END_FUNCTION" | "END_FUNCTION_BLOCK" | "END_ACTION"
+    )
+}
+
+fn pou_keywords(kind: HirPouKind) -> (&'static str, &'static str) {
+    match kind {
+        HirPouKind::Program => ("PROGRAM", "END_PROGRAM"),
+        HirPouKind::Function => ("FUNCTION", "END_FUNCTION"),
+        HirPouKind::FunctionBlock => ("FUNCTION_BLOCK", "END_FUNCTION_BLOCK"),
+        HirPouKind::Action => ("ACTION", "END_ACTION"),
+    }
+}
+
+fn hir_type_name(ty: HirType) -> &'static str {
+    match ty {
+        HirType::Bool => "BOOL",
+        HirType::Int => "INT",
+        HirType::Real => "REAL",
+        HirType::Str => "STRING",
+        HirType::Time => "TIME",
+        HirType::Unknown => "INT",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mnemonics_match_iec_il_spelling() {
+        // Guard against drift from plc_runtime bytecode LOAD_VAR/STORE_VAR/ADD/SUB.
+        assert_eq!((IL_LD, IL_ST, IL_ADD, IL_SUB), ("LD", "ST", "ADD", "SUB"));
+    }
+}

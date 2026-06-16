@@ -6,10 +6,18 @@ license = "MIT"
 description = "CLI for PLC VS Code Structured Text tooling."
 
 [dependencies]
+plc_api = { path = "../plc_api" }
 plc_compiler_core = { path = "../plc_compiler_core" }
+plc_runtime = { path = "../plc_runtime" }
+plc_lang = { path = "../plc_lang" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [dev-dependencies]
 tempfile = "3"
+
+[lib]
+path = "src/lib.rs"
 
 [[bin]]
 name = "plc"

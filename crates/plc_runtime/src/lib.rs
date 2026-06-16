@@ -7,12 +7,13 @@
 
 use std::collections::HashMap;
 
-use plc_syntax::{StatementKind, parse_source};
-
 mod bytecode;
 mod clock;
 pub mod counters;
+mod debug;
 pub mod edge;
+mod engine;
+mod interp;
 pub mod stdlib;
 pub mod timers;
 mod value;
@@ -20,7 +21,9 @@ mod value;
 pub use bytecode::{BytecodeModule, Instruction, lower_module, lower_program};
 pub use clock::VirtualClock;
 pub use counters::{Ctd, Ctu, Ctud};
+pub use debug::{DebugCommand, DebugSession, PauseEvent, PauseReason};
 pub use edge::{FTrig, RTrig};
+pub use engine::ScanRuntimeEngine;
 pub use timers::{Tof, Ton, Tp};
 pub use value::Value;
 
@@ -75,20 +78,19 @@ pub struct VariableSnapshot {
     pub forced: bool,
 }
 
-/// One assignment extracted from the parsed program (target := expression).
-#[derive(Debug, Clone)]
-struct Assignment {
-    target: String,
-    expression: String,
-}
-
 /// Deterministic scan-cycle runtime over a single Structured Text program.
 #[derive(Debug, Clone)]
 pub struct Runtime {
-    program: Vec<Assignment>,
+    body: Vec<interp::Stmt>,
     state: VariableTable,
     pending_inputs: VariableTable,
     outputs: Vec<String>,
+    /// Declared scalar variables in source order, for the watch snapshot.
+    declared_order: Vec<String>,
+    /// Declared function-block instance names in source order, for the debugger.
+    declared_fbs: Vec<String>,
+    /// Live standard function-block instances keyed by lowercased name.
+    fbs: HashMap<String, interp::FbInstance>,
     scan_count: u64,
     clock: VirtualClock,
     forces: VariableTable,
@@ -97,49 +99,43 @@ pub struct Runtime {
 impl Runtime {
     /// Build a runtime from Structured Text source, retaining declared outputs.
     pub fn from_source(text: &str) -> Self {
-        let parse = parse_source(text);
-        let mut program = Vec::new();
-        let mut outputs = Vec::new();
+        let program = interp::build_program(text);
         let mut state = VariableTable::default();
+        let mut outputs = Vec::new();
+        let mut declared_order = Vec::new();
+        let mut declared_fbs = Vec::new();
+        let mut fbs = HashMap::new();
 
-        for unit in parse.units() {
-            for block in &unit.declaration_blocks {
-                if block.kind == plc_syntax::VarBlockKind::Output {
-                    for declaration in &block.declarations {
-                        outputs.push(declaration.name.clone());
-                    }
+        for var in &program.vars {
+            // Function-block instances are stateful objects, not scalar state.
+            if var.is_fb {
+                if let Some(instance) = interp::FbInstance::new(&var.type_name) {
+                    fbs.insert(var.name.to_ascii_lowercase(), instance);
+                    declared_fbs.push(var.name.clone());
                 }
-                // Cold-start initialization: declared variables take their
-                // initializer if present, otherwise the type default.
-                for declaration in &block.declarations {
-                    let value = declaration
-                        .initializer
-                        .as_deref()
-                        .and_then(Value::parse_literal)
-                        .unwrap_or_else(|| Value::type_default(&declaration.type_name));
-                    state.set(&declaration.name, value);
-                }
+                continue;
             }
-            for statement in &unit.statements {
-                if statement.kind != StatementKind::Assignment {
-                    continue;
-                }
-                if let (Some(target), Some(expression)) =
-                    (statement.target.as_deref(), statement.expression.as_deref())
-                {
-                    program.push(Assignment {
-                        target: target.to_owned(),
-                        expression: expression.to_owned(),
-                    });
-                }
+            // Cold-start initialization: the initializer if present, else the
+            // type default.
+            let value = var
+                .init
+                .clone()
+                .unwrap_or_else(|| Value::type_default(&var.type_name));
+            state.set(&var.name, value);
+            declared_order.push(var.name.clone());
+            if var.is_output {
+                outputs.push(var.name.clone());
             }
         }
 
         Self {
-            program,
+            body: program.body,
             state,
             pending_inputs: VariableTable::default(),
             outputs,
+            declared_order,
+            declared_fbs,
+            fbs,
             scan_count: 0,
             clock: VirtualClock::default(),
             forces: VariableTable::default(),
@@ -239,6 +235,46 @@ impl Runtime {
         snapshot
     }
 
+    /// Run up to `scans` scan cycles with a stepping-debug `hook` installed in
+    /// each logic phase. Mirrors [`run_scan`](Self::run_scan) but routes the
+    /// logic scan through the hook so it can pause/inspect/resume; stops early
+    /// once the hook reports the session has been stopped.
+    pub(crate) fn run_scans_with_hook(&mut self, hook: &mut dyn interp::DebugHook, scans: u64) {
+        for _ in 0..scans {
+            self.clock.tick();
+            self.scan_phase(ScanPhase::Input);
+            hook.enter_scan(self.scan_count);
+
+            let body = std::mem::take(&mut self.body);
+            let now_ms = self.clock.now_ms();
+            let mut exec = interp::ExecState {
+                vars: &mut self.state,
+                fbs: &mut self.fbs,
+                now_ms,
+                hook: Some(&mut *hook),
+                depth: 0,
+            };
+            interp::exec_block(&body, &mut exec);
+            self.body = body;
+
+            self.apply_forces();
+            self.scan_count += 1;
+            if hook.is_stopped() {
+                break;
+            }
+        }
+    }
+
+    /// Declared scalar variable names in source order (for the debugger).
+    pub(crate) fn declared_order(&self) -> &[String] {
+        &self.declared_order
+    }
+
+    /// Declared function-block instance names in source order (for the debugger).
+    pub(crate) fn declared_fbs(&self) -> &[String] {
+        &self.declared_fbs
+    }
+
     fn scan_phase(&mut self, phase: ScanPhase) {
         match phase {
             ScanPhase::Input => {
@@ -253,11 +289,19 @@ impl Runtime {
                 }
             }
             ScanPhase::Logic => {
-                let program = self.program.clone();
-                for assignment in &program {
-                    let value = self.evaluate(&assignment.expression);
-                    self.state.set(&assignment.target, value);
-                }
+                // Move the body out so the interpreter can borrow `state`/`fbs`
+                // mutably while walking the (disjoint) statement tree.
+                let body = std::mem::take(&mut self.body);
+                let now_ms = self.clock.now_ms();
+                let mut exec = interp::ExecState {
+                    vars: &mut self.state,
+                    fbs: &mut self.fbs,
+                    now_ms,
+                    hook: None,
+                    depth: 0,
+                };
+                interp::exec_block(&body, &mut exec);
+                self.body = body;
             }
             ScanPhase::Output => {}
         }
@@ -285,36 +329,28 @@ impl Runtime {
             .collect()
     }
 
-    /// Minimal deterministic expression evaluator: literals, variable
-    /// references, and `a + b` / `a - b` over integers.
-    fn evaluate(&self, expression: &str) -> Value {
-        let trimmed = expression.trim();
-
-        if let Some((left, right)) = split_binary(trimmed, '+') {
-            return Value::add(self.operand(left), self.operand(right));
-        }
-        if let Some((left, right)) = split_binary(trimmed, '-') {
-            return Value::sub(self.operand(left), self.operand(right));
-        }
-        self.operand(trimmed)
-    }
-
-    fn operand(&self, token: &str) -> Value {
-        let token = token.trim();
-        if let Some(value) = Value::parse_literal(token) {
-            return value;
-        }
-        self.state.get(token).cloned().unwrap_or(Value::Unknown)
+    /// Online "watch" snapshot: every declared scalar variable as `name = value`
+    /// in source order. STRING values are rendered without surrounding quotes,
+    /// the way an HMI / online Watch table displays them.
+    pub fn watch(&self) -> Vec<String> {
+        self.declared_order
+            .iter()
+            .map(|name| {
+                let value = self.state.get(name).cloned().unwrap_or(Value::Unknown);
+                format!("{name} = {}", display_watch(&value))
+            })
+            .collect()
     }
 }
 
-/// Split `a <op> b` on the first top-level binary operator, if present.
-fn split_binary(expression: &str, op: char) -> Option<(&str, &str)> {
-    let index = expression.find(op)?;
-    // Avoid treating a leading sign as a binary operator.
-    if index == 0 {
-        return None;
+/// Render a value for the watch table the way an online monitor shows it:
+/// strings without their quotes, REAL/TIME using the same CODESYS-style
+/// formatting as `REAL_TO_STRING` / `TIME_TO_STRING`.
+pub(crate) fn display_watch(value: &Value) -> String {
+    match value {
+        Value::Str(text) => text.clone(),
+        Value::Real(real) => stdlib::real_to_string(*real),
+        Value::Time(ms) => stdlib::time_to_string(*ms),
+        other => other.to_string(),
     }
-    let (left, right) = expression.split_at(index);
-    Some((left, &right[op.len_utf8()..]))
 }

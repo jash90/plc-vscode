@@ -433,6 +433,12 @@ fn is_keyword(text: &str) -> bool {
     matches!(
         text.to_ascii_uppercase().as_str(),
         "ACTION"
+            // Operator keywords (IEC logical/arithmetic word operators).
+            | "AND"
+            | "MOD"
+            | "NOT"
+            | "OR"
+            | "XOR"
             | "ARRAY"
             | "BY"
             | "CASE"

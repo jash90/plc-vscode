@@ -17,6 +17,10 @@ jobs:
   package:
     name: package ${{ matrix.vsce_target }}
     runs-on: ${{ matrix.os }}
+    # Exposed as a job-level env so the publish step's `if:` can read it — the
+    # `secrets` context is NOT allowed in `if:`, but `env` is.
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
     strategy:
       fail-fast: false
       matrix:
@@ -40,6 +44,13 @@ jobs:
           - os: windows-latest
             rust_target: x86_64-pc-windows-msvc
             vsce_target: win32-x64
+            ext: ".exe"
+          # Windows on ARM. Cross-compiled from the x64 windows-latest runner
+          # (MSVC links ARM64 natively); best-effort — fail-fast: false keeps the
+          # other platform VSIXs publishing if this leg ever fails.
+          - os: windows-latest
+            rust_target: aarch64-pc-windows-msvc
+            vsce_target: win32-arm64
             ext: ".exe"
     steps:
       - uses: actions/checkout@v4
@@ -96,9 +107,9 @@ jobs:
           files: editors/vscode/plc-vscode-${{ matrix.vsce_target }}.vsix
 
       # Publishing requires a VSCE_PAT secret; skipped automatically otherwise.
+      # Gated on the job-level `env.VSCE_PAT` (the `secrets` context is invalid
+      # inside `if:`).
       - name: Publish platform VSIX to VS Code Marketplace
-        if: ${{ secrets.VSCE_PAT != '' }}
+        if: ${{ env.VSCE_PAT != '' }}
         working-directory: editors/vscode
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: npx vsce publish --no-dependencies --target ${{ matrix.vsce_target }} --packagePath "plc-vscode-${{ matrix.vsce_target }}.vsix" --pat "$VSCE_PAT"

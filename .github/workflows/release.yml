@@ -63,7 +63,6 @@ jobs:
             vsce_target: win32-arm64
             ext: ".exe"
             plc_features: ""
-            ext: ".exe"
     steps:
       - uses: actions/checkout@v4
 

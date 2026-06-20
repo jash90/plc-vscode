@@ -25,32 +25,44 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # `plc_features` enables the CPDev VM (`cpdev`) in the bundled `plc` so
+          # `plc run <file>.xcp` works locally. The vendored VM is a POSIX/Linux
+          # port (unistd.h / clock_gettime), so it is enabled only on macOS +
+          # Linux; on Windows the CLI still compiles .xcp (pure Rust) but prints a
+          # clear message for `run .xcp`.
           - os: macos-latest
             rust_target: aarch64-apple-darwin
             vsce_target: darwin-arm64
             ext: ""
+            plc_features: "--features cpdev"
           - os: macos-latest
             rust_target: x86_64-apple-darwin
             vsce_target: darwin-x64
             ext: ""
+            plc_features: "--features cpdev"
           - os: ubuntu-latest
             rust_target: x86_64-unknown-linux-gnu
             vsce_target: linux-x64
             ext: ""
+            plc_features: "--features cpdev"
           - os: ubuntu-latest
             rust_target: aarch64-unknown-linux-gnu
             vsce_target: linux-arm64
             ext: ""
+            plc_features: "--features cpdev"
           - os: windows-latest
             rust_target: x86_64-pc-windows-msvc
             vsce_target: win32-x64
             ext: ".exe"
+            plc_features: ""
           # Windows on ARM. Cross-compiled from the x64 windows-latest runner
           # (MSVC links ARM64 natively); best-effort — fail-fast: false keeps the
           # other platform VSIXs publishing if this leg ever fails.
           - os: windows-latest
             rust_target: aarch64-pc-windows-msvc
             vsce_target: win32-arm64
+            ext: ".exe"
+            plc_features: ""
             ext: ".exe"
     steps:
       - uses: actions/checkout@v4
@@ -61,17 +73,23 @@ jobs:
           targets: ${{ matrix.rust_target }}
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install aarch64 Linux cross linker
+      - name: Install aarch64 Linux cross toolchain
         if: matrix.vsce_target == 'linux-arm64'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
+          # gcc = Rust linker; g++ = C++ cross-compiler the `cc` crate needs to
+          # build the vendored CPDev VM for the `cpdev` feature.
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          {
+            echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
+            echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc"
+            echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++"
+          } >> "$GITHUB_ENV"
 
       - name: Build server and CLI (release)
         run: |
           cargo build --release --target ${{ matrix.rust_target }} --package plc_lsp_server --bin plc-lsp-server
-          cargo build --release --target ${{ matrix.rust_target }} --package plc_cli --bin plc
+          cargo build --release --target ${{ matrix.rust_target }} --package plc_cli --bin plc ${{ matrix.plc_features }}
 
       - name: Bundle binaries into the extension
         shell: bash

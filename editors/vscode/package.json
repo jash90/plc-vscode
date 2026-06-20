@@ -2,7 +2,7 @@
   "name": "plc-vscode",
   "displayName": "PLC VS Code",
   "description": "Structured Text / IEC 61131-3 support backed by the PLC VS Code Rust language server.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "raccoonsoftware",
   "private": true,
   "engines": {
@@ -16,6 +16,7 @@
     "onCommand:plc-vscode.showStatus",
     "onCommand:plc-vscode.runCurrentFile",
     "onCommand:plc-vscode.debugCurrentFile",
+    "onCommand:plc-vscode.buildCpdev",
     "onDebugResolve:plc-st",
     "onDebugDynamicConfigurations:plc-st"
   ],
@@ -108,6 +109,10 @@
       {
         "command": "plc-vscode.debugCurrentFile",
         "title": "PLC VS Code: Debug Current Structured Text File"
+      },
+      {
+        "command": "plc-vscode.buildCpdev",
+        "title": "PLC VS Code: Compile to CPDev .xcp"
       }
     ],
     "menus": {
@@ -121,6 +126,11 @@
           "command": "plc-vscode.debugCurrentFile",
           "group": "navigation@1",
           "when": "resourceLangId == structured-text"
+        },
+        {
+          "command": "plc-vscode.buildCpdev",
+          "group": "navigation@2",
+          "when": "resourceLangId == structured-text"
         }
       ],
       "editor/context": [
@@ -133,6 +143,11 @@
           "command": "plc-vscode.debugCurrentFile",
           "group": "navigation@11",
           "when": "editorLangId == structured-text"
+        },
+        {
+          "command": "plc-vscode.buildCpdev",
+          "group": "navigation@12",
+          "when": "editorLangId == structured-text"
         }
       ],
       "explorer/context": [
@@ -144,6 +159,11 @@
         {
           "command": "plc-vscode.debugCurrentFile",
           "group": "navigation@11",
+          "when": "resourceLangId == structured-text"
+        },
+        {
+          "command": "plc-vscode.buildCpdev",
+          "group": "navigation@12",
           "when": "resourceLangId == structured-text"
         }
       ]

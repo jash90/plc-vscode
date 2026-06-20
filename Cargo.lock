@@ -505,6 +505,7 @@ version = "0.1.0"
 dependencies = [
  "plc_api",
  "plc_compiler_core",
+ "plc_cpdev_backend",
  "plc_cpdev_vm",
  "plc_lang",
  "plc_runtime",
@@ -520,6 +521,13 @@ dependencies = [
  "plc_api",
  "plc_semantics",
  "plc_syntax",
+]
+
+[[package]]
+name = "plc_cpdev_backend"
+version = "0.1.0"
+dependencies = [
+ "plc_runtime",
 ]
 
 [[package]]

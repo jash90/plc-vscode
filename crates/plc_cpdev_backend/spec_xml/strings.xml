@@ -1,0 +1,271 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<CPDEV version="1.0">
+  <VMSPEC>
+    <USER>
+      <title>Functions for STRING type support</title>
+      <version>2.9.3</version>
+      <extraver/>
+      <builddate>2016.08-21 23:44</builddate>
+      <exportdate>#now</exportdate>
+    </USER>
+    <FUNCTIONS>
+      <function name="SEL" vmcode="0C0F" return="STRING">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="STRING"/>
+          <arg no="2" name="case_true" type="STRING"/>
+        </args>
+        <comment>Wybiera jeden spośród dwóch argumentów</comment>
+      </function>
+      <function name="LIMIT" vmcode="0D0F" return="STRING">
+        <args>
+          <arg no="0" name="value" type="STRING"/>
+          <arg no="1" name="min" type="STRING"/>
+          <arg no="2" name="max" type="STRING"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+      </function>
+      <function name="MAX" vmcode="0E0F" return="STRING">
+        <args>
+          <arg no="0" type="STRING"/>
+          <arg no="1" type="STRING"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+      </function>
+      <function name="MIN" vmcode="0F0F" return="STRING">
+        <args>
+          <arg no="0" type="STRING"/>
+          <arg no="1" type="STRING"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+      </function>
+      <function name="GT" vmcode="100F" return="BOOL">
+        <args>
+          <arg no="0" type="STRING"/>
+          <arg no="1" type="STRING"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+      </function>
+      <function name="GE" vmcode="110F" return="BOOL">
+        <args>
+          <arg no="0" type="STRING"/>
+          <arg no="1" type="STRING"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+      </function>
+      <function name="EQ" vmcode="120F" return="BOOL">
+        <args>
+          <arg no="0" type="STRING"/>
+          <arg no="1" type="STRING"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+      </function>
+      <function name="LE" vmcode="130F" return="BOOL">
+        <args>
+          <arg no="0" type="STRING"/>
+          <arg no="1" type="STRING"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+      </function>
+      <function name="LT" vmcode="140F" return="BOOL">
+        <args>
+          <arg no="0" type="STRING"/>
+          <arg no="1" type="STRING"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+      </function>
+      <function name="NE" vmcode="150F" return="BOOL">
+        <args>
+          <arg no="0" type="STRING"/>
+          <arg no="1" type="STRING"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+      </function>
+      <function name="MUX" vmcode="16*F" return="STRING">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="STRING"/>
+        </args>
+        <comment>Selects one of the values</comment>
+      </function>
+      <function name="ADD" vmcode="01*F" return="STRING">
+        <args>
+          <arg no="*" name="str*" type="STRING"/>
+        </args>
+        <comment>Concatenates two or more strings</comment>
+      </function>
+
+      <function name="LEN" vmcode="1801" return="INT">
+        <args>
+          <arg no="0" name="str" type="STRING"/>
+        </args>
+        <comment>Returns length of the string</comment>
+      </function>
+      <function name="LEFT" vmcode="1802" return="STRING">
+        <args>
+          <arg no="0" name="str" type="STRING"/>
+          <arg no="1" name="chars" type="INT"/>
+        </args>
+        <comment>Returns beginning of the string</comment>
+      </function>
+      <function name="RIGHT" vmcode="1803" return="STRING">
+        <args>
+          <arg no="0" name="str" type="STRING"/>
+          <arg no="1" name="chars" type="INT"/>
+        </args>
+        <comment>Returns end of the string</comment>
+      </function>
+      <function name="MID" vmcode="1804" return="STRING">
+        <args>
+          <arg no="0" name="str" type="STRING"/>
+          <arg no="1" name="from" type="INT"/>
+          <arg no="2" name="len" type="INT"/>
+        </args>
+        <comment>Returns substring</comment>
+      </function>
+      <function name="INSERT" vmcode="1805" return="STRING">
+        <args>
+          <arg no="0" name="src" type="STRING"/>
+          <arg no="1" name="incl" type="STRING"/>
+          <arg no="2" name="offset" type="INT"/>
+        </args>
+        <comment>Inserts incl string into src at offset position</comment>
+      </function>
+      <function name="DELETE" vmcode="1806" return="STRING">
+        <args>
+          <arg no="0" name="src" type="STRING"/>
+          <arg no="1" name="from" type="INT"/>
+          <arg no="2" name="len" type="INT"/>
+        </args>
+        <comment>Removes len characters at offset from</comment>
+      </function>
+      <function name="REPLACE" vmcode="1807" return="STRING">
+        <args>
+          <arg no="0" name="src" type="STRING"/>
+          <arg no="1" name="rep" type="STRING"/>
+          <arg no="2" name="search_len" type="INT"/>
+          <arg no="3" name="search_offs" type="INT"/>
+        </args>
+        <comment>Replaces search_len characters of src by rep starting at search_offs character position</comment>
+      </function>
+      <function name="FIND" vmcode="1808" return="INT">
+        <args>
+          <arg no="0" name="haystack" type="STRING"/>
+          <arg no="1" name="needle" type="STRING"/>
+        </args>
+        <comment>Finds substring position in string. If not found returns -1.</comment>
+      </function>
+      <function name="CONCAT" vmcode="01*F" return="STRING">
+        <args>
+          <arg no="*" type="STRING"/>
+        </args>
+        <comment>Concatenates two or more strings</comment>
+      </function>
+      <function name="STRING_TO_REAL" vmcode="1809" return="REAL">
+        <args>
+          <arg no="0" type="STRING"/>
+        </args>
+        <comment>Converts STRING to REAL value. Returns NAN if value cannot be converted and sets bit 16#10 returned by GET_STATUS_WORD1 function</comment>
+      </function>
+      <function name="STRING_TO_INT" vmcode="180A" return="INT">
+        <args>
+          <arg no="0" type="STRING"/>
+        </args>
+        <comment>Converts STRING to INT value. Returns 0 if value cannot be converted and sets bit 16#10 returned by GET_STATUS_WORD1 function</comment>
+      </function>
+      <function name="INT_TO_STRING" vmcode="180B" return="STRING">
+        <args>
+          <arg no="0" type="INT"/>
+        </args>
+        <comment>Converts INT to STRING value. If value is negative then include '-' character before number</comment>
+      </function>
+      <function name="REAL_TO_STRING" vmcode="180C" return="STRING">
+        <args>
+          <arg no="0" type="REAL"/>
+        </args>
+        <comment>Converts REAL to STRING value. One integer digit, dot, 7 mantisa characters, 'E±', 3 characters of mantisa. If value is negative then include '-' character before whole number. Always occupies approx. 15 characters.</comment>
+      </function>
+
+      <function name="STRING_TO_LREAL" vmcode="180D" return="LREAL">
+        <args>
+          <arg no="0" type="STRING"/>
+        </args>
+        <comment>Converts STRING to LREAL value. Returns NAN if value cannot be converted and sets bit 16#10 returned by GET_STATUS_WORD1 function</comment>
+      </function>
+      <function name="STRING_TO_DINT" vmcode="180E" return="DINT">
+        <args>
+          <arg no="0" type="STRING"/>
+        </args>
+        <comment>Converts STRING to DINT value. Returns 0 if value cannot be converted and sets bit 16#10 returned by GET_STATUS_WORD1 function</comment>
+      </function>
+      <function name="DINT_TO_STRING" vmcode="180F" return="STRING">
+        <args>
+          <arg no="0" type="DINT"/>
+        </args>
+        <comment>Converts DINT to STRING value. If value is negative then include '-' character before number</comment>
+      </function>
+      <function name="LREAL_TO_STRING" vmcode="1810" return="STRING">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Converts LREAL to STRING value. One integer digit, dot, 14 mantisa characters, 'E±', 3 characters of mantisa. If value is negative then include '-' character before whole number. Always occupies approx. 22 characters.</comment>
+      </function>
+      <function name="STRING_TO_LINT" vmcode="1811" return="LINT">
+        <args>
+          <arg no="0" type="STRING"/>
+        </args>
+        <comment>Converts STRING to LINT value. Returns 0 if value cannot be converted and sets bit 16#10 returned by GET_STATUS_WORD1 function</comment>
+      </function>
+      <function name="LINT_TO_STRING" vmcode="1812" return="STRING">
+        <args>
+          <arg no="0" type="LINT"/>
+        </args>
+        <comment>Converts LINT to STRING value. If value is negative then include '-' character before number</comment>
+      </function>
+    <function name="CHAR_AT" vmcode="1813" return="BYTE">
+        <args>
+          <arg no="0" name="str" type="STRING"/>
+          <arg no="1" name="pos" type="INT"/>
+        </args>
+        <comment>Returns a character at the given position</comment>
+    </function>
+    <function name="CHAR_SET" vmcode="1814" return="INT">
+        <args>
+          <arg no="0" name="str" type="STRING"/>
+          <arg no="1" name="pos" type="INT"/>
+          <arg no="2" name="char" type="BYTE"/>
+        </args>
+        <comment>Sets character at the given position of string.</comment>
+    </function>
+      <function name="FIND_REPLACE" vmcode="1815" return="STRING">
+        <args>
+          <arg no="0" name="haystack" type="STRING"/>
+          <arg no="1" name="needle" type="STRING"/>
+          <arg no="2" name="search_offs" type="INT"/>
+          <arg no="3" name="search_len" type="INT"/>
+          <arg no="4" name="replacement" type="STRING"/>
+        </args>
+        <comment>Replaces occurences of first string with replacement string</comment>
+      </function>
+      <function name="FIND_EX" vmcode="1816" return="INT">
+        <args>
+          <arg no="0" name="haystack" type="STRING"/>
+          <arg no="1" name="needle" type="STRING"/>
+          <arg no="2" name="search_offs" type="INT"/>
+          <arg no="3" name="search_len" type="INT"/>
+        </args>
+        <comment>Finds substring position in string. If not found returns -1.</comment>
+      </function>
+   </FUNCTIONS>
+    <SYSTEM>
+      <sysproc name="STRASGN" vmcode="1800">
+        <args>
+          <arg no="0" name="dest" type=":rdlabel.STRING"/>
+          <arg no="1" name="src" type=":rdlabel.STRING"/>
+        </args>
+        <comment>String assignment</comment>
+      </sysproc>   
+ 
+     </SYSTEM>
+  </VMSPEC>
+</CPDEV>

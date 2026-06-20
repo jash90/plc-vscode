@@ -1,0 +1,925 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<CPDEV version="1.0">
+  <VMSPEC>
+    <USER>
+      <title>Virtual machine little endian in line functions</title>
+      <version>2.9.2</version>
+      <extraver/>
+      <builddate>2016.06-12 15:45</builddate>
+      <exportdate>#now</exportdate>
+    </USER>
+    <HARDWARE>
+      <AddressSize>4</AddressSize>
+    </HARDWARE>
+    <!-- Since 2.4.7 version -->
+    <!-- In-line functions -->
+    <INLINE>
+      <function name="GET_YEAR" return="INT">
+        <args>
+          <arg no="0" name="PDATE_TIME" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Returns year value from DATE_AND_TIME parameter</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.MEMCP GET_YEAR, PDATE_TIME.6, #/0200 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="GET_YEAR" return="INT">
+        <args>
+          <arg no="0" name="PDATE" type="DATE"/>
+        </args>
+        <comment>Returns year value from DATE parameter</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.MEMCP GET_YEAR, PDATE.2, #/0200 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="GET_MONTH" return="INT">
+        <args>
+          <arg no="0" name="PDATE_TIME" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Returns month value from DATE_AND_TIME parameter</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  
+          $VMSYS.MCD GET_MONTH.1, #/01, #/00 
+          $VMSYS.MEMCP GET_MONTH, PDATE_TIME.5, #/0100
+          ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="GET_MONTH" return="INT">
+        <args>
+          <arg no="0" name="PDATE" type="DATE"/>
+        </args>
+        <comment>Returns month value from DATE parameter</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[            
+          $VMSYS.MCD GET_MONTH.1, #/01, #/00 
+          $VMSYS.MEMCP GET_MONTH, PDATE.1, #/0100 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="GET_DAY" return="INT">
+        <args>
+          <arg no="0" name="PDATE" type="DATE"/>
+        </args>
+        <comment>Returns day value from DATE parameter</comment>
+        <code>
+          <![CDATA[ 
+          $VMSYS.MCD   GET_DAY.1, #/01, #/00
+          $VMSYS.MEMCP GET_DAY, PDATE, #/0100 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="GET_DAY" return="INT">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Returns day value from DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MCD   GET_DAY.1, #/01, #/00
+          $VMSYS.MEMCP GET_DAY, PDATETIME.4, #/0100 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+
+      <function name="GET_HOUR" return="INT">
+        <args>
+          <arg no="0" name="PTIMEOFDAY" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Returns hour value from TIME_OF_DAY parameter</comment>
+        <code>
+          <![CDATA[ 
+          $VMSYS.MCD   GET_HOUR.1, #/01, #/00
+          $VMSYS.MEMCP GET_HOUR, PTIMEOFDAY.3, #/0100 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="GET_HOUR" return="INT">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Returns hour value from DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MCD   GET_HOUR.1, #/01, #/00
+          $VMSYS.MEMCP GET_HOUR, PDATETIME.3, #/0100 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="GET_MINUTE" return="INT">
+        <args>
+          <arg no="0" name="PTIMEOFDAY" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Returns minute value from TIME_OF_DAY parameter</comment>
+        <code>
+          <![CDATA[ 
+          $VMSYS.MCD GET_MINUTE.1, #/01, #/00
+          $VMSYS.MEMCP GET_MINUTE, PTIMEOFDAY.2, #/0100 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="GET_MINUTE" return="INT">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Returns minute value from DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[ 
+          $VMSYS.MCD GET_MINUTE.1, #/01, #/00
+          $VMSYS.MEMCP GET_MINUTE, PDATETIME.2, #/0100 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="GET_SECOND" return="INT">
+        <args>
+          <arg no="0" name="PTIMEOFDAY" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Returns second value from TIME_OF_DAY parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MCD GET_SECOND.1, #/01, #/00
+          $VMSYS.MEMCP GET_SECOND, PTIMEOFDAY.1, #/0100 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="GET_SECOND" return="INT">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Returns second value from DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[ 
+          $VMSYS.MCD GET_SECOND.1, #/01, #/00
+          $VMSYS.MEMCP GET_SECOND, PDATETIME.1, #/0100 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="GET_HUNDSEC" return="INT">
+        <args>
+          <arg no="0" name="PTIMEOFDAY" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Returns 1/100 second value from TIME_OF_DAY parameter</comment>
+        <code>
+          <![CDATA[ 
+          $VMSYS.MCD GET_HUNDSEC.1, #/01, #/00 
+          $VMSYS.MEMCP GET_HUNDSEC, PTIMEOFDAY, #/0100 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="GET_HUNDSEC" return="INT">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Returns 1/100 second value from DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[ 
+          $VMSYS.MCD   GET_HUNDSEC.1, #/01, #/00 
+          $VMSYS.MEMCP GET_HUNDSEC, PDATETIME, #/0100 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="DT_TO_TOD" return="TIME_OF_DAY">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Extracts TIME_OF_DAY from DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[ 
+          { $VMSYS.MCD   DT_TO_TOD, #/04, #/00000000 }
+          $VMSYS.MEMCP DT_TO_TOD, PDATETIME, #/0400 ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <!-- Od wersji 2.4.7.1 -->
+      <function name="BOOL_TO_INT" return="INT">
+        <args>
+          <arg no="0" name="INP" type="BOOL"/>
+        </args>
+        <comment>Conversion BOOL parameter to INT value</comment>
+        <code>
+          <![CDATA[ 
+          $VMSYS.MCD   BOOL_TO_INT.1, #/01, #/00
+          $VMSYS.MEMCP BOOL_TO_INT, INP, #/0100 ]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <!-- Od wersji 2.4.7.2 -->
+      <function name="DEPR_INT_TO_DINT" return="DINT">
+        <args>
+          <arg no="0" name="INP" type="INT"/>
+        </args>
+        <vars>
+          <var name="_SIGN" type="WORD"/>
+        </vars>
+        <comment>[Depreciate] Converts INT parameter to DINT value by duplicating the most significant bit</comment>
+        <code>
+          <![CDATA[ 
+          $VMSYS.MCD        _SIGN, #/02, #/0080
+          $VMSYS.MEMCP      DEPR_INT_TO_DINT, INP, #/0200
+          $DEFAULT.AND/0822 DEPR_INT_TO_DINT, DEPR_INT_TO_DINT, _SIGN
+          $VMSYS.JRZ{1C05}  DEPR_INT_TO_DINT.1, #/0B00 {:__FILL_OH}
+          $VMSYS.MCD        DEPR_INT_TO_DINT.2, #/02, #/FFFF
+          $VMSYS.JR         #/0700 {:__FILL_DONE}
+{:__FILL_OH}
+          $VMSYS.MCD   DEPR_INT_TO_DINT.2, #/02, #/0000
+{:__FILL_DONE}
+          $VMSYS.MEMCP DEPR_INT_TO_DINT, INP, #/0200 ]]>
+        </code>
+        <group>
+          <item value="3" mask="1"/>
+        </group>
+      </function>
+      <function name="DINT_TO_INT" return="INT">
+        <args>
+          <arg no="0" name="INP" type="DINT"/>
+        </args>
+        <comment>Converts DINT parameter to INT value by omitting the most significant bits</comment>
+        <code>
+          <![CDATA[$VMSYS.MEMCP DINT_TO_INT, INP, #/0200]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <!-- Od wersji 2.4.9 -->
+      <function name="BYTE_TO_SINT" return="SINT">
+        <args>
+          <arg no="0" name="INP" type="BYTE"/>
+        </args>
+        <comment>Converts BYTE parameter to SINT value without affection</comment>
+        <code>
+          <![CDATA[$VMSYS.MEMCP BYTE_TO_SINT, INP, #/0100]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="SINT_TO_BYTE" return="BYTE">
+        <args>
+          <arg no="0" name="INP" type="SINT"/>
+        </args>
+        <comment>Converts SINT parameter to BYTE value without affection</comment>
+        <code>
+          <![CDATA[$VMSYS.MEMCP SINT_TO_BYTE, INP, #/0100]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="WORD_TO_INT" return="INT">
+        <args>
+          <arg no="0" name="INP" type="WORD"/>
+        </args>
+        <comment>Converts WORD parameter to INT value without affection</comment>
+        <code>
+          <![CDATA[$VMSYS.MEMCP WORD_TO_INT, INP, #/0200]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="WORD_TO_BYTE" return="BYTE">
+        <args>
+          <arg no="0" name="INP" type="WORD"/>
+        </args>
+        <comment>Converts WORD parameter to BYTE value</comment>
+        <code>
+          <![CDATA[$VMSYS.MEMCP WORD_TO_BYTE, INP, #/0100]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="INT_TO_WORD" return="WORD">
+        <args>
+          <arg no="0" name="INP" type="INT"/>
+        </args>
+        <comment>Converts INT parameter to WORD value without affection</comment>
+        <code>
+          <![CDATA[$VMSYS.MEMCP INT_TO_WORD, INP, #/0200]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="DWORD_TO_DINT" return="DINT">
+        <args>
+          <arg no="0" name="INP" type="DWORD"/>
+        </args>
+        <comment>Converts DWORD parameter to DINT value without affection</comment>
+        <code>
+          <![CDATA[$VMSYS.MEMCP DWORD_TO_DINT, INP, #/0400]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="DINT_TO_DWORD" return="DWORD">
+        <args>
+          <arg no="0" name="INP" type="DINT"/>
+        </args>
+        <comment>Converts DWORD parameter to DINT value without affection</comment>
+        <code>
+          <![CDATA[$VMSYS.MEMCP DINT_TO_DWORD, INP, #/0400]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="LWORD_TO_LINT" return="LINT">
+        <args>
+          <arg no="0" name="INP" type="LWORD"/>
+        </args>
+        <comment>Converts LWORD parameter to LINT value without affection</comment>
+        <code>
+          <![CDATA[$VMSYS.MEMCP LWORD_TO_LINT, INP, #/0800]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="LINT_TO_LWORD" return="LWORD">
+        <args>
+          <arg no="0" name="INP" type="LINT"/>
+        </args>
+        <comment>Converts LINT parameter to LWORD value without affection</comment>
+        <code>
+          <![CDATA[$VMSYS.MEMCP LINT_TO_LWORD, INP, #/0800]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <!-- Od wersji 2.5.2 -->
+      <function name="DINT_TO_LINT" return="LINT">
+        <args>
+          <arg no="0" name="INP" type="DINT"/>
+        </args>
+        <vars>
+          <var name="_SIGN" type="DWORD"/>
+        </vars>
+        <comment>Converts DINT parameter to LINT value by duplicating the most significant bit</comment>
+        <code>
+          <![CDATA[ 
+          $VMSYS.MCD        _SIGN, #/04, #/00000080
+          $VMSYS.MEMCP      DINT_TO_LINT, INP, #/0400
+          $DEFAULT.AND/0823 DINT_TO_LINT, DINT_TO_LINT, _SIGN
+          $VMSYS.JRZ/1C05   DINT_TO_LINT.3, #/0A00 {:__FILL_OH}
+          $VMSYS.FPAT       DINT_TO_LINT.4, #/04, #/FF
+          $VMSYS.JR         #/0600 {:__FILL_DONE}
+{:__FILL_OH}
+          $VMSYS.FPAT       DINT_TO_LINT.4, #/04, #/00
+{:__FILL_DONE}
+          $VMSYS.MEMCP      DINT_TO_LINT, INP, #/0400 ]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="LINT_TO_DINT" return="DINT">
+        <args>
+          <arg no="0" name="INP" type="LINT"/>
+        </args>
+        <comment>Converts LINT parameter to DINT value by omitting the most significant bits</comment>
+        <code>
+          <![CDATA[$VMSYS.MEMCP LINT_TO_DINT, INP, #/0400]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="DWORD_TO_LWORD" return="LWORD">
+        <args>
+          <arg no="0" name="INP" type="DWORD"/>
+        </args>
+        <comment>Converts DWORD parameter to LWORD value by filling the most significant bits with zeroes</comment>
+        <code>
+          <![CDATA[
+          $VMSYS.MEMCP DWORD_TO_LWORD, INP, #/0400
+          $VMSYS.FPAT  DWORD_TO_LWORD.4, #/04, #/00 ]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="LWORD_TO_DWORD" return="DWORD">
+        <args>
+          <arg no="0" name="INP" type="LWORD"/>
+        </args>
+        <comment>Converts LWORD parameter to DWORD value by omitting the most significant bits</comment>
+        <code>
+          <![CDATA[$VMSYS.MEMCP LWORD_TO_DWORD, INP, #/0400]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="WORD_TO_DWORD" return="DWORD">
+        <args>
+          <arg no="0" name="INP" type="WORD"/>
+        </args>
+        <comment>Converts WORD parameter to DWORD value by filling the most significant bits with zeroes</comment>
+        <code>
+          <![CDATA[
+          $VMSYS.MEMCP WORD_TO_DWORD, INP, #/0200
+          $VMSYS.FPAT  WORD_TO_DWORD.2, #/02, #/00 ]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="WORD_TO_LWORD" return="LWORD">
+        <args>
+          <arg no="0" name="INP" type="WORD"/>
+        </args>
+        <comment>Converts WORD parameter to LWORD value by filling the most significant bits with zeroes</comment>
+        <code>
+          <![CDATA[
+          $VMSYS.MEMCP WORD_TO_LWORD, INP, #/0200
+          $VMSYS.FPAT  WORD_TO_LWORD.2, #/06, #/00 ]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="INT_TO_LINT" return="LINT">
+        <args>
+          <arg no="0" name="INP" type="INT"/>
+        </args>
+        <vars>
+          <var name="_SIGN" type="WORD"/>
+        </vars>
+        <comment>Converts DINT parameter to LINT value by duplicating the most significant bit</comment>
+        <code>
+          <![CDATA[ 
+          $VMSYS.MCD        _SIGN, #/02, #/0080
+          $VMSYS.MEMCP      INT_TO_LINT, INP, #/0200
+          $DEFAULT.AND/0822 INT_TO_LINT, INT_TO_LINT, _SIGN
+          $VMSYS.JRZ/1C05   INT_TO_LINT.1, #/0A00 {:__FILL_OH}
+          $VMSYS.FPAT       INT_TO_LINT.2, #/06, #/FF
+          $VMSYS.JR         #/0600 {:__FILL_DONE}
+{:__FILL_OH}
+          $VMSYS.FPAT       INT_TO_LINT.2, #/06, #/00
+{:__FILL_DONE}
+          $VMSYS.MEMCP      INT_TO_LINT, INP, #/0200 ]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="REAL_TO_DINT" return="DINT">
+        <args>
+          <arg no="0" name="INP" type="REAL"/>
+        </args>
+        <comment>Converts REAL parameter to DINT value with truncate</comment>
+        <code>
+          <![CDATA[$DEFAULT.TRUNC REAL_TO_DINT, INP]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="INT_TO_BYTE" return="BYTE">
+        <args>
+          <arg no="0" name="INP" type="INT"/>
+        </args>
+        <comment>Converts INT parameter to BYTE value by ignoring high part</comment>
+        <code>
+          <![CDATA[$VMSYS.MEMCP INT_TO_BYTE, INP, #/0100]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="BYTE_TO_INT" return="INT">
+        <args>
+          <arg no="0" name="INP" type="BYTE"/>
+        </args>
+        <comment>Converts BYTE parameter to INT value</comment>
+        <code>
+          <![CDATA[
+          $VMSYS.MCD   BYTE_TO_INT.1, #/01, #/00
+          $VMSYS.MEMCP BYTE_TO_INT.0, INP, #/0100]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="TEST_BYTE" return="BOOL">
+        <args>
+          <arg no="0" name="VALUE" type="BYTE"/>
+          <arg no="1" name="MASK" type="BYTE"/>
+        </args>
+        <comment>Checks if two bytes have at least one common bit</comment>
+        <code>
+          <![CDATA[
+          $VMSYS.AND/0821   TEST_BYTE, VALUE, MASK]]>
+        </code>
+      </function>
+
+      <!--since 2.6.1-->
+      <function name="SET_HOUR" return="DATE_AND_TIME">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME">
+            <comment>Input DATE_AND_TIME</comment>
+          </arg>
+          <arg no="1" name="PNEWHOUR" type="INT">
+            <comment>New Hour. It must be between 0 and 23. It value is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets hour value for DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MEMCP SET_HOUR, PDATETIME, #/0800
+          $VMSYS.MEMCP SET_HOUR.3, PNEWHOUR, #/0100
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+      <function name="SET_HOUR" return="TIME_OF_DAY">
+        <args>
+          <arg no="0" name="PTIMEOFDAY" type="TIME_OF_DAY">
+            <comment>Input TIME_OF_DAY</comment>
+          </arg>
+          <arg no="1" name="PNEWHOUR" type="INT">
+            <comment>New Hour. It must be between 0 and 23. It value is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets hour value for TIME_OF_DAY parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MEMCP SET_HOUR, PTIMEOFDAY, #/0400
+          $VMSYS.MEMCP SET_HOUR.3, PNEWHOUR, #/0100
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+
+      <function name="SET_MINUTE" return="DATE_AND_TIME">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME">
+            <comment>Input DATE_AND_TIME</comment>
+          </arg>
+          <arg no="1" name="PNEWMINUTE" type="INT">
+            <comment>New minute. It must be between 0 and 59. Its value is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets minute value for DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MEMCP SET_MINUTE, PDATETIME, #/0800
+          $VMSYS.MEMCP SET_MINUTE.2, PNEWMINUTE, #/0100
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+      <function name="SET_MINUTE" return="TIME_OF_DAY">
+        <args>
+          <arg no="0" name="PTIMEOFDAY" type="TIME_OF_DAY">
+            <comment>Input TIME_OF_DAY</comment>
+          </arg>
+          <arg no="1" name="PNEWMINUTE" type="INT">
+            <comment>New minute. It must be between 0 and 59. Its value is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets minute value for TIME_OF_DAY parameter</comment>
+        <code>
+          <![CDATA[
+          $VMSYS.MEMCP SET_MINUTE, PTIMEOFDAY, #/0400
+          $VMSYS.MEMCP SET_MINUTE.2, PNEWMINUTE, #/0100
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+
+      <function name="SET_SECOND" return="DATE_AND_TIME">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME">
+            <comment>Input DATE_AND_TIME</comment>
+          </arg>
+          <arg no="1" name="PNEWSECOND" type="INT">
+            <comment>New second. It must be between 0 and 59. Its value is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets minute value for DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MEMCP SET_SECOND, PDATETIME, #/0800
+          $VMSYS.MEMCP SET_SECOND.1, PNEWSECOND, #/0100
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+      <function name="SET_SECOND" return="TIME_OF_DAY">
+        <args>
+          <arg no="0" name="PTIMEOFDAY" type="TIME_OF_DAY">
+            <comment>Input TIME_OF_DAY</comment>
+          </arg>
+          <arg no="1" name="PNEWSECOND" type="INT">
+            <comment>New second. It must be between 0 and 59. Its value is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets second value for TIME_OF_DAY parameter</comment>
+        <code>
+          <![CDATA[
+          $VMSYS.MEMCP SET_SECOND, PTIMEOFDAY, #/0400
+          $VMSYS.MEMCP SET_SECOND.1, PNEWSECOND, #/0100
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+
+      <function name="SET_HUNDSEC" return="DATE_AND_TIME">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME">
+            <comment>Input DATE_AND_TIME</comment>
+          </arg>
+          <arg no="1" name="PNEWHUND" type="INT">
+            <comment>New hundsec. It must be between 0 and 99. Its value is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets hundsec value for DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MEMCP SET_HUNDSEC, PDATETIME, #/0800
+          $VMSYS.MEMCP SET_HUNDSEC, PNEWHUND, #/0100
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+      <function name="SET_HUNDSEC" return="TIME_OF_DAY">
+        <args>
+          <arg no="0" name="PTIMEOFDAY" type="TIME_OF_DAY">
+            <comment>Input TIME_OF_DAY</comment>
+          </arg>
+          <arg no="1" name="PNEWHUND" type="INT">
+            <comment>New hundsec. It must be between 0 and 99. Its value is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets hundredseconds value for TIME_OF_DAY parameter</comment>
+        <code>
+          <![CDATA[
+          $VMSYS.MEMCP SET_HUNDSEC, PTIMEOFDAY, #/0400
+          $VMSYS.MEMCP SET_HUNDSEC, PNEWHUND, #/0100
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+
+      <function name="SET_YEAR" return="DATE_AND_TIME">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME">
+            <comment>Input DATE_AND_TIME</comment>
+          </arg>
+          <arg no="1" name="PNEWYEAR" type="INT">
+            <comment>New year. It must be between 1 and 4096. Its value is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets year value for DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MEMCP SET_YEAR, PDATETIME, #/0800
+          $VMSYS.MEMCP SET_YEAR.6, PNEWYEAR, #/0200
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+
+      <function name="SET_YEAR" return="DATE">
+        <args>
+          <arg no="0" name="PDATE" type="DATE">
+            <comment>Input DATE</comment>
+          </arg>
+          <arg no="1" name="PNEWYEAR" type="INT">
+            <comment>New year. It must be between 1 and 4096. Its value is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets year value for DATE parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MEMCP SET_YEAR, PDATE, #/0400
+          $VMSYS.MEMCP SET_YEAR.2, PNEWYEAR, #/0200
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+
+      <function name="SET_MONTH" return="DATE_AND_TIME">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME">
+            <comment>Input DATE_AND_TIME</comment>
+          </arg>
+          <arg no="1" name="PNEWMONTH" type="INT">
+            <comment>New month. It must be between 1 and 12. Its value is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets month value for DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MEMCP SET_MONTH, PDATETIME, #/0800
+          $VMSYS.MEMCP SET_MONTH.5, PNEWMONTH, #/0100
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+
+      <function name="SET_MONTH" return="DATE">
+        <args>
+          <arg no="0" name="PDATE" type="DATE">
+            <comment>Input DATE</comment>
+          </arg>
+          <arg no="1" name="PNEWMONTH" type="INT">
+            <comment>New month. It must be between 1 and 12. Its value is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets month value for DATE parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MEMCP SET_MONTH, PDATE, #/0400
+          $VMSYS.MEMCP SET_MONTH.1, PNEWMONTH, #/0100
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+
+      <function name="SET_DAY" return="DATE_AND_TIME">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME">
+            <comment>Input DATE_AND_TIME</comment>
+          </arg>
+          <arg no="1" name="PNEWDAY" type="INT">
+            <comment>New day. It must be between 1 and 31. Its value and date correctness is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets month value for DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MEMCP SET_DAY, PDATETIME, #/0800
+          $VMSYS.MEMCP SET_DAY.4, PNEWDAY, #/0100
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+
+      <function name="SET_DAY" return="DATE">
+        <args>
+          <arg no="0" name="PDATE" type="DATE">
+            <comment>Input DATE</comment>
+          </arg>
+          <arg no="1" name="PNEWDAY" type="INT">
+            <comment>New day. It must be between 1 and 31. Its value and date correctness is not checked.</comment>
+          </arg>
+        </args>
+        <comment>Sets day value for DATE parameter</comment>
+        <code>
+          <![CDATA[           
+          $VMSYS.MEMCP SET_DAY, PDATE, #/0400
+          $VMSYS.MEMCP SET_DAY, PNEWDAY, #/0100
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="1"/>
+        </group>
+      </function>
+
+      <function name="DATE_TIME_TO_DATE" return="DATE">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME">
+            <comment>Input DATE_AND_TIME</comment>
+          </arg>
+        </args>
+        <comment>Gets DATE value from DATE_AND_TIME parameter</comment>
+        <code>
+          <![CDATA[
+          $VMSYS.MEMCP DATE_TIME_TO_DATE, PDATETIME.4, #/0400
+           ]]>
+        </code>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="BOOL_TO_REAL" return="REAL">
+        <args>
+          <arg no="0" name="W" type="BOOL">
+            <comment>Input BOOL value</comment>
+          </arg>
+        </args>
+        <comment>Converts BOOL to REAL value</comment>
+        <code>
+          <![CDATA[
+          $VMSYS.JRZ W, #/0D00 {:?BOOL_TO_REALIF?B0015}
+          $VMSYS.MCD BOOL_TO_REAL, #04, #0000803F
+          $VMSYS.JR #/0900 {:?BOOL_TO_REALIF?E0017}
+          {:?BOOL_TO_REALIF?B0015}
+          $VMSYS.MCD BOOL_TO_REAL, #04, #00000000
+          {:?BOOL_TO_REALIF?E0017}
+           ]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="WORD_TO_REAL" return="REAL">
+        <args>
+          <arg no="0" name="W" type="WORD">
+            <comment>Input WORD value</comment>
+          </arg>
+        </args>
+        <vars>
+          <var name="_LEAD" type="DINT"/>
+        </vars>
+        <comment>Converts WORD to REAL value</comment>
+        <code>
+          <![CDATA[
+          $VMSYS.MEMCP _LEAD, W, #0200
+          $VMSYS.FPAT _LEAD.2, #02, #00
+          $DEFAULT.DINT_TO_REAL WORD_TO_REAL, _LEAD
+          ]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+    </INLINE>
+    <CONVERSIONS>
+      <conv from="DINT" to="LINT" method="single">
+        <funcall param="DINT">DINT_TO_LINT</funcall>
+      </conv>
+      <conv from="INT" to="LINT" method="multiple">
+        <funcall param="INT">INT_TO_DINT</funcall>
+        <funcall param="DINT">DINT_TO_LINT</funcall>
+      </conv>
+      <conv from="WORD" to="REAL" method="single">
+        <funcall param="DINT">WORD_TO_REAL</funcall>
+      </conv>
+    </CONVERSIONS>
+  </VMSPEC>
+</CPDEV>

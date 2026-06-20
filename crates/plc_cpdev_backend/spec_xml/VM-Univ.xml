@@ -1,0 +1,80 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<CPDEV version="1.0">
+  <VMSPEC>
+    <USER>
+      <title>Experimental Virtual Machine Specification for University</title>
+      <version>2.9.3</version>
+      <extraver/>
+      <builddate>2016.08-20 14:02</builddate>
+      <exportdate>#now</exportdate>
+      <!-- Last function code: 1C32, and few other -->
+    </USER>
+    <HARDWARE>
+      <MaxCodeAddress>0xFFFF</MaxCodeAddress>
+      <MaxDataAddress>0xFFFF</MaxDataAddress>
+      <FlashSize>0x0000</FlashSize>
+      <AddressSize>4</AddressSize>
+    </HARDWARE>
+    <!-- Since 2.6.0 -->
+    <INCLUDE>
+      <PRE order="0">VMCore.xml</PRE>
+      <POST order="0">lreals.xml</POST>
+      <POST order="1">le-IF.xml</POST>
+      <POST order="2">flash.xml</POST>
+      <POST order="3">strings.xml</POST>
+    </INCLUDE>
+
+    <TYPES>
+      <!--deny-type name="STRING" /-->
+    </TYPES>
+    <FUNCTIONS />
+    <!-- Since 2.4.7 -->
+    <SYSTEM>
+      <sysproc name="HWFBC" vmcode="1D00">
+        <args>
+          <arg no="0" name="selector" type=":imm.WORD">
+            <comment>Type of function block</comment>
+          </arg>
+          <arg no="1" name="instance" type=":rdlabel">
+            <comment>Function block instance to work on it</comment>
+          </arg>
+        </args>
+        <comment>Hardware function block call (see initialization in HWFBI)</comment>
+      </sysproc>
+      <sysproc name="HWFBI" vmcode="1D01">
+        <args>
+          <arg no="0" name="selector" type=":imm.WORD">
+            <comment>Type of function block</comment>
+          </arg>
+          <arg no="1" name="instance" type=":rdlabel">
+            <comment>Function block instance to work on it</comment>
+          </arg>
+        </args>
+        <comment>Initialize hardware function block (see calling in HWFBC)</comment>
+      </sysproc>
+    </SYSTEM>
+    <FUN_BLOCKS>
+    <funblock name="HW_RS" flag="64" selector="1">
+      <vars>
+        <var_input name="R" type="BOOL">
+          <comment>Reset input</comment>
+        </var_input>
+        <var_input name="S" type="BOOL">
+          <comment>Set input</comment>
+        </var_input>
+        <var_output name="Q" type="BOOL">
+          <comment>Output</comment>
+        </var_output>
+      </vars>
+      <init>
+        <![CDATA[:?$DEFAULT.HW_RS?INIT 
+$VMSYS.MCD Q, #/01, #/00
+$VMSYS.RETURN 
+]]>
+      </init>
+      <comment>Hardware RS function block for testing purpose</comment>
+    </funblock>
+    </FUN_BLOCKS>
+    <INLINE />
+  </VMSPEC>
+</CPDEV>

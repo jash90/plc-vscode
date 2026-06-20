@@ -22,7 +22,17 @@ struct CpdevVm {
     VMDCP dcp;
     std::vector<VMVariable *> vars; // owned: freed in cpdev_free
     std::vector<unsigned char> code; // owned copy for the byte-array loader
+    std::vector<unsigned char> data; // owned data segment (byte-array loader)
 };
+
+namespace {
+// Floor a requested data-segment size at the VM's default so behaviour for
+// small programs is unchanged, while larger programs get a correctly sized
+// (heap) buffer instead of the vendored 256-byte static one.
+int data_buffer_size(int datasize) {
+    return datasize > DEFAULT_DATA_SIZE ? datasize : DEFAULT_DATA_SIZE;
+}
+} // namespace
 
 namespace {
 // RAII: redirect C stdout to /dev/null for its lifetime. The vendored VMDCP
@@ -73,26 +83,38 @@ void cpdev_free(CpdevVm *vm) {
     delete vm;
 }
 
-int cpdev_load_xcp_file(CpdevVm *vm, const char *path) {
+int cpdev_load_xcp_file(CpdevVm *vm, const char *path, int datasize) {
     if (!vm || !path) {
         return -100;
     }
     try {
-        return vm->vm.VMP_LoadProgramAndData(path, DEFAULT_DATA_SIZE);
+        // The file loader malloc()s `datasize` and zero-fills it, so it already
+        // supports buffers larger than the static default.
+        return vm->vm.VMP_LoadProgramAndData(path, data_buffer_size(datasize));
     } catch (...) {
         return -101;
     }
 }
 
-int cpdev_load_xcp(CpdevVm *vm, const unsigned char *code, int len) {
+int cpdev_load_xcp(CpdevVm *vm, const unsigned char *code, int len, int datasize) {
     if (!vm || !code || len <= 0) {
         return -100;
     }
     try {
-        // Copy: VMP_LoadProgramFromArray stores the pointer WITHOUT copying, so
-        // the code bytes must outlive the VM. We own the copy here.
+        // Copy: the VM stores the code pointer WITHOUT copying, so the bytes must
+        // outlive the VM. We own both the code copy and the data segment here.
+        //
+        // The vendored VMP_LoadProgramFromArray hardcodes the 256-byte static
+        // `pgmDataDefault` and rejects datasize > 256, so we replicate its setup
+        // (pgmCode/pgmData/wStatus1/nCycles are public registers) over a
+        // shim-owned, correctly sized, zero-filled heap buffer instead.
         vm->code.assign(code, code + len);
-        return vm->vm.VMP_LoadProgramFromArray(vm->code.data(), DEFAULT_DATA_SIZE);
+        vm->data.assign(static_cast<size_t>(data_buffer_size(datasize)), 0);
+        vm->vm.pgmCode = vm->code.data();
+        vm->vm.pgmData = vm->data.data();
+        vm->vm.wStatus1 = WMSTAT_COLDRESTART;
+        vm->vm.nCycles = 0;
+        return 0;
     } catch (...) {
         return -101;
     }

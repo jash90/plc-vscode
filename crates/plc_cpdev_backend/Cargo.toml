@@ -1,0 +1,13 @@
+[package]
+name = "plc_cpdev_backend"
+version = "0.1.0"
+edition = "2024"
+license-file = "../../LICENSE"
+publish = false
+description = "CPDev .XCP bytecode compiler backend: lowers PLC IR to CPDev VM bytecode via a spec-driven assembler."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+plc_runtime = { path = "../plc_runtime" }

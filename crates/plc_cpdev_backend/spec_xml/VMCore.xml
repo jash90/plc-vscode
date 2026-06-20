@@ -1,0 +1,3628 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<CPDEV version="1.0">
+  <VMSPEC>
+    <USER>
+      <title>Core Virtual Machine Functions</title>
+      <version>2.9.3</version>
+      <extraver/>
+      <builddate>2016.08-21 23:45</builddate>
+      <exportdate>#now</exportdate>
+      <!-- Last function code: 1C36 -->
+    </USER>
+    <TYPES>
+      <!-- <deny-type name="LREAL" /> - denys are removed, and since 2.6.0 they exists in specific VM descriptors
+      <deny-type name="STRING" /-->
+
+      <type name="USINT" implement="alias">
+        <alias name="BYTE"/>
+        <comment>Type USINT (for compability with IEC standard is alias for BYTE)</comment>
+      </type>
+      <type name="UINT" implement="alias">
+        <alias name="WORD"/>
+        <comment>Type UINT (for compability with IEC standard is alias for WORD)</comment>
+      </type>
+      <type name="UDINT" implement="alias">
+        <alias name="DWORD"/>
+        <comment>Type UDINT (for compability with IEC standard is alias for DWORD)</comment>
+      </type>
+      <type name="ULINT" implement="alias">
+        <alias name="LWORD"/>
+        <comment>Type ULINT (for compability with IEC standard is alias for LWORD)</comment>
+      </type>
+      <!-- type name="TOD" implement="alias">
+        <alias name="TIME_OF_DAY"/>
+        <comment>Inna nazwa typu TIME_OF_DAY</comment>
+      </type-->
+      <special-type name="$DPPTR" method="3">
+        <comment>Internal pointer type</comment>
+      </special-type>
+    </TYPES>
+    <FUNCTIONS>
+      <!-- 
+      Grupy:
+      1 - arytmetyczne
+      2 - boolowskie
+      3 - konwersje
+      4 - numeryczne
+      5 - porównania
+      6 - przesuwanie bitów
+      7 - selekcja
+      8 - RTC, cykl
+      9 - godzina, dzień
+      10 - inne
+      11 - alarmy
+      12 - komunikacja
+      13 - parametry NV
+      -->
+      <function name="ADD" vmcode="01*1" return="SINT">
+        <args>
+          <arg no="*" name="summand*" type="SINT"/>
+        </args>
+        <comment>Adds two or more SINT operands</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="ADD" vmcode="01*2" return="INT">
+        <args>
+          <arg no="*" name="summand*" type="INT"/>
+        </args>
+        <comment>Adds two or more INT operands</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="ADD" vmcode="01*3" return="DINT">
+        <args>
+          <arg no="*" name="summand*" type="DINT"/>
+        </args>
+        <comment>Adds two or more DINT operands</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="ADD" vmcode="01*5" return="BYTE">
+        <args>
+          <arg no="*" name="summand*" type="BYTE"/>
+        </args>
+        <comment>Adds two or more BYTE operands</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="ADD" vmcode="01*6" return="WORD">
+        <args>
+          <arg no="*" name="summand*" type="WORD"/>
+        </args>
+        <comment>Adds two or more WORD operands</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="ADD" vmcode="01*7" return="DWORD">
+        <args>
+          <arg no="*" name="summand*" type="DWORD"/>
+        </args>
+        <comment>Adds two or more DWORD operands</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="ADD" vmcode="01*9" return="REAL">
+        <args>
+          <arg no="*" name="summand*" type="REAL"/>
+        </args>
+        <comment>Adds two or more REAL operands</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+
+      <function name="SUB" vmcode="0201" return="SINT">
+        <args>
+          <arg no="0" name="minuend" type="SINT"/>
+          <arg no="1" name="subtrahend" type="SINT"/>
+        </args>
+        <comment>Calculates subtract between first and second argument</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="SUB" vmcode="0202" return="INT">
+        <args>
+          <arg no="0" name="minuend" type="INT"/>
+          <arg no="1" name="subtrahend" type="INT"/>
+        </args>
+        <comment>Calculates subtract between first and second argument</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="SUB" vmcode="0203" return="DINT">
+        <args>
+          <arg no="0" name="minuend" type="DINT"/>
+          <arg no="1" name="subtrahend" type="DINT"/>
+        </args>
+        <comment>Calculates subtract between first and second argument</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="SUB" vmcode="0205" return="BYTE">
+        <args>
+          <arg no="0" name="minuend" type="BYTE"/>
+          <arg no="1" name="subtrahend" type="BYTE"/>
+        </args>
+        <comment>Calculates subtract between first and second argument</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="SUB" vmcode="0206" return="WORD">
+        <args>
+          <arg no="0" name="minuend" type="WORD"/>
+          <arg no="1" name="subtrahend" type="WORD"/>
+        </args>
+        <comment>Calculates subtract between first and second argument</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="SUB" vmcode="0207" return="DWORD">
+        <args>
+          <arg no="0" name="minuend" type="DWORD"/>
+          <arg no="1" name="subtrahend" type="DWORD"/>
+        </args>
+        <comment>Calculates subtract between first and second argument</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="SUB" vmcode="0209" return="REAL">
+        <args>
+          <arg no="0" name="minuend" type="REAL"/>
+          <arg no="1" name="subtrahend" type="REAL"/>
+        </args>
+        <comment>Calculates subtract between first and second argument</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="SUB" vmcode="020B" return="TIME">
+        <args>
+          <arg no="0" name="minuend" type="TIME"/>
+          <arg no="1" name="subtrahend" type="TIME"/>
+        </args>
+        <comment>Calculates subtract between first and second argument</comment>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+
+      <function name="MUL" vmcode="03*1" return="SINT">
+        <args>
+          <arg no="*" name="factor*" type="SINT"/>
+        </args>
+        <comment>Multiplies two or more SINT factors</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="MUL" vmcode="03*2" return="INT">
+        <args>
+          <arg no="*" name="factor*" type="INT"/>
+        </args>
+        <comment>Multiplies two or more INT factors</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="MUL" vmcode="03*3" return="DINT">
+        <args>
+          <arg no="*" name="factor*" type="DINT"/>
+        </args>
+        <comment>Multiplies two or more DINT factors</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="MUL" vmcode="03*5" return="BYTE">
+        <args>
+          <arg no="*" name="factor*" type="BYTE"/>
+        </args>
+        <comment>Multiplies two or more BYTE factors</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="MUL" vmcode="03*6" return="WORD">
+        <args>
+          <arg no="*" name="factor*" type="WORD"/>
+        </args>
+        <comment>Multiplies two or more WORD factors</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="MUL" vmcode="03*7" return="DWORD">
+        <args>
+          <arg no="*" name="factor*" type="DWORD"/>
+        </args>
+        <comment>Multiplies two or more DWORD factors</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="MUL" vmcode="03*9" return="REAL">
+        <args>
+          <arg no="*" name="factor*" type="REAL"/>
+        </args>
+        <comment>Multiplies two or more REAL factors</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+
+      <function name="DIV" vmcode="0401" return="SINT">
+        <args>
+          <arg no="0" name="dividend" type="SINT"/>
+          <arg no="1" name="divisor" type="SINT"/>
+        </args>
+        <comment>Divides dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="DIV" vmcode="0402" return="INT">
+        <args>
+          <arg no="0" name="dividend" type="INT"/>
+          <arg no="1" name="divisor" type="INT"/>
+        </args>
+        <comment>Divides dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="DIV" vmcode="0403" return="DINT">
+        <args>
+          <arg no="0" name="dividend" type="DINT"/>
+          <arg no="1" name="divisor" type="DINT"/>
+        </args>
+        <comment>Divides dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="DIV" vmcode="0405" return="BYTE">
+        <args>
+          <arg no="0" name="dividend" type="BYTE"/>
+          <arg no="1" name="divisor" type="BYTE"/>
+        </args>
+        <comment>Divides dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="DIV" vmcode="0406" return="WORD">
+        <args>
+          <arg no="0" name="dividend" type="WORD"/>
+          <arg no="1" name="divisor" type="WORD"/>
+        </args>
+        <comment>Divides dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="DIV" vmcode="0407" return="DWORD">
+        <args>
+          <arg no="0" name="dividend" type="DWORD"/>
+          <arg no="1" name="divisor" type="DWORD"/>
+        </args>
+        <comment>Divides dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="DIV" vmcode="0409" return="REAL">
+        <args>
+          <arg no="0" name="dividend" type="REAL"/>
+          <arg no="1" name="divisor" type="REAL"/>
+        </args>
+        <comment>Divides dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+
+      <function name="MOD" vmcode="0411" return="SINT">
+        <args>
+          <arg no="0" name="dividend" type="SINT"/>
+          <arg no="1" name="divisor" type="SINT"/>
+        </args>
+        <comment>Remainder of division dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="MOD" vmcode="0412" return="INT">
+        <args>
+          <arg no="0" name="dividend" type="INT"/>
+          <arg no="1" name="divisor" type="INT"/>
+        </args>
+        <comment>Remainder of division dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="MOD" vmcode="0413" return="DINT">
+        <args>
+          <arg no="0" name="dividend" type="DINT"/>
+          <arg no="1" name="divisor" type="DINT"/>
+        </args>
+        <comment>Remainder of division dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="MOD" vmcode="0415" return="BYTE">
+        <args>
+          <arg no="0" name="dividend" type="BYTE"/>
+          <arg no="1" name="divisor" type="BYTE"/>
+        </args>
+        <comment>Remainder of division dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="MOD" vmcode="0416" return="WORD">
+        <args>
+          <arg no="0" name="dividend" type="WORD"/>
+          <arg no="1" name="divisor" type="WORD"/>
+        </args>
+        <comment>Remainder of division dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="MOD" vmcode="0417" return="DWORD">
+        <args>
+          <arg no="0" name="dividend" type="DWORD"/>
+          <arg no="1" name="divisor" type="DWORD"/>
+        </args>
+        <comment>Remainder of division dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+
+      <function name="NEG" vmcode="0501" return="SINT">
+        <args>
+          <arg no="0" name="INP"  type="SINT"/>
+        </args>
+        <comment>Changes sign of the signed value</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="NEG" vmcode="0502" return="INT">
+        <args>
+          <arg no="0" name="INP" type="INT"/>
+        </args>
+        <comment>Changes sign of the signed value</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="NEG" vmcode="0503" return="DINT">
+        <args>
+          <arg no="0" name="INP" type="DINT"/>
+        </args>
+        <comment>Changes sign of the signed value</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="NEG" vmcode="0507" return="REAL">
+        <args>
+          <arg no="0" name="INP" type="REAL"/>
+        </args>
+        <comment>Changes sign of the signed value</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+
+
+      <function name="NOT" vmcode="0510" return="BOOL">
+        <args>
+          <arg no="0" name="INP" type="BOOL"/>
+        </args>
+        <comment>Binary negation</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="NOT" vmcode="0511" return="BYTE">
+        <args>
+          <arg no="0" name="INP" type="BYTE"/>
+        </args>
+        <comment>Bitwise negation of unsigned value</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="NOT" vmcode="0512" return="WORD">
+        <args>
+          <arg no="0" name="INP" type="WORD"/>
+        </args>
+        <comment>Bitwise negation of unsigned value</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="NOT" vmcode="0513" return="DWORD">
+        <args>
+          <arg no="0" name="INP" type="DWORD"/>
+        </args>
+        <comment>Bitwise negation of unsigned value</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+
+      <function name="EXPT" vmcode="0601" return="DINT">
+        <args>
+          <arg no="0" name="X" type="SINT"/>
+          <arg no="1" name="Y" type="SINT"/>
+        </args>
+        <comment>Returns X raised to the specified power (Y)</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="EXPT" vmcode="0602" return="DINT">
+        <args>
+          <arg no="0" name="X" type="INT"/>
+          <arg no="1" name="Y" type="SINT"/>
+        </args>
+        <comment>Returns X raised to the specified power (Y)</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="EXPT" vmcode="0603" return="DINT">
+        <args>
+          <arg no="0" name="X" type="DINT"/>
+          <arg no="1" name="Y" type="SINT"/>
+        </args>
+        <comment>Returns X raised to the specified power (Y)</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="EXPT" vmcode="0604" return="REAL">
+        <args>
+          <arg no="0" name="X" type="REAL"/>
+          <arg no="1" name="Y" type="SINT"/>
+        </args>
+        <comment>Returns X raised to the specified power (Y)</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="EXPT" vmcode="0605" return="REAL">
+        <args>
+          <arg no="0" name="X" type="REAL"/>
+          <arg no="1" name="Y" type="INT"/>
+        </args>
+        <comment>Returns X raised to the specified power (Y)</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="EXPT" vmcode="0606" return="REAL">
+        <args>
+          <arg no="0" name="X" type="REAL"/>
+          <arg no="1" name="Y" type="DINT"/>
+        </args>
+        <comment>Returns X raised to the specified power (Y)</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="EXPT" vmcode="0607" return="REAL">
+        <args>
+          <arg no="0" name="X" type="REAL"/>
+          <arg no="1" name="Y" type="REAL"/>
+        </args>
+        <comment>Returns X raised to the specified power (Y)</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+
+      <function name="ABS" vmcode="0611" return="SINT">
+        <args>
+          <arg no="0" name="INP" type="SINT"/>
+        </args>
+        <comment>Returns the absolute value of a specified number</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="ABS" vmcode="0612" return="INT">
+        <args>
+          <arg no="0" name="INP" type="INT"/>
+        </args>
+        <comment>Returns the absolute value of a specified number</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="ABS" vmcode="0613" return="DINT">
+        <args>
+          <arg no="0" name="INP" type="DINT"/>
+        </args>
+        <comment>Returns the absolute value of a specified number</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="ABS" vmcode="0615" return="BYTE">
+        <args>
+          <arg no="0" name="INP" type="BYTE"/>
+        </args>
+        <comment>Returns the absolute value of a specified number</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="ABS" vmcode="0616" return="WORD">
+        <args>
+          <arg no="0" name="INP" type="WORD"/>
+        </args>
+        <comment>Returns the absolute value of a specified number</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="ABS" vmcode="0617" return="DWORD">
+        <args>
+          <arg no="0" name="INP" type="DWORD"/>
+        </args>
+        <comment>Returns the absolute value of a specified number</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="ABS" vmcode="0619" return="REAL">
+        <args>
+          <arg no="0" name="INP" type="REAL"/>
+        </args>
+        <comment>Returns the absolute value of a specified number</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+
+      <function name="SQRT" vmcode="0620" return="REAL">
+        <args>
+          <arg no="0" name="R" type="REAL"/>
+        </args>
+        <comment>Returns the square root of a specified number</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="LN" vmcode="0622" return="REAL">
+        <args>
+          <arg no="0" name="R" type="REAL"/>
+        </args>
+        <comment>Returns the natural (base e) logarithm of a specified number</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="LOG" vmcode="0624" return="REAL">
+        <args>
+          <arg no="0" name="R" type="REAL"/>
+        </args>
+        <comment>Returns the base 10 logarithm of a specified number</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="EXP" vmcode="0626" return="REAL">
+        <args>
+          <arg no="0" name="Y" type="REAL"/>
+        </args>
+        <comment>Returns e raised to the specified power (Y)</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="SIN" vmcode="0628" return="REAL">
+        <args>
+          <arg no="0" name="A" type="REAL">
+            <comment>An angle, measured in radians</comment>
+          </arg>
+        </args>
+        <comment>Returns the sine of the specified angle</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="COS" vmcode="062A" return="REAL">
+        <args>
+          <arg no="0" name="A" type="REAL">
+            <comment>An angle, measured in radians</comment>
+          </arg>
+        </args>
+        <comment>Returns the cosine of the specified angle</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="TAN" vmcode="062C" return="REAL">
+        <args>
+          <arg no="0" name="A" type="REAL">
+            <comment>An angle, measured in radians</comment>
+          </arg>
+        </args>
+        <comment>Returns the tangent of the specified angle</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="ASIN" vmcode="062E" return="REAL">
+        <args>
+          <arg no="0" name="R" type="REAL">
+            <comment>A number representing a sine, where -1 &lt;= R &lt;= 1</comment>
+          </arg>
+        </args>
+        <comment>Returns the angle PHI (measured in radians, such that -PI/2 &lt;= PHI &lt;= PI/2) whose sine is the specified number.</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="ACOS" vmcode="0630" return="REAL">
+        <args>
+          <arg no="0" name="R" type="REAL">
+            <comment>A number representing a sine, where -1 &lt;= R &lt;= 1</comment>
+          </arg>
+        </args>
+        <comment>Returns the angle PHI (measured in radians, such that 0 &lt;= PHI &lt;= PI) whose cosine is the specified number.</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="ATAN" vmcode="0632" return="REAL">
+        <args>
+          <arg no="0" name="R" type="REAL">
+            <comment>A number representing a tangent</comment>
+          </arg>
+        </args>
+        <comment>Returns the angle PHI (measured in radians, such that -PI/2 &lt;= PHI &lt;= PI/2) whose tangent is the specified number.</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="TRUNC" vmcode="0634" return="DINT">
+        <args>
+          <arg no="0" name="R" type="REAL"/>
+        </args>
+        <comment>Calculates the integral part of REAL number as DINT value</comment>
+        <group>
+          <item value="10" mask="0"/>
+        </group>
+      </function>
+      <function name="ROUND" vmcode="0636" return="DINT">
+        <args>
+          <arg no="0" name="R" type="REAL"/>
+        </args>
+        <comment>Rounds a value to the nearest integer</comment>
+        <group>
+          <item value="10" mask="0"/>
+        </group>
+      </function>
+
+      <function name="AND" vmcode="08*0" return="BOOL">
+        <args>
+          <arg no="*" name="arg*" type="BOOL"/>
+        </args>
+        <comment>Binary AND of BOOL operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="AND" vmcode="08*1" return="BYTE">
+        <args>
+          <arg no="*" name="arg*" type="BYTE"/>
+        </args>
+        <comment>Bitwise AND of BYTE operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="AND" vmcode="08*2" return="WORD">
+        <args>
+          <arg no="*" name="arg*" type="WORD"/>
+        </args>
+        <comment>Bitwise AND of WORD operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="AND" vmcode="08*3" return="DWORD">
+        <args>
+          <arg no="*" name="arg*" type="DWORD"/>
+        </args>
+        <comment>Bitwise AND of DWORD operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+
+      <function name="OR" vmcode="09*0" return="BOOL">
+        <args>
+          <arg no="*" name="arg*" type="BOOL"/>
+        </args>
+        <comment>Binary OR of BOOL operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="OR" vmcode="09*1" return="BYTE">
+        <args>
+          <arg no="*" name="arg*" type="BYTE"/>
+        </args>
+        <comment>Bitwise OR of BYTE operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="OR" vmcode="09*2" return="WORD">
+        <args>
+          <arg no="*" name="arg*" type="WORD"/>
+        </args>
+        <comment>Bitwise OR of WORD operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="OR" vmcode="09*3" return="DWORD">
+        <args>
+          <arg no="*" name="arg*" type="DWORD"/>
+        </args>
+        <comment>Bitwise OR of DWORD operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+
+      <function name="XOR" vmcode="0A*0" return="BOOL">
+        <args>
+          <arg no="*" name="arg*" type="BOOL"/>
+        </args>
+        <comment>Binary XOR of BOOL operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="XOR" vmcode="0A*1" return="BYTE">
+        <args>
+          <arg no="*" name="arg*" type="BYTE"/>
+        </args>
+        <comment>Bitwise XOR of BYTE operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="XOR" vmcode="0A*2" return="WORD">
+        <args>
+          <arg no="*" name="arg*" type="WORD"/>
+        </args>
+        <comment>Bitwise XOR of WORD operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="XOR" vmcode="0A*4" return="DWORD">
+        <args>
+          <arg no="*" name="arg*" type="DWORD"/>
+        </args>
+        <comment>Bitwise XOR of DWORD operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+
+      <function name="SHL" vmcode="0B01" return="BYTE">
+        <args>
+          <arg no="0" name="arg" type="BYTE"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Shifts first argument left by the number of bits specified by second argument</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="SHL" vmcode="0B02" return="WORD">
+        <args>
+          <arg no="0" name="arg" type="WORD"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Shifts first argument left by the number of bits specified by second argument</comment>
+      </function>
+      <function name="SHL" vmcode="0B03" return="DWORD">
+        <args>
+          <arg no="0" name="arg" type="DWORD"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Shifts first argument left by the number of bits specified by second argument</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="SHR" vmcode="0B11" return="BYTE">
+        <args>
+          <arg no="0" name="arg" type="BYTE"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Shifts first argument right by the number of bits specified by second argument</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="SHR" vmcode="0B12" return="WORD">
+        <args>
+          <arg no="0" name="arg" type="WORD"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Shifts first argument left by the number of bits specified by second argument</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="SHR" vmcode="0B13" return="DWORD">
+        <args>
+          <arg no="0" name="arg" type="DWORD"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Shifts first argument left by the number of bits specified by second argument</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="ROL" vmcode="0B21" return="BYTE">
+        <args>
+          <arg no="0" name="arg" type="BYTE"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Rotate the input values to the left to the most significant bit (MSB) by a specified number of bit positions</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="ROL" vmcode="0B22" return="WORD">
+        <args>
+          <arg no="0" name="arg" type="WORD"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Rotate the input values to the left to the most significant bit (MSB) by a specified number of bit positions</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="ROL" vmcode="0B23" return="DWORD">
+        <args>
+          <arg no="0" name="arg" type="DWORD"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Rotate the input values to the left to the most significant bit (MSB) by a specified number of bit positions</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="ROR" vmcode="0B31" return="BYTE">
+        <args>
+          <arg no="0" name="arg" type="BYTE"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Rotate the input values to the right to the least significant bit (LSB) by a specified number of bit positions</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="ROR" vmcode="0B32" return="WORD">
+        <args>
+          <arg no="0" name="arg" type="WORD"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Rotate the input values to the right to the least significant bit (LSB) by a specified number of bit positions</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="ROR" vmcode="0B33" return="DWORD">
+        <args>
+          <arg no="0" name="arg" type="DWORD"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Rotate the input values to the right to the least significant bit (LSB) by a specified number of bit positions</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+
+      <function name="SEL" vmcode="0C00" return="BOOL">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="BOOL"/>
+          <arg no="2" name="case_true" type="BOOL"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="SEL" vmcode="0C01" return="SINT">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="SINT"/>
+          <arg no="2" name="case_true" type="SINT"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="SEL" vmcode="0C02" return="INT">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="INT"/>
+          <arg no="2" name="case_true" type="INT"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="SEL" vmcode="0C03" return="DINT">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="DINT"/>
+          <arg no="2" name="case_true" type="DINT"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="SEL" vmcode="0C05" return="BYTE">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="BYTE"/>
+          <arg no="2" name="case_true" type="BYTE"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="SEL" vmcode="0C06" return="WORD">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="WORD"/>
+          <arg no="2" name="case_true" type="WORD"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="SEL" vmcode="0C07" return="DWORD">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="DWORD"/>
+          <arg no="2" name="case_true" type="DWORD"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="SEL" vmcode="0C09" return="REAL">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="REAL"/>
+          <arg no="2" name="case_true" type="REAL"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="SEL" vmcode="0C0B" return="TIME">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="TIME"/>
+          <arg no="2" name="case_true" type="TIME"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="SEL" vmcode="0C0C" return="DATE">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="DATE"/>
+          <arg no="2" name="case_true" type="DATE"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="SEL" vmcode="0C0D" return="TIME_OF_DAY">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="TIME_OF_DAY"/>
+          <arg no="2" name="case_true" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="SEL" vmcode="0C0E" return="DATE_AND_TIME">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="DATE_AND_TIME"/>
+          <arg no="2" name="case_true" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+
+      <function name="LIMIT" vmcode="0D00" return="BOOL">
+        <args>
+          <arg no="0" name="value" type="BOOL"/>
+          <arg no="1" name="min" type="BOOL"/>
+          <arg no="2" name="max" type="BOOL"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="LIMIT" vmcode="0D01" return="SINT">
+        <args>
+          <arg no="0" name="value" type="SINT"/>
+          <arg no="1" name="min" type="SINT"/>
+          <arg no="2" name="max" type="SINT"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="LIMIT" vmcode="0D02" return="INT">
+        <args>
+          <arg no="0" name="value" type="INT"/>
+          <arg no="1" name="min" type="INT"/>
+          <arg no="2" name="max" type="INT"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="LIMIT" vmcode="0D03" return="DINT">
+        <args>
+          <arg no="0" name="value" type="DINT"/>
+          <arg no="1" name="min" type="DINT"/>
+          <arg no="2" name="max" type="DINT"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="LIMIT" vmcode="0D05" return="BYTE">
+        <args>
+          <arg no="0" name="value" type="BYTE"/>
+          <arg no="1" name="min" type="BYTE"/>
+          <arg no="2" name="max" type="BYTE"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="LIMIT" vmcode="0D06" return="WORD">
+        <args>
+          <arg no="0" name="value" type="WORD"/>
+          <arg no="1" name="min" type="WORD"/>
+          <arg no="2" name="max" type="WORD"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="LIMIT" vmcode="0D07" return="DWORD">
+        <args>
+          <arg no="0" name="value" type="DWORD"/>
+          <arg no="1" name="min" type="DWORD"/>
+          <arg no="2" name="max" type="DWORD"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="LIMIT" vmcode="0D09" return="REAL">
+        <args>
+          <arg no="0" name="value" type="REAL"/>
+          <arg no="1" name="min" type="REAL"/>
+          <arg no="2" name="max" type="REAL"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="LIMIT" vmcode="0D0B" return="TIME">
+        <args>
+          <arg no="0" name="value" type="TIME"/>
+          <arg no="1" name="min" type="TIME"/>
+          <arg no="2" name="max" type="TIME"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="LIMIT" vmcode="0D0C" return="DATE">
+        <args>
+          <arg no="0" name="value" type="DATE"/>
+          <arg no="1" name="min" type="DATE"/>
+          <arg no="2" name="max" type="DATE"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="LIMIT" vmcode="0D0D" return="TIME_OF_DAY">
+        <args>
+          <arg no="0" name="value" type="TIME_OF_DAY"/>
+          <arg no="1" name="min" type="TIME_OF_DAY"/>
+          <arg no="2" name="max" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="LIMIT" vmcode="0D0E" return="DATE_AND_TIME">
+        <args>
+          <arg no="0" name="value" type="DATE_AND_TIME"/>
+          <arg no="1" name="min" type="DATE_AND_TIME"/>
+          <arg no="2" name="max" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+
+      <function name="MAX" vmcode="0E00" return="BOOL">
+        <args>
+          <arg no="0" type="BOOL"/>
+          <arg no="1" type="BOOL"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MAX" vmcode="0E01" return="SINT">
+        <args>
+          <arg no="0" type="SINT"/>
+          <arg no="1" type="SINT"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MAX" vmcode="0E02" return="INT">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="1" type="INT"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MAX" vmcode="0E03" return="DINT">
+        <args>
+          <arg no="0" type="DINT"/>
+          <arg no="1" type="DINT"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MAX" vmcode="0E05" return="BYTE">
+        <args>
+          <arg no="0" type="BYTE"/>
+          <arg no="1" type="BYTE"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MAX" vmcode="0E06" return="WORD">
+        <args>
+          <arg no="0" type="WORD"/>
+          <arg no="1" type="WORD"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MAX" vmcode="0E07" return="DWORD">
+        <args>
+          <arg no="0" type="DWORD"/>
+          <arg no="1" type="DWORD"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MAX" vmcode="0E09" return="REAL">
+        <args>
+          <arg no="0" type="REAL"/>
+          <arg no="1" type="REAL"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MAX" vmcode="0E0B" return="TIME">
+        <args>
+          <arg no="0" type="TIME"/>
+          <arg no="1" type="TIME"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MAX" vmcode="0E0C" return="DATE">
+        <args>
+          <arg no="0" type="DATE"/>
+          <arg no="1" type="DATE"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MAX" vmcode="0E0D" return="TIME_OF_DAY">
+        <args>
+          <arg no="0" type="TIME_OF_DAY"/>
+          <arg no="1" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MAX" vmcode="0E0E" return="DATE_AND_TIME">
+        <args>
+          <arg no="0" type="DATE_AND_TIME"/>
+          <arg no="1" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+
+      <function name="MIN" vmcode="0F00" return="BOOL">
+        <args>
+          <arg no="0" type="BOOL"/>
+          <arg no="1" type="BOOL"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MIN" vmcode="0F01" return="SINT">
+        <args>
+          <arg no="0" type="SINT"/>
+          <arg no="1" type="SINT"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MIN" vmcode="0F02" return="INT">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="1" type="INT"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MIN" vmcode="0F03" return="DINT">
+        <args>
+          <arg no="0" type="DINT"/>
+          <arg no="1" type="DINT"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MIN" vmcode="0F05" return="BYTE">
+        <args>
+          <arg no="0" type="BYTE"/>
+          <arg no="1" type="BYTE"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MIN" vmcode="0F06" return="WORD">
+        <args>
+          <arg no="0" type="WORD"/>
+          <arg no="1" type="WORD"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MIN" vmcode="0F07" return="DWORD">
+        <args>
+          <arg no="0" type="DWORD"/>
+          <arg no="1" type="DWORD"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MIN" vmcode="0F09" return="REAL">
+        <args>
+          <arg no="0" type="REAL"/>
+          <arg no="1" type="REAL"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MIN" vmcode="0F0B" return="TIME">
+        <args>
+          <arg no="0" type="TIME"/>
+          <arg no="1" type="TIME"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MIN" vmcode="0F0C" return="DATE">
+        <args>
+          <arg no="0" type="DATE"/>
+          <arg no="1" type="DATE"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MIN" vmcode="0F0D" return="TIME_OF_DAY">
+        <args>
+          <arg no="0" type="TIME_OF_DAY"/>
+          <arg no="1" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MIN" vmcode="0F0E" return="DATE_AND_TIME">
+        <args>
+          <arg no="0" type="DATE_AND_TIME"/>
+          <arg no="1" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+
+      <function name="GT" vmcode="1000" return="BOOL">
+        <args>
+          <arg no="0" type="BOOL"/>
+          <arg no="1" type="BOOL"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GT" vmcode="1001" return="BOOL">
+        <args>
+          <arg no="0" type="SINT"/>
+          <arg no="1" type="SINT"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GT" vmcode="1002" return="BOOL">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="1" type="INT"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GT" vmcode="1003" return="BOOL">
+        <args>
+          <arg no="0" type="DINT"/>
+          <arg no="1" type="DINT"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GT" vmcode="1005" return="BOOL">
+        <args>
+          <arg no="0" type="BYTE"/>
+          <arg no="1" type="BYTE"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GT" vmcode="1006" return="BOOL">
+        <args>
+          <arg no="0" type="WORD"/>
+          <arg no="1" type="WORD"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GT" vmcode="1007" return="BOOL">
+        <args>
+          <arg no="0" type="DWORD"/>
+          <arg no="1" type="DWORD"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GT" vmcode="1009" return="BOOL">
+        <args>
+          <arg no="0" type="REAL"/>
+          <arg no="1" type="REAL"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GT" vmcode="100B" return="BOOL">
+        <args>
+          <arg no="0" type="TIME"/>
+          <arg no="1" type="TIME"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GT" vmcode="100C" return="BOOL">
+        <args>
+          <arg no="0" type="DATE"/>
+          <arg no="1" type="DATE"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GT" vmcode="100D" return="BOOL">
+        <args>
+          <arg no="0" type="TIME_OF_DAY"/>
+          <arg no="1" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GT" vmcode="100E" return="BOOL">
+        <args>
+          <arg no="0" type="DATE_AND_TIME"/>
+          <arg no="1" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+
+      <function name="GE" vmcode="1100" return="BOOL">
+        <args>
+          <arg no="0" type="BOOL"/>
+          <arg no="1" type="BOOL"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GE" vmcode="1101" return="BOOL">
+        <args>
+          <arg no="0" type="SINT"/>
+          <arg no="1" type="SINT"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GE" vmcode="1102" return="BOOL">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="1" type="INT"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GE" vmcode="1103" return="BOOL">
+        <args>
+          <arg no="0" type="DINT"/>
+          <arg no="1" type="DINT"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GE" vmcode="1105" return="BOOL">
+        <args>
+          <arg no="0" type="BYTE"/>
+          <arg no="1" type="BYTE"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GE" vmcode="1106" return="BOOL">
+        <args>
+          <arg no="0" type="WORD"/>
+          <arg no="1" type="WORD"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GE" vmcode="1107" return="BOOL">
+        <args>
+          <arg no="0" type="DWORD"/>
+          <arg no="1" type="DWORD"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GE" vmcode="1109" return="BOOL">
+        <args>
+          <arg no="0" type="REAL"/>
+          <arg no="1" type="REAL"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GE" vmcode="110B" return="BOOL">
+        <args>
+          <arg no="0" type="TIME"/>
+          <arg no="1" type="TIME"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GE" vmcode="110C" return="BOOL">
+        <args>
+          <arg no="0" type="DATE"/>
+          <arg no="1" type="DATE"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GE" vmcode="110D" return="BOOL">
+        <args>
+          <arg no="0" type="TIME_OF_DAY"/>
+          <arg no="1" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GE" vmcode="110E" return="BOOL">
+        <args>
+          <arg no="0" type="DATE_AND_TIME"/>
+          <arg no="1" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+
+      <function name="EQ" vmcode="1200" return="BOOL">
+        <args>
+          <arg no="0" type="BOOL"/>
+          <arg no="1" type="BOOL"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="EQ" vmcode="1201" return="BOOL">
+        <args>
+          <arg no="0" type="SINT"/>
+          <arg no="1" type="SINT"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="EQ" vmcode="1202" return="BOOL">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="1" type="INT"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="EQ" vmcode="1203" return="BOOL">
+        <args>
+          <arg no="0" type="DINT"/>
+          <arg no="1" type="DINT"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="EQ" vmcode="1205" return="BOOL">
+        <args>
+          <arg no="0" type="BYTE"/>
+          <arg no="1" type="BYTE"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="EQ" vmcode="1206" return="BOOL">
+        <args>
+          <arg no="0" type="WORD"/>
+          <arg no="1" type="WORD"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="EQ" vmcode="1207" return="BOOL">
+        <args>
+          <arg no="0" type="DWORD"/>
+          <arg no="1" type="DWORD"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="EQ" vmcode="1209" return="BOOL">
+        <args>
+          <arg no="0" type="REAL"/>
+          <arg no="1" type="REAL"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="EQ" vmcode="120B" return="BOOL">
+        <args>
+          <arg no="0" type="TIME"/>
+          <arg no="1" type="TIME"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="EQ" vmcode="120C" return="BOOL">
+        <args>
+          <arg no="0" type="DATE"/>
+          <arg no="1" type="DATE"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="EQ" vmcode="120D" return="BOOL">
+        <args>
+          <arg no="0" type="TIME_OF_DAY"/>
+          <arg no="1" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="EQ" vmcode="120E" return="BOOL">
+        <args>
+          <arg no="0" type="DATE_AND_TIME"/>
+          <arg no="1" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+
+      <function name="LE" vmcode="1300" return="BOOL">
+        <args>
+          <arg no="0" type="BOOL"/>
+          <arg no="1" type="BOOL"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LE" vmcode="1301" return="BOOL">
+        <args>
+          <arg no="0" type="SINT"/>
+          <arg no="1" type="SINT"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LE" vmcode="1302" return="BOOL">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="1" type="INT"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LE" vmcode="1303" return="BOOL">
+        <args>
+          <arg no="0" type="DINT"/>
+          <arg no="1" type="DINT"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LE" vmcode="1305" return="BOOL">
+        <args>
+          <arg no="0" type="BYTE"/>
+          <arg no="1" type="BYTE"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LE" vmcode="1306" return="BOOL">
+        <args>
+          <arg no="0" type="WORD"/>
+          <arg no="1" type="WORD"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LE" vmcode="1307" return="BOOL">
+        <args>
+          <arg no="0" type="DWORD"/>
+          <arg no="1" type="DWORD"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LE" vmcode="1309" return="BOOL">
+        <args>
+          <arg no="0" type="REAL"/>
+          <arg no="1" type="REAL"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LE" vmcode="130B" return="BOOL">
+        <args>
+          <arg no="0" type="TIME"/>
+          <arg no="1" type="TIME"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LE" vmcode="130C" return="BOOL">
+        <args>
+          <arg no="0" type="DATE"/>
+          <arg no="1" type="DATE"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LE" vmcode="130D" return="BOOL">
+        <args>
+          <arg no="0" type="TIME_OF_DAY"/>
+          <arg no="1" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LE" vmcode="130E" return="BOOL">
+        <args>
+          <arg no="0" type="DATE_AND_TIME"/>
+          <arg no="1" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+
+      <function name="LT" vmcode="1400" return="BOOL">
+        <args>
+          <arg no="0" type="BOOL"/>
+          <arg no="1" type="BOOL"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LT" vmcode="1401" return="BOOL">
+        <args>
+          <arg no="0" type="SINT"/>
+          <arg no="1" type="SINT"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LT" vmcode="1402" return="BOOL">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="1" type="INT"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LT" vmcode="1403" return="BOOL">
+        <args>
+          <arg no="0" type="DINT"/>
+          <arg no="1" type="DINT"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LT" vmcode="1405" return="BOOL">
+        <args>
+          <arg no="0" type="BYTE"/>
+          <arg no="1" type="BYTE"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LT" vmcode="1406" return="BOOL">
+        <args>
+          <arg no="0" type="WORD"/>
+          <arg no="1" type="WORD"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LT" vmcode="1407" return="BOOL">
+        <args>
+          <arg no="0" type="DWORD"/>
+          <arg no="1" type="DWORD"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LT" vmcode="1409" return="BOOL">
+        <args>
+          <arg no="0" type="REAL"/>
+          <arg no="1" type="REAL"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LT" vmcode="140B" return="BOOL">
+        <args>
+          <arg no="0" type="TIME"/>
+          <arg no="1" type="TIME"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LT" vmcode="140C" return="BOOL">
+        <args>
+          <arg no="0" type="DATE"/>
+          <arg no="1" type="DATE"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LT" vmcode="140D" return="BOOL">
+        <args>
+          <arg no="0" type="TIME_OF_DAY"/>
+          <arg no="1" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LT" vmcode="140E" return="BOOL">
+        <args>
+          <arg no="0" type="DATE_AND_TIME"/>
+          <arg no="1" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+
+      <function name="NE" vmcode="1500" return="BOOL">
+        <args>
+          <arg no="0" type="BOOL"/>
+          <arg no="1" type="BOOL"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="NE" vmcode="1501" return="BOOL">
+        <args>
+          <arg no="0" type="SINT"/>
+          <arg no="1" type="SINT"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="NE" vmcode="1502" return="BOOL">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="1" type="INT"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="NE" vmcode="1503" return="BOOL">
+        <args>
+          <arg no="0" type="DINT"/>
+          <arg no="1" type="DINT"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="NE" vmcode="1505" return="BOOL">
+        <args>
+          <arg no="0" type="BYTE"/>
+          <arg no="1" type="BYTE"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="NE" vmcode="1506" return="BOOL">
+        <args>
+          <arg no="0" type="WORD"/>
+          <arg no="1" type="WORD"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="NE" vmcode="1507" return="BOOL">
+        <args>
+          <arg no="0" type="DWORD"/>
+          <arg no="1" type="DWORD"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="NE" vmcode="1509" return="BOOL">
+        <args>
+          <arg no="0" type="REAL"/>
+          <arg no="1" type="REAL"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="NE" vmcode="150B" return="BOOL">
+        <args>
+          <arg no="0" type="TIME"/>
+          <arg no="1" type="TIME"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="NE" vmcode="150C" return="BOOL">
+        <args>
+          <arg no="0" type="DATE"/>
+          <arg no="1" type="DATE"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="NE" vmcode="150D" return="BOOL">
+        <args>
+          <arg no="0" type="TIME_OF_DAY"/>
+          <arg no="1" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="NE" vmcode="150E" return="BOOL">
+        <args>
+          <arg no="0" type="DATE_AND_TIME"/>
+          <arg no="1" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+
+      <function name="MUX" vmcode="16*0" return="BOOL">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="BOOL"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MUX" vmcode="16*1" return="SINT">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="SINT"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MUX" vmcode="16*2" return="INT">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="INT"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MUX" vmcode="16*3" return="DINT">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="DINT"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MUX" vmcode="16*5" return="BYTE">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="BYTE"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MUX" vmcode="16*6" return="WORD">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="WORD"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MUX" vmcode="16*7" return="DWORD">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="DWORD"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MUX" vmcode="16*9" return="REAL">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="REAL"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MUX" vmcode="16*B" return="TIME">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="TIME"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MUX" vmcode="16*C" return="DATE">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="DATE"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MUX" vmcode="16*D" return="TIME_OF_DAY">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MUX" vmcode="16*E" return="DATE_AND_TIME">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+
+      <function name="INT_TO_REAL" vmcode="1900" return="REAL">
+        <args>
+          <arg no="0" name="INP" type="INT"/>
+        </args>
+        <comment>Converts INT value to REAL value</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="DINT_TO_REAL" vmcode="1901" return="REAL">
+        <args>
+          <arg no="0" name="INP" type="DINT"/>
+        </args>
+        <comment>Converts DINT value to REAL value</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="TIME_TO_DINT" vmcode="1902" return="DINT">
+        <args>
+          <arg no="0" name="INP" type="TIME"/>
+        </args>
+        <comment>Returns number represented by TIME</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="DINT_TO_TIME" vmcode="1903" return="TIME">
+        <args>
+          <arg no="0" name="INP" type="DINT"/>
+        </args>
+        <comment>Returns TIME represented by number</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="TIME_TO_REAL" vmcode="1904" return="REAL">
+        <args>
+          <arg no="0" name="INP" type="TIME"/>
+        </args>
+        <comment>Returns REAL number represented by TIME. Superposition of conversions TIME->DINT->REAL</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="REAL_TO_TIME" vmcode="1905" return="TIME">
+        <args>
+          <arg no="0" name="INP" type="REAL"/>
+        </args>
+        <comment>Returns TIME represented by REAL number. Superposition of conversions REAL->DINT->TIME</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <!-- Od wersji 2.4.7, Usunięto w 2.5.1, Przywrócono w 2.5.2 -->
+      <function name="BCD_TO_INT" vmcode="1906" return="INT">
+        <args>
+          <arg no="0" name="INP" type="BYTE"/>
+        </args>
+        <comment>Converts BCD stored at BYTE to INT value</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="BCD_TO_INT" vmcode="1907" return="INT">
+        <args>
+          <arg no="0" name="INP" type="WORD"/>
+        </args>
+        <comment>Converts BCD stored at WORD to INT value</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="INT_TO_BYTE_BCD" vmcode="1908" return="BYTE">
+        <args>
+          <arg no="0" name="INP" type="INT"/>
+        </args>
+        <comment>Converts INT value to BCD stored at BYTE</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="INT_TO_WORD_BCD" vmcode="1909" return="WORD">
+        <args>
+          <arg no="0" name="INP" type="INT"/>
+        </args>
+        <comment>Converts INT value to BCD stored at WORD</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <!-- Od wersji 2.4.7.1 -->
+      <function name="REAL_TO_INT" vmcode="190A" return="INT">
+        <args>
+          <arg no="0" name="INP" type="REAL"/>
+        </args>
+        <comment>Converts REAL to INT value with truncation</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="INT_TO_BOOL" vmcode="190B" return="BOOL">
+        <args>
+          <arg no="0" name="INP" type="INT"/>
+        </args>
+        <comment>Converts INT to BOOL value</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <!-- Od wersji 2.4.8 jako wbudowana-->
+      <function name="INT_TO_DINT" vmcode="190C" return="DINT">
+        <args>
+          <arg no="0" name="INP" type="INT"/>
+        </args>
+        <comment>Converts INT to DINT value</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <!--function name="REAL_TO_LREAL" vmcode="190D" return="LREAL">
+        <args>
+          <arg no="0" name="INP" type="REAL"/>
+        </args>
+        <comment>Konwersja REAL do typu LREAL</comment>
+      </function>
+      <function name="LREAL_TO_REAL" vmcode="190E" return="REAL">
+        <args>
+          <arg no="0" name="INP" type="LREAL"/>
+        </args>
+        <comment>Konwersja LREAL do typu REAL</comment>
+      </function-->
+      <function name="DWORD_TO_REAL" vmcode="1910" return="REAL">
+        <args>
+          <arg no="0" name="INP" type="DWORD"/>
+        </args>
+        <comment>Converts DWORD to REAL value</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      <function name="REAL_TO_DWORD" vmcode="1911" return="DWORD">
+        <args>
+          <arg no="0" name="INP" type="REAL"/>
+        </args>
+        <comment>Converts REAL to DWORD value</comment>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+      
+      <function name="CUR_TIME" vmcode="1C17" return="TIME">
+        <args>
+        </args>
+        <comment>Returns current system time</comment>
+        <group>
+          <item value="8" mask="0"/>
+        </group>
+      </function>
+      <function name="READ_RTC" vmcode="1C20" return="DATE_AND_TIME">
+        <args>
+        </args>
+        <comment>Returns current date and time from RTC clock</comment>
+        <group>
+          <item value="8" mask="0"/>
+        </group>
+      </function>
+      <function name="WRITE_RTC" vmcode="1C21" return="BOOL">
+        <args>
+          <arg no="0" name="TIME_TO_SAVE" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Sets the RTC clock. Returns clock update status.</comment>
+        <group>
+          <item value="8" mask="0"/>
+        </group>
+      </function>
+
+      <!-- od wersji 2.4.7 -->
+      <function name="GET_TST" vmcode="1C30" return="DATE_AND_TIME">
+        <args>
+        </args>
+        <comment>Returns task cycle start time.</comment>
+        <group>
+          <item value="8" mask="0"/>
+        </group>
+      </function>
+
+      <!-- od wersji 2.4.5 ? -->
+      <function name="RANDOML" vmcode="1C22" return="REAL">
+        <args />
+        <comment>Returns random value with linear probability with range 0 to 1</comment>
+      </function>
+
+      <!-- od wersji 2.4.6 -->
+      <function name="GET_STATUS_WORD1" vmcode="1C2F" return="WORD">
+        <args />
+        <comment>
+          Returns value of status word 1. Meaning of the bitwise mask: &lt;br&gt;
+          16#01 - Last cycle execution with overrun. &lt;br&gt;
+          16#02 - Access to array index was over bounds. &lt;br&gt;
+          16#04 - If set then its mean initial (cold) statup (1). If reset (0) then normal execution. &lt;br&gt;
+          16#08 - If set then its mean first startup after uploading xcp code.
+          16#10 - If set then last conversion from STRING to number type has failed.
+        </comment>
+      </function>
+      <!-- od wersji 2.5.0 -->
+      <function name="GET_VMACH_VERSION" vmcode="1C32" return="WORD">
+        <args />
+        <comment>Returns current virtual machine number in nibble Little Endian order (ie. 2.5.6.7 as 0x6725).</comment>
+      </function>
+
+      <!-- od wersji 2.4.9 -->
+      <function name="TASK_CYCLE" vmcode="1C31" return="TIME">
+        <args>
+        </args>
+        <comment>Task interval of current task</comment>
+        <group>
+          <item value="8" mask="0"/>
+        </group>
+      </function>
+
+
+      <!-- LINT, LREAL, LWORD functions -->
+      <function name="ADD" vmcode="01*4" return="LINT">
+        <args>
+          <arg no="*" name="summand*" type="LINT"/>
+        </args>
+        <comment>Adds two or more LINT operands</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="ADD" vmcode="01*8" return="LWORD">
+        <args>
+          <arg no="*" name="summand*" type="LWORD"/>
+        </args>
+        <comment>Adds two or more LWORD operands</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <!--function name="ADD" vmcode="01*A" return="LREAL">
+        <args>
+          <arg no="*" name="summand*" type="LREAL"/>
+        </args>
+        <comment>Dodaje dwa lub więcej operandów</comment>
+      </function-->
+      <function name="ADD" vmcode="01*B" return="TIME">
+        <args>
+          <arg no="*" name="summand*" type="TIME"/>
+        </args>
+        <comment>Adds two or more TIME operands</comment>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="SUB" vmcode="0204" return="LINT">
+        <args>
+          <arg no="0" name="minuend" type="LINT"/>
+          <arg no="1" name="subtrahend" type="LINT"/>
+        </args>
+        <comment>Calculates subtract between first and second argument</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="SUB" vmcode="0208" return="LWORD">
+        <args>
+          <arg no="0" name="minuend" type="LWORD"/>
+          <arg no="1" name="subtrahend" type="LWORD"/>
+        </args>
+        <comment>Calculates subtract between first and second argument</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <!--function name="SUB" vmcode="020A" return="LREAL">
+        <args>
+          <arg no="0" name="minuend" type="LREAL"/>
+          <arg no="1" name="subtrahend" type="LREAL"/>
+        </args>
+        <comment>Oblicza różnicę pomiędzy pierwszym a drugim argumentem</comment>
+      </function-->
+      <function name="MUL" vmcode="03*4" return="LINT">
+        <args>
+          <arg no="*" name="factor*" type="LINT"/>
+        </args>
+        <comment>Multiplies two or more LINT factors</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="MUL" vmcode="03*8" return="LWORD">
+        <args>
+          <arg no="*" name="factor*" type="LWORD"/>
+        </args>
+        <comment>Multiplies two or more LWORD factors</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <!--function name="MUL" vmcode="03*A" return="LREAL">
+        <args>
+          <arg no="*" name="factor*" type="LREAL"/>
+        </args>
+        <comment>Mnoży dwa lub więcej argumentów tego samego typu</comment>
+      </function-->
+      <function name="DIV" vmcode="0404" return="LINT">
+        <args>
+          <arg no="0" name="dividend" type="LINT"/>
+          <arg no="1" name="divisor" type="LINT"/>
+        </args>
+        <comment>Divides dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="DIV" vmcode="0408" return="LWORD">
+        <args>
+          <arg no="0" name="dividend" type="LWORD"/>
+          <arg no="1" name="divisor" type="LWORD"/>
+        </args>
+        <comment>Divides dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <!--function name="DIV" vmcode="040A" return="LREAL">
+        <args>
+          <arg no="0" name="dividend" type="LREAL"/>
+          <arg no="1" name="divisor" type="LREAL"/>
+        </args>
+        <comment>Dzieli pierwszy argument przez drugi</comment>
+      </function-->
+      <function name="MOD" vmcode="0414" return="LINT">
+        <args>
+          <arg no="0" name="dividend" type="LINT"/>
+          <arg no="1" name="divisor" type="LINT"/>
+        </args>
+        <comment>Remainder of division dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="MOD" vmcode="0418" return="LWORD">
+        <args>
+          <arg no="0" name="dividend" type="LWORD"/>
+          <arg no="1" name="divisor" type="LWORD"/>
+        </args>
+        <comment>Remainder of division dividend by divisor</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="NEG" vmcode="0504" return="LINT">
+        <args>
+          <arg no="0" type="LINT"/>
+        </args>
+        <comment>Changes sign of the signed value</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <!--function name="NEG" vmcode="0509" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Neguje wartość liczby ze znakiem</comment>
+      </function-->
+      <function name="NOT" vmcode="0514" return="LWORD">
+        <args>
+          <arg no="0" type="LWORD"/>
+        </args>
+        <comment>Bitwise negation of unsigned value</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="ABS" vmcode="0614" return="LINT">
+        <args>
+          <arg no="0" type="LINT"/>
+        </args>
+        <comment>Returns the absolute value of a specified number</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <function name="ABS" vmcode="0618" return="LWORD">
+        <args>
+          <arg no="0" type="LWORD"/>
+        </args>
+        <comment>Returns the absolute value of a specified number</comment>
+        <group>
+          <item value="4" mask="0"/>
+        </group>
+      </function>
+      <!--function name="ABS" vmcode="061A" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Oblicza wartość bezwzględną argumentu</comment>
+      </function>
+      <function name="SQRT" vmcode="0621" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Oblicza pierwiastek kwadratowy argumentu</comment>
+      </function>
+      <function name="LN" vmcode="0623" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Oblicza logarytm naturalny argumentu</comment>
+      </function>
+      <function name="LOG" vmcode="0625" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Oblicza logarytm dziesiętny argumentu</comment>
+      </function>
+      <function name="EXP" vmcode="0627" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Podnosi e do potęgi rzeczywistej.</comment>
+      </function>
+      <function name="SIN" vmcode="0629" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Oblicza wartość funkcji sinus dla argumentu</comment>
+      </function>
+      <function name="COS" vmcode="062B" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Oblicza wartość funkcji cosinus dla argumentu</comment>
+      </function>
+      <function name="TAN" vmcode="062D" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Oblicza wartość funkcji tanges dla argumentu</comment>
+      </function>
+      <function name="ASIN" vmcode="062F" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Oblicza wartość funkcji arcus sinus dla argumentu</comment>
+      </function>
+      <function name="ACOS" vmcode="0631" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Oblicza wartość funkcji arcus cosinus dla argumentu</comment>
+      </function>
+      <function name="ATAN" vmcode="0633" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Oblicza wartość funkcji arcus tanges dla argumentu</comment>
+      </function>
+      <function name="TRUNC" vmcode="0635" return="LINT">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Obcina liczbę rzeczywistą do całkowitej</comment>
+      </function>
+      <function name="ROUND" vmcode="0637" return="LINT">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Zaokrągla liczbę rzeczywistą do całkowitej</comment>
+      </function-->
+      <function name="AND" vmcode="08*4" return="LWORD">
+        <args>
+          <arg no="*" type="LWORD"/>
+        </args>
+        <comment>Bitwise AND of LWORD operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="OR" vmcode="09*4" return="LWORD">
+        <args>
+          <arg no="*" type="LWORD"/>
+        </args>
+        <comment>Bitwise OR of LWORD operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="XOR" vmcode="0A*5" return="LWORD">
+        <args>
+          <arg no="*" type="LWORD"/>
+        </args>
+        <comment>Bitwise XOR of LWORD operands</comment>
+        <group>
+          <item value="2" mask="0"/>
+        </group>
+      </function>
+      <function name="SHL" vmcode="0B04" return="LWORD">
+        <args>
+          <arg no="0" name="arg" type="LWORD"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Shifts first argument left by the number of bits specified by second argument</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="SHR" vmcode="0B14" return="LWORD">
+        <args>
+          <arg no="0" name="arg" type="LWORD"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Shifts first argument left by the number of bits specified by second argument</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="ROL" vmcode="0B24" return="LWORD">
+        <args>
+          <arg no="0" name="arg" type="LWORD"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Rotate the input values to the left to the most significant bit (MSB) by a specified number of bit positions</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="ROR" vmcode="0B34" return="LWORD">
+        <args>
+          <arg no="0" name="arg" type="LWORD"/>
+          <arg no="1" name="num" type="INT"/>
+        </args>
+        <comment>Rotate the input values to the right to the least significant bit (LSB) by a specified number of bit positions</comment>
+        <group>
+          <item value="6" mask="0"/>
+        </group>
+      </function>
+      <function name="SEL" vmcode="0C04" return="LINT">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="LINT"/>
+          <arg no="2" name="case_true" type="LINT"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="SEL" vmcode="0C08" return="LWORD">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="LWORD"/>
+          <arg no="2" name="case_true" type="LWORD"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <!--function name="SEL" vmcode="0C0A" return="LREAL">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="LREAL"/>
+          <arg no="2" name="case_true" type="LREAL"/>
+        </args>
+        <comment>Wybiera jeden spośród dwóch argumentów</comment>
+      </function-->
+      <function name="LIMIT" vmcode="0D04" return="LINT">
+        <args>
+          <arg no="0" name="value" type="LINT"/>
+          <arg no="1" name="min" type="LINT"/>
+          <arg no="2" name="max" type="LINT"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="LIMIT" vmcode="0D08" return="LWORD">
+        <args>
+          <arg no="0" name="value" type="LWORD"/>
+          <arg no="1" name="min" type="LWORD"/>
+          <arg no="2" name="max" type="LWORD"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <!--function name="LIMIT" vmcode="0D0A" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+          <arg no="2" type="LREAL"/>
+        </args>
+        <comment>Ogranicza argument pomiędzy wartościami</comment>
+      </function-->
+      <function name="MAX" vmcode="0E04" return="LINT">
+        <args>
+          <arg no="0" type="LINT"/>
+          <arg no="1" type="LINT"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MAX" vmcode="0E08" return="LWORD">
+        <args>
+          <arg no="0" type="LWORD"/>
+          <arg no="1" type="LWORD"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <!--function name="MAX" vmcode="0E0A" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Wybiera maksymalną z dwóch wartości</comment>
+      </function-->
+      <function name="MIN" vmcode="0F04" return="LINT">
+        <args>
+          <arg no="0" type="LINT"/>
+          <arg no="1" type="LINT"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MIN" vmcode="0F08" return="LWORD">
+        <args>
+          <arg no="0" type="LWORD"/>
+          <arg no="1" type="LWORD"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <!--function name="MIN" vmcode="0F0A" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+      </function-->
+      <function name="GT" vmcode="1004" return="BOOL">
+        <args>
+          <arg no="0" type="LINT"/>
+          <arg no="1" type="LINT"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GT" vmcode="1008" return="BOOL">
+        <args>
+          <arg no="0" type="LWORD"/>
+          <arg no="1" type="LWORD"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <!--function name="GT" vmcode="100A" return="BOOL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+      </function-->
+      <function name="GE" vmcode="1104" return="BOOL">
+        <args>
+          <arg no="0" type="LINT"/>
+          <arg no="1" type="LINT"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="GE" vmcode="1108" return="BOOL">
+        <args>
+          <arg no="0" type="LWORD"/>
+          <arg no="1" type="LWORD"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <!--function name="GE" vmcode="110A" return="BOOL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Sprawdzenie czy argument pierwszy jest większy lub równy drugiemu</comment>
+      </function-->
+      <function name="EQ" vmcode="1204" return="BOOL">
+        <args>
+          <arg no="0" type="LINT"/>
+          <arg no="1" type="LINT"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="EQ" vmcode="1208" return="BOOL">
+        <args>
+          <arg no="0" type="LWORD"/>
+          <arg no="1" type="LWORD"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <!--function name="EQ" vmcode="120A" return="BOOL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+      </function-->
+      <function name="LE" vmcode="1304" return="BOOL">
+        <args>
+          <arg no="0" type="LINT"/>
+          <arg no="1" type="LINT"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LE" vmcode="1308" return="BOOL">
+        <args>
+          <arg no="0" type="LWORD"/>
+          <arg no="1" type="LWORD"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <!--function name="LE" vmcode="130A" return="BOOL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+      </function-->
+      <function name="LT" vmcode="1404" return="BOOL">
+        <args>
+          <arg no="0" type="LINT"/>
+          <arg no="1" type="LINT"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="LT" vmcode="1408" return="BOOL">
+        <args>
+          <arg no="0" type="LWORD"/>
+          <arg no="1" type="LWORD"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <!--function name="LT" vmcode="140A" return="BOOL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+      </function-->
+      <function name="NE" vmcode="1504" return="BOOL">
+        <args>
+          <arg no="0" type="LINT"/>
+          <arg no="1" type="LINT"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <function name="NE" vmcode="1508" return="BOOL">
+        <args>
+          <arg no="0" type="LWORD"/>
+          <arg no="1" type="LWORD"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+        <group>
+          <item value="5" mask="0"/>
+        </group>
+      </function>
+      <!--function name="NE" vmcode="150A" return="BOOL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+      </function-->
+      <function name="MUX" vmcode="16*4" return="LINT">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="LINT"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <function name="MUX" vmcode="16*8" return="LWORD">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="LWORD"/>
+        </args>
+        <comment>Selects one of the values</comment>
+        <group>
+          <item value="7" mask="0"/>
+        </group>
+      </function>
+      <!--function name="MUX" vmcode="16*A" return="LREAL">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="LREAL"/>
+        </args>
+        <comment>Selects one of the values</comment>
+      </function-->
+
+      <function name="GET_DAYOFWEEK" vmcode="0640" return="INT">
+        <args>
+          <arg no="0" name="PDATE" type="DATE"/>
+        </args>
+        <comment>Returns day of week with DATE argument. 0 - Sunday, 1 - Monday, 2 - Tuesday, 3 - Wednesday, 4 - Thursday, 5 - Friday, 6 - Saturday.</comment>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+      <function name="GET_DAYOFWEEK" vmcode="0641" return="INT">
+        <args>
+          <arg no="0" name="PDATETIME" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Returns day of week with DATE_AND_TIME argument. 0 - Sunday, 1 - Monday, 2 - Tuesday, 3 - Wednesday, 4 - Thursday, 5 - Friday, 6 - Saturday.</comment>
+        <group>
+          <item value="9" mask="0"/>
+        </group>
+      </function>
+
+    </FUNCTIONS>
+    <!-- Od wersji 2.4.7 -->
+    <FUN_BLOCKS />
+    <SYSTEM>
+      <sysproc name="JMP" vmcode="1C00">
+        <args>
+          <arg no="0" name="imm" type=":gclabel"/>
+        </args>
+        <comment>Unconditional jump to immediate address (imm)</comment>
+      </sysproc>
+      <sysproc name="JNZ" vmcode="1C01">
+        <args>
+          <arg no="0" name="condition" type="BOOL"/>
+          <arg no="1" name="imm" type=":gclabel"/>
+        </args>
+        <comment>Conditional jump to immediate address (imm) when (condition) = 1</comment>
+      </sysproc>
+      <sysproc name="JZ" vmcode="1C02">
+        <args>
+          <arg no="0" name="condition" type="BOOL"/>
+          <arg no="1" name="imm" type=":gclabel"/>
+        </args>
+        <comment>Conditional jump to immediate address (imm) when (condition) = 0</comment>
+      </sysproc>
+      <sysproc name="JR" vmcode="1C03">
+        <args>
+          <arg no="0" name="imm" type=":rclabel"/>
+        </args>
+        <comment>Unconditional jump to relative immediate address (imm)</comment>
+      </sysproc>
+      <sysproc name="JRN" vmcode="1C04">
+        <args>
+          <arg no="0" name="condition" type="BOOL"/>
+          <arg no="1" name="imm" type=":rclabel"/>
+        </args>
+        <comment>Conditional jump to relative immediate address (imm) when (condition) = 1</comment>
+      </sysproc>
+      <sysproc name="JRZ" vmcode="1C05">
+        <args>
+          <arg no="0" name="condition" type="BOOL"/>
+          <arg no="1" name="imm" type=":rclabel"/>
+        </args>
+        <comment>Conditional jump to relative immediate address (imm) when (condition) = 0</comment>
+      </sysproc>
+      <sysproc name="CALF" vmcode="1C10">
+        <args>
+          <arg no="0" name="ParamPtr" type=":rdlabel">
+            <comment>Pointer to parameter area</comment>
+          </arg>
+          <arg no="1" name="FunctionAdr" type=":gclabel">
+            <comment>Address of execution code</comment>
+          </arg>
+        </args>
+        <comment>User function call. /*Old DPTR and CSIP values to separate stacks, increment DPTR with ParamPtr value*/</comment>
+      </sysproc>
+      <sysproc name="RETURN" vmcode="1C13">
+        <args />
+        <comment>Return from user function. /*Pulls DPTR and CSIP values from their stacks*/.</comment>
+      </sysproc>
+      <sysproc name="MCD" vmcode="1C15">
+        <args>
+          <arg no="0" name="DST" type=":rdlabel"/>
+          <arg no="1" name="imm1" type=":imm.BYTE"/>
+          <arg no="2" name="imm2" type=":imm.*"/>
+        </args>
+        <comment>Initializes data at arg0 adress with area size arg1 and source pattern arg2.</comment>
+      </sysproc>
+      <sysproc name="CALB" vmcode="1C16">
+        <args>
+          <arg no="0" name="InstPtr" type=":rdlabel">
+            <comment>Function block instance pointer</comment>
+          </arg>
+          <arg no="1" name="FunBlockAdr" type=":gclabel">
+            <comment>Address of function block code</comment>
+          </arg>
+        </args>
+        <comment>User function block call. /*Old DPTR and CSIP values to separate stacks, increment DPTR with InstPtr value*/</comment>
+      </sysproc>
+      <sysproc name="RETFB" vmcode="1C18">
+        <args/>
+        <comment>Return from function block.</comment>
+      </sysproc>
+
+      <sysproc name="MMV" vmcode="0701">
+        <args>
+          <arg no="0" name="DST" type=":rdlabel.BOOL"/>
+          <arg no="1" name="SRC" type=":gdlabel.BOOL"/>
+        </args>
+        <comment>Copies BOOL from global area to relative area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0701">
+        <args>
+          <arg no="0" name="DST" type=":rdlabel.SINT"/>
+          <arg no="1" name="SRC" type=":gdlabel.SINT"/>
+        </args>
+        <comment>Copies SINT from global area to relative area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0701">
+        <args>
+          <arg no="0" name="DST" type=":rdlabel.BYTE"/>
+          <arg no="1" name="SRC" type=":gdlabel.BYTE"/>
+        </args>
+        <comment>Copies BYTE from global area to relative area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0702">
+        <args>
+          <arg no="0" name="DST" type=":rdlabel.INT"/>
+          <arg no="1" name="SRC" type=":gdlabel.INT"/>
+        </args>
+        <comment>Copies INT from global area to relative area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0702">
+        <args>
+          <arg no="0" name="DST" type=":rdlabel.WORD"/>
+          <arg no="1" name="SRC" type=":gdlabel.WORD"/>
+        </args>
+        <comment>Copies WORD from global area to relative area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0704">
+        <args>
+          <arg no="0" name="DST" type=":rdlabel.DINT"/>
+          <arg no="1" name="SRC" type=":gdlabel.DINT"/>
+        </args>
+        <comment>Copies DINT from global area to relative area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0704">
+        <args>
+          <arg no="0" name="DST" type=":rdlabel.DWORD"/>
+          <arg no="1" name="SRC" type=":gdlabel.DWORD"/>
+        </args>
+        <comment>Copies DWORD from global area to relative area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0708">
+        <args>
+          <arg no="0" name="DST" type=":rdlabel.LINT"/>
+          <arg no="1" name="SRC" type=":gdlabel.LINT"/>
+        </args>
+        <comment>Copies LINT from global area to relative area</comment>
+      </sysproc>
+
+      <sysproc name="MMV" vmcode="0781">
+        <args>
+          <arg no="0" name="DST" type=":gdlabel.BOOL"/>
+          <arg no="1" name="SRC" type=":rdlabel.BOOL"/>
+        </args>
+        <comment>Copies BOOL from relative area to global area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0781">
+        <args>
+          <arg no="0" name="DST" type=":gdlabel.SINT"/>
+          <arg no="1" name="SRC" type=":rdlabel.SINT"/>
+        </args>
+        <comment>Copies SINT from relative area to global area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0781">
+        <args>
+          <arg no="0" name="DST" type=":gdlabel.BYTE"/>
+          <arg no="1" name="SRC" type=":rdlabel.BYTE"/>
+        </args>
+        <comment>Copies BYTE from relative area to global area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0782">
+        <args>
+          <arg no="0" name="DST" type=":gdlabel.INT"/>
+          <arg no="1" name="SRC" type=":rdlabel.INT"/>
+        </args>
+        <comment>Copies INT from relative area to global area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0782">
+        <args>
+          <arg no="0" name="DST" type=":gdlabel.WORD"/>
+          <arg no="1" name="SRC" type=":rdlabel.WORD"/>
+        </args>
+        <comment>Copies WORD from relative area to global area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0784">
+        <args>
+          <arg no="0" name="DST" type=":gdlabel.DINT"/>
+          <arg no="1" name="SRC" type=":rdlabel.DINT"/>
+        </args>
+        <comment>Copies DINT from relative area to global area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0784">
+        <args>
+          <arg no="0" name="DST" type=":gdlabel.DWORD"/>
+          <arg no="1" name="SRC" type=":rdlabel.DWORD"/>
+        </args>
+        <comment>Copies DWORD from relative area to global area</comment>
+      </sysproc>
+      <sysproc name="MMV" vmcode="0788">
+        <args>
+          <arg no="0" name="DST" type=":gdlabel.LINT"/>
+          <arg no="1" name="SRC" type=":rdlabel.LINT"/>
+        </args>
+        <comment>Copies LINT from relative area to global area</comment>
+      </sysproc>
+
+      <sysproc name="TRML" vmcode="1C1D">
+        <args>
+          <arg no="0" name="AdresStart" type=":gclabel"/>
+        </args>
+        <comment>Terminates current task loop and starts execution of VM internal code. Next VM instruction is placed at AdresStart argument.</comment>
+      </sysproc>
+      <sysproc name="NOP" vmcode="0000">
+        <args/>
+        <comment>Empty instruction</comment>
+      </sysproc>
+      <sysproc name="HALT" vmcode="FFFF">
+        <args/>
+        <comment>Terminates VM work with bad instruction</comment>
+      </sysproc>
+
+      <sysproc name="CALP" vmcode="1C1E">
+        <args>
+          <arg no="0" name="PrgData" type=":gdlabel.WORD"/>
+          <arg no="1" name="FlgExecPtr" type=":rdlabel.BOOL"/>
+          <arg no="2" name="ExecCode" type=":gclabel"/>
+        </args>
+        <comment>Call program. When BOOL variable located at PrgData + FlgExecPtr address is equal to 1, then code from ExecCode is executed with loading mediate register PrgData value.</comment>
+      </sysproc>
+
+      <sysproc name="MEMCP" vmcode="1C1F">
+        <args>
+          <arg no="0" name="Dst" type=":rdlabel">
+            <comment>Destination area</comment>
+          </arg>
+          <arg no="1" name="Src" type=":rdlabel">
+            <comment>Source area</comment>
+          </arg>
+          <arg no="2" name="Count" type=":imm.WORD">
+            <comment>Number of bytes</comment>
+          </arg>
+        </args>
+        <comment>Copies data between two areas in memory</comment>
+      </sysproc>
+
+      <!-- Od wersji 2.4.6 -->
+      <sysproc name="FPAT" vmcode="1C23">
+        <args>
+          <arg no="0" name="Dst" type=":rdlabel">
+            <comment>Destination area</comment>
+          </arg>
+          <arg no="1" name="Val" type=":imm.BYTE">
+            <comment>BYTE pattern</comment>
+          </arg>
+          <arg no="2" name="Count" type=":imm.BYTE">
+            <comment>Number of bytes</comment>
+          </arg>
+        </args>
+        <comment>Fills destination area with BYTE pattern</comment>
+      </sysproc>
+
+      <sysproc name="AURD" vmcode="1C24">
+        <args>
+          <arg no="0" name="Dst" type=":rdlabel"/>
+          <arg no="1" name="SrcBase" type=":rdlabel"/>
+          <arg no="2" name="Index" type="INT"/>
+          <arg no="3" name="Size" type="BYTE"/>
+        </args>
+        <comment>Copies to Dst address, Size bytes from SrcBase+Size*Index address</comment>
+      </sysproc>
+
+      <sysproc name="AUWR" vmcode="1C25">
+        <args>
+          <arg no="0" name="Src" type=":rdlabel"/>
+          <arg no="1" name="DstBase" type=":rdlabel"/>
+          <arg no="2" name="Index" type="INT"/>
+          <arg no="3" name="Size" type="BYTE"/>
+        </args>
+        <comment>Copies from Src address, Size bytes to DstBase+Size*Index address</comment>
+      </sysproc>
+
+      <sysproc name="AORD" vmcode="1C26">
+        <args>
+          <arg no="0" name="Dst" type=":rdlabel"/>
+          <arg no="1" name="SrcBase" type=":rdlabel"/>
+          <arg no="2" name="Index" type="INT"/>
+        </args>
+        <comment>Copies to Dst address, one byte from SrcBase+Index address</comment>
+      </sysproc>
+
+      <sysproc name="AOWR" vmcode="1C27">
+        <args>
+          <arg no="0" name="Src" type=":rdlabel"/>
+          <arg no="1" name="DstBase" type=":rdlabel"/>
+          <arg no="2" name="Index" type="INT"/>
+        </args>
+        <comment>Copies from Src address, one byte to DstBase+Index address</comment>
+      </sysproc>
+
+      <sysproc name="ATRD" vmcode="1C28">
+        <args>
+          <arg no="0" name="Dst" type=":rdlabel"/>
+          <arg no="1" name="SrcBase" type=":rdlabel"/>
+          <arg no="2" name="Index" type="INT"/>
+        </args>
+        <comment>Copies to Dst address, two bytes from SrcBase+2*Index address</comment>
+      </sysproc>
+
+      <sysproc name="ATWR" vmcode="1C29">
+        <args>
+          <arg no="0" name="Src" type=":rdlabel"/>
+          <arg no="1" name="DstBase" type=":rdlabel"/>
+          <arg no="2" name="Index" type="INT"/>
+        </args>
+        <comment>Copies from Src address, two bytes to DstBase+2*Index address</comment>
+      </sysproc>
+
+      <sysproc name="AFRD" vmcode="1C2A">
+        <args>
+          <arg no="0" name="Dst" type=":rdlabel"/>
+          <arg no="1" name="SrcBase" type=":rdlabel"/>
+          <arg no="2" name="Index" type="INT"/>
+        </args>
+        <comment>Copies to Dst address, four bytes from SrcBase+4*Index address</comment>
+      </sysproc>
+
+      <sysproc name="AFWR" vmcode="1C2B">
+        <args>
+          <arg no="0" name="Src" type=":rdlabel"/>
+          <arg no="1" name="DstBase" type=":rdlabel"/>
+          <arg no="2" name="Index" type="INT"/>
+        </args>
+        <comment>Copies from Src address, four bytes to DstBase+4*Index address</comment>
+      </sysproc>
+
+      <sysproc name="AQRD" vmcode="1C2C">
+        <args>
+          <arg no="0" name="Dst" type=":rdlabel"/>
+          <arg no="1" name="SrcBase" type=":rdlabel"/>
+          <arg no="2" name="Index" type="INT"/>
+        </args>
+        <comment>Copies to Dst address, eight bytes from SrcBase+8*Index address</comment>
+      </sysproc>
+
+      <sysproc name="AQWR" vmcode="1C2D">
+        <args>
+          <arg no="0" name="Src" type=":rdlabel"/>
+          <arg no="1" name="DstBase" type=":rdlabel"/>
+          <arg no="2" name="Index" type="INT"/>
+        </args>
+        <comment>Copies from Src address, eight bytes to DstBase+8*Index address</comment>
+      </sysproc>
+
+      <!-- zmiana od wersji 2.4.8 -->
+      <sysproc name="CEAC" vmcode="1C2E">
+        <args>
+          <arg no="0" name="Index" type="INT"/>
+          <arg no="1" name="LoBase" type="INT"/>
+          <arg no="2" name="HiLevel" type="INT"/>
+        </args>
+        <comment>Decrements Index variable with LoBase value, then checks if value is in 0..HiLevel range, if not then signals out of bounds array index (bit 16#2 in first status word)</comment>
+      </sysproc>
+
+      <!-- since 2.6.1 version -->
+      <sysproc name="GARD" vmcode="1C34">
+        <args>
+          <arg no="0" name="Dst" type=":rdlabel"/>
+          <arg no="1" name="SrcBase" type=":gdlabel"/>
+          <arg no="2" name="Index" type="INT"/>
+          <arg no="3" name="Size" type="BYTE"/>
+        </args>
+        <comment>Copies to Dst local address, Size bytes from SrcBase+Size*Index global address</comment>
+      </sysproc>
+      <sysproc name="GAWR" vmcode="1C35">
+        <args>
+          <arg no="0" name="Src" type=":rdlabel"/>
+          <arg no="1" name="DstBase" type=":gdlabel"/>
+          <arg no="2" name="Index" type="INT"/>
+          <arg no="3" name="Size" type="BYTE"/>
+        </args>
+        <comment>Copies from Src local address, Size bytes to DstBase+Size*Index global address</comment>
+      </sysproc>
+      <!-- since 2.9.0 version -->
+      <sysproc name="DPSTO" vmcode="1E00">
+        <args>
+          <arg no="0" name="DST" type=":rdlabel.$DPPTR"/>
+        </args>
+        <comment>Stores current DPTR register in variable DST</comment>
+      </sysproc>
+      <sysproc name="DPRDL" vmcode="1E01">
+        <args>
+          <arg no="0" name="DST" type=":rdlabel">
+            <comment>Destination address (variable)</comment>
+          </arg>
+          <arg no="1" name="SRC" type=":rdlabel.$DPPTR">
+            <comment>Pointer with source address</comment>
+          </arg>
+          <arg no="2" name="COUNT" type=":imm.WORD">
+            <comment>Number of bytes to copy</comment>
+          </arg>
+        </args>
+        <comment>Copies COUNT bytes from memory indicated by pointer SRC to local variable DST</comment>
+      </sysproc>
+      <sysproc name="DPWRL" vmcode="1E02">
+        <args>
+          <arg no="0" name="SRC" type=":rdlabel">
+            <comment>Source address (variable)</comment>
+          </arg>
+          <arg no="1" name="DST" type=":rdlabel.$DPPTR">
+            <comment>Pointer with destination address</comment>
+          </arg>
+          <arg no="2" name="COUNT" type=":imm.WORD">
+            <comment>Number of bytes to copy</comment>
+          </arg>
+        </args>
+        <comment>Copies COUNT bytes from local variable SRC to memory indicated by pointer DST</comment>
+      </sysproc>
+      <sysproc name="CALBR" vmcode="1E03">
+        <args>
+          <arg no="0" name="InstPtr" type=":rdlabel.$DPPTR">
+            <comment>Pointer to function block instance</comment>
+          </arg>
+          <arg no="1" name="FunBlockAdr" type=":gclabel">
+            <comment>Address of function block code</comment>
+          </arg>
+        </args>
+        <comment>User function block call by reference. /*Push old DPTR and CSIP values to separate stacks, set DPTR with InstPtr value*/</comment>
+      </sysproc>
+      <sysproc name="JNUL" vmcode="1E04">
+        <args>
+          <arg no="0" name="InstPtr" type=":rdlabel.$DPPTR">
+            <comment>Pointer to addressing variable</comment>
+          </arg>
+          <arg no="1" name="CodePtr" type=":gclabel">
+            <comment>Address of code to jump</comment>
+          </arg>
+        </args>
+        <comment>Conditional JUMP if the value is equal to NULL</comment>
+      </sysproc>
+      <sysproc name="MEMCPP" vmcode="1E05">
+        <args>
+          <arg no="0" name="pSourceAddress" type=":rdlabel.$DPPTR"/>
+          <arg no="1" name="pDestinationAddress" type=":rdlabel.$DPPTR"/>
+          <arg no="2" name="BytesToCopy" type=":rdlabel.INT"/>
+        </args>
+        <comment>Memory copying function</comment>
+      </sysproc>
+    </SYSTEM>
+    <CONVERSIONS>
+      <conv from="INT" to="DINT" method="single">
+        <funcall param="INT">INT_TO_DINT</funcall>
+      </conv>
+      <conv from="DINT" to="REAL" method="single">
+        <funcall param="DINT">DINT_TO_REAL</funcall>
+      </conv>
+      <conv from="INT" to="REAL" method="single">
+        <funcall param="INT">INT_TO_REAL</funcall>
+      </conv>
+    </CONVERSIONS>
+  </VMSPEC>
+</CPDEV>

@@ -14,7 +14,7 @@
 
 use std::collections::HashMap;
 
-use plc_syntax::{Token, TokenKind, parse_source};
+use plc_syntax::{PouKind, Token, TokenKind, parse_source};
 
 use crate::counters::{Ctd, Ctu, Ctud};
 use crate::edge::{FTrig, RTrig};
@@ -27,7 +27,7 @@ use crate::{Value, VariableTable, stdlib};
 
 /// Binary operator, ordered loosely by family rather than precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum BinOp {
+pub enum BinOp {
     Or,
     Xor,
     And,
@@ -46,14 +46,14 @@ pub(crate) enum BinOp {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum UnOp {
+pub enum UnOp {
     Not,
     Neg,
 }
 
 /// An executable Structured Text expression.
 #[derive(Debug, Clone)]
-pub(crate) enum Expr {
+pub enum Expr {
     Lit(Value),
     Var(String),
     /// Function-block / struct member read (`inst.Q`).
@@ -66,29 +66,29 @@ pub(crate) enum Expr {
 
 /// A single CASE label (`2`) or inclusive range (`1..5`).
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum CaseLabel {
+pub enum CaseLabel {
     Single(i64),
     Range(i64, i64),
 }
 
 /// One actual argument of a function-block call: named (`IN := x`) or positional.
 #[derive(Debug, Clone)]
-pub(crate) struct CallArg {
-    name: Option<String>,
-    value: Expr,
+pub struct CallArg {
+    pub name: Option<String>,
+    pub value: Expr,
 }
 
 /// An executable statement, tagged with the 1-based source line of its first
 /// token so the stepping debugger can map execution to editor positions.
 #[derive(Debug, Clone)]
-pub(crate) struct Stmt {
-    pub(crate) line: u32,
-    pub(crate) kind: StmtKind,
+pub struct Stmt {
+    pub line: u32,
+    pub kind: StmtKind,
 }
 
 /// The executable shape of a statement (without its source position).
 #[derive(Debug, Clone)]
-pub(crate) enum StmtKind {
+pub enum StmtKind {
     Assign {
         target: String,
         value: Expr,
@@ -129,20 +129,38 @@ pub(crate) enum StmtKind {
 
 /// A declared variable lowered for runtime initialization.
 #[derive(Debug, Clone)]
-pub(crate) struct VarDecl {
-    pub(crate) name: String,
-    pub(crate) type_name: String,
-    pub(crate) init: Option<Value>,
-    pub(crate) is_output: bool,
+pub struct VarDecl {
+    pub name: String,
+    pub type_name: String,
+    /// Sizing clause spelling for sized types (`Some("[80]")` for `STRING[80]`),
+    /// or `None` for an unsized type. Backends parse the capacity from this.
+    pub type_size: Option<String>,
+    pub init: Option<Value>,
+    /// `true` for a `VAR_INPUT` declaration.
+    pub is_input: bool,
+    /// `true` for a `VAR_OUTPUT` declaration.
+    pub is_output: bool,
     /// `true` when the declared type is a standard function block (TON, CTU, …).
-    pub(crate) is_fb: bool,
+    pub is_fb: bool,
 }
 
 /// A lowered, executable program: its declarations and its statement body.
 #[derive(Debug, Clone)]
-pub(crate) struct Program {
-    pub(crate) vars: Vec<VarDecl>,
-    pub(crate) body: Vec<Stmt>,
+pub struct Program {
+    pub vars: Vec<VarDecl>,
+    pub body: Vec<Stmt>,
+}
+
+/// A single lowered program organization unit (PROGRAM / FUNCTION_BLOCK / …):
+/// its kind, declarations, and statement body. Produced by [`build_units`] for
+/// code-generation backends that need per-POU bodies (the interpreter merges
+/// PROGRAM bodies via [`build_program`]).
+#[derive(Debug, Clone)]
+pub struct Unit {
+    pub name: String,
+    pub kind: plc_syntax::PouKind,
+    pub vars: Vec<VarDecl>,
+    pub body: Vec<Stmt>,
 }
 
 /// Maps a byte offset in the source to its 1-based line number, so statements
@@ -179,28 +197,12 @@ impl LineIndex {
 /// Build an executable [`Program`] from Structured Text source. Declarations are
 /// taken from the parser facade (so they match the rest of the toolchain);
 /// `PROGRAM` bodies are re-parsed into a real AST from the lexer token stream.
-pub(crate) fn build_program(text: &str) -> Program {
+pub fn build_program(text: &str) -> Program {
     let parse = parse_source(text);
     let mut vars = Vec::new();
 
     for unit in parse.units() {
-        for block in &unit.declaration_blocks {
-            let is_output = block.kind == plc_syntax::VarBlockKind::Output;
-            for declaration in &block.declarations {
-                let is_fb = is_standard_fb(&declaration.type_name);
-                let init = declaration
-                    .initializer
-                    .as_deref()
-                    .and_then(Value::parse_literal);
-                vars.push(VarDecl {
-                    name: declaration.name.clone(),
-                    type_name: declaration.type_name.clone(),
-                    init,
-                    is_output,
-                    is_fb,
-                });
-            }
-        }
+        vars.extend(unit_vars(unit));
     }
 
     let body_tokens = program_body_tokens(&parse);
@@ -209,6 +211,105 @@ pub(crate) fn build_program(text: &str) -> Program {
     let body = parser.parse_block(&[]);
 
     Program { vars, body }
+}
+
+/// Lower one parsed unit's declaration blocks into [`VarDecl`]s.
+fn unit_vars(unit: &plc_syntax::Pou) -> Vec<VarDecl> {
+    let mut vars = Vec::new();
+    for block in &unit.declaration_blocks {
+        let is_input = block.kind == plc_syntax::VarBlockKind::Input;
+        let is_output = block.kind == plc_syntax::VarBlockKind::Output;
+        for declaration in &block.declarations {
+            let is_fb = is_standard_fb(&declaration.type_name);
+            let init = declaration
+                .initializer
+                .as_deref()
+                .and_then(Value::parse_literal);
+            vars.push(VarDecl {
+                name: declaration.name.clone(),
+                type_name: declaration.type_name.clone(),
+                type_size: declaration.type_size.clone(),
+                init,
+                is_input,
+                is_output,
+                is_fb,
+            });
+        }
+    }
+    vars
+}
+
+/// Lower every program organization unit (PROGRAM, FUNCTION_BLOCK, …) into a
+/// [`Unit`] with its own declarations and parsed statement body. Backends that
+/// generate per-POU code (e.g. function blocks) consume this; the interpreter
+/// uses [`build_program`], which only runs PROGRAM bodies.
+pub fn build_units(text: &str) -> Vec<Unit> {
+    let parse = parse_source(text);
+    let line_index = LineIndex::new(text);
+    let mut units = Vec::new();
+    for unit in parse.units() {
+        let name = unit.name.clone().unwrap_or_default();
+        let body_tokens = unit_body_tokens(&parse, unit.kind, &name);
+        let mut parser = StmtParser::new(&body_tokens, &line_index);
+        units.push(Unit {
+            name,
+            kind: unit.kind,
+            vars: unit_vars(unit),
+            body: parser.parse_block(&[]),
+        });
+    }
+    units
+}
+
+/// Collect the significant body tokens of the POU with the given kind and name,
+/// excluding its header, its `VAR…END_VAR` blocks, and its terminator.
+fn unit_body_tokens(parse: &plc_syntax::SyntaxParse, kind: PouKind, name: &str) -> Vec<Token> {
+    let significant: Vec<&Token> = parse
+        .tokens()
+        .iter()
+        .filter(|token| !token.is_trivia())
+        .collect();
+    let start_kw = kind.start_keyword();
+    let end_kw = kind.end_keyword();
+
+    let mut out = Vec::new();
+    let mut cursor = 0usize;
+    while cursor < significant.len() {
+        // Find `<start_kw> <name>`.
+        if !significant[cursor].keyword_eq(start_kw) {
+            cursor += 1;
+            continue;
+        }
+        cursor += 1;
+        let matches_name = significant
+            .get(cursor)
+            .is_some_and(|token| token.kind == TokenKind::Identifier && token.text == name);
+        if significant
+            .get(cursor)
+            .is_some_and(|token| token.kind == TokenKind::Identifier)
+        {
+            cursor += 1;
+        }
+        while cursor < significant.len() && !significant[cursor].keyword_eq(end_kw) {
+            if is_var_block_keyword(significant[cursor]) {
+                cursor += 1;
+                while cursor < significant.len() && !significant[cursor].keyword_eq("END_VAR") {
+                    cursor += 1;
+                }
+                cursor += 1; // consume END_VAR
+            } else {
+                if matches_name {
+                    out.push(significant[cursor].clone());
+                }
+                cursor += 1;
+            }
+        }
+        cursor += 1; // consume the terminator
+        if matches_name {
+            break;
+        }
+    }
+    out
 }
 
 /// Collect the significant body tokens of every `PROGRAM` unit, excluding the

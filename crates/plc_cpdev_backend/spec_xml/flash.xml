@@ -1,0 +1,1099 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CPDEV version="1.0">
+  <VMSPEC>
+    <USER>
+      <title>Definition for FLASH memory support</title>
+      <version>2.7.0</version>
+      <extraver/>
+      <builddate>2010.11-16 15:15</builddate>
+      <exportdate>#now</exportdate>
+    </USER>
+    <FUNCTIONS>
+      <function name="FLASH_CTL_CMD" vmcode="1D02" return="WORD">
+        <args>
+          <arg no="0" name="command" type="WORD">
+            <comment>Command number</comment>
+          </arg>
+        </args>
+        <comment>Flash memory commands</comment>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+    </FUNCTIONS>
+    <SYSTEM>
+      <sysproc name="FLASH_WRITE_ANY" vmcode="1D03">
+        <args>
+          <arg no="0" name="status" type=":rdlabel.BOOL">
+            <comment>Status of calling function</comment>
+          </arg>
+          <arg no="1" name="varstore" type=":rdlabel">
+            <comment>Variable to store</comment>
+          </arg>
+          <arg no="2" name="size" type=":imm.WORD">
+            <comment>varstore size</comment>
+          </arg>
+        </args>
+        <comment>Write variable value to flash memory</comment>
+      </sysproc>
+    <sysproc name="FLASH_READ_ANY" vmcode="1D04">
+        <args>
+          <arg no="0" name="status" type=":rdlabel.BOOL">
+            <comment>Status of calling function</comment>
+          </arg>
+          <arg no="1" name="varstore" type=":rdlabel">
+            <comment>Variable to store</comment>
+          </arg>
+          <arg no="2" name="size" type=":imm.WORD">
+            <comment>varstore size</comment>
+          </arg>
+        </args>
+        <comment>Write variable value to flash memory</comment>
+      </sysproc>
+      <sysproc name="FLASH_WRITE_ANY_4A" vmcode="1D43">
+        <args>
+          <arg no="0" name="status" type=":rdlabel.BOOL">
+            <comment>Status of calling function</comment>
+          </arg>
+          <arg no="1" name="varstore" type=":rdlabel">
+            <comment>Variable to store</comment>
+          </arg>
+          <arg no="2" name="size" type=":imm.DWORD">
+            <comment>varstore size</comment>
+          </arg>
+        </args>
+        <comment>Write variable value to flash memory</comment>
+      </sysproc>
+    <sysproc name="FLASH_READ_ANY_4A" vmcode="1D44">
+        <args>
+          <arg no="0" name="status" type=":rdlabel.BOOL">
+            <comment>Status of calling function</comment>
+          </arg>
+          <arg no="1" name="varstore" type=":rdlabel">
+            <comment>Variable to store</comment>
+          </arg>
+          <arg no="2" name="size" type=":imm.DWORD">
+            <comment>varstore size</comment>
+          </arg>
+        </args>
+        <comment>Write variable value to flash memory</comment>
+      </sysproc> 
+    </SYSTEM>
+    <INLINE>
+      <function name="FLASH_WRITE_INT" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_INT" type="INT"/>
+        </args>
+        <comment>Writes INT variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_INT, VAR_INT, #/0200 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_INT" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_INT" type="INT"/>
+        </args>
+        <comment>Read INT variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_INT, VAR_INT, #/0200 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_WRITE_REAL" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_REAL" type="REAL"/>
+        </args>
+        <comment>Writes REAL variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_REAL, VAR_REAL, #/0400 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_REAL" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_REAL" type="REAL"/>
+        </args>
+        <comment>Reads REAL variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_REAL, VAR_REAL, #/0400 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_WRITE_BOOL" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_BOOL" type="BOOL"/>
+        </args>
+        <comment>Writes BOOL variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_BOOL, VAR_BOOL, #/0100 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_BOOL" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_BOOL" type="BOOL"/>
+        </args>
+        <comment>Reads BOOL variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_BOOL, VAR_BOOL, #/0100 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_WRITE_BYTE" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_BYTE" type="BYTE"/>
+        </args>
+        <comment>Writes BYTE variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_BYTE, VAR_BYTE, #/0100 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_BYTE" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_BYTE" type="BYTE"/>
+        </args>
+        <comment>Reads BYTE variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_BYTE, VAR_BYTE, #/0100 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_WRITE_SINT" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_SINT" type="SINT"/>
+        </args>
+        <comment>Writes SINT variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_SINT, VAR_SINT, #/0100 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_SINT" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_SINT" type="SINT"/>
+        </args>
+        <comment>Reads SINT variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_SINT, VAR_SINT, #/0100 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_WRITE_WORD" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_WORD" type="WORD"/>
+        </args>
+        <comment>Writes WORD variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_WORD, VAR_WORD, #/0200 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_WORD" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_WORD" type="WORD"/>
+        </args>
+        <comment>Reads WORD variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_WORD, VAR_WORD, #/0200 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_WRITE_DWORD" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_DWORD" type="DWORD"/>
+        </args>
+        <comment>Writes DWORD variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_DWORD, VAR_DWORD, #/0400 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_DWORD" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_DWORD" type="DWORD"/>
+        </args>
+        <comment>Reads DWORD variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_DWORD, VAR_DWORD, #/0400 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_WRITE_DINT" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_DINT" type="DINT"/>
+        </args>
+        <comment>Writes DINT variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_DINT, VAR_DINT, #/0400 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_DINT" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_DINT" type="DINT"/>
+        </args>
+        <comment>Reads DINT variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_DINT, VAR_DINT, #/0400 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_WRITE_LINT" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_LINT" type="LINT"/>
+        </args>
+        <comment>Writes LINT variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_LINT, VAR_LINT, #/0800 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_LINT" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_LINT" type="LINT"/>
+        </args>
+        <comment>Reads LINT variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_LINT, VAR_LINT, #/0800 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_WRITE_LWORD" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_LWORD" type="LWORD"/>
+        </args>
+        <comment>Writes LWORD variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_LWORD, VAR_LWORD, #/0800 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_LWORD" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_LWORD" type="LWORD"/>
+        </args>
+        <comment>Reads LWORD variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_LWORD, VAR_LWORD, #/0800 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <!--function name="FLASH_WRITE_LREAL" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_LREAL" type="LREAL"/>
+        </args>
+        <comment>Writes LREAL variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_LREAL, VAR_LREAL, #/0800 ]]>
+        </code>
+      </function>
+      <function name="FLASH_READ_LREAL" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_LREAL" type="LREAL"/>
+        </args>
+        <comment>Reads LREAL variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_LREAL, VAR_LREAL, #/0800 ]]>
+        </code>
+      </function-->
+      <function name="FLASH_WRITE_TIME" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_TIME" type="TIME"/>
+        </args>
+        <comment>Writes TIME variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_TIME, VAR_TIME, #/0400 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_TIME" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_TIME" type="TIME"/>
+        </args>
+        <comment>Reads TIME variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_TIME, VAR_TIME, #/0400 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_WRITE_DATE" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_DATE" type="DATE"/>
+        </args>
+        <comment>Writes DATE variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_DATE, VAR_DATE, #/0400 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_DATE" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_DATE" type="DATE"/>
+        </args>
+        <comment>Reads DATE variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_DATE, VAR_DATE, #/0400 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_WRITE_DATE_AND_TIME" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_DATE_AND_TIME" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Writes DATE_AND_TIME variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_DATE_AND_TIME, VAR_DATE_AND_TIME, #/0800 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_DATE_AND_TIME" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_DATE_AND_TIME" type="DATE_AND_TIME"/>
+        </args>
+        <comment>Reads DATE_AND_TIME variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_DATE_AND_TIME, VAR_DATE_AND_TIME, #/0800 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_WRITE_TIME_OF_DAY" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_TIME_OF_DAY" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Writes TIME_OF_DAY variable to flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_WRITE_ANY/1D03 FLASH_WRITE_TIME_OF_DAY, VAR_TIME_OF_DAY, #/0400 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+      <function name="FLASH_READ_TIME_OF_DAY" return="BOOL">
+        <args>
+          <arg no="0" name="VAR_TIME_OF_DAY" type="TIME_OF_DAY"/>
+        </args>
+        <comment>Reads TIME_OF_DAY variable from flash memory</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  $VMSYS.FLASH_READ_ANY/1D04 FLASH_READ_TIME_OF_DAY, VAR_TIME_OF_DAY, #/0400 ]]>
+        </code>
+        <group>
+          <item value="-1" mask="1"/>
+        </group>
+      </function>
+    </INLINE>
+    <EXTRA>
+      <function name="NV_PAR_STATUS" return="$DEFAULT.BYTE">
+        <comment>Non-volatile memory status</comment>
+        <args/>
+        <vars>
+          <var name="?L?CST001A" type="$DEFAULT.WORD" visibility="00100000" />
+          <var name="?F?FLASH_CTL_CMD001B" type="$DEFAULT.WORD" visibility="00200000" />
+        </vars>
+        <code>
+          <![CDATA[:?$DEFAULT.NV_PAR_STATUS?CODE 
+$VMSYS.MCD NV_PAR_STATUS, #/01, #/00
+$VMSYS.MCD ?L?CST001A, #/02, #/0200
+$DEFAULT.FLASH_CTL_CMD ?F?FLASH_CTL_CMD001B, ?L?CST001A
+$VMSYS.MEMCP NV_PAR_STATUS, ?F?FLASH_CTL_CMD001B, #/0100
+$VMSYS.RETURN 
+]]>
+        </code>
+        <group>
+          <item value="13" mask="1"/>
+        </group>
+      </function>      
+    </EXTRA>
+    <FUN_BLOCKS>
+      <funblock name="NV_PAR_INT" flag="0">
+        <comment>Non-volatile memory INT</comment>
+        <vars>
+          <var_input name="IN" type="$DEFAULT.INT" flag="16"/>
+          <var_input name="STROBE" type="$DEFAULT.BOOL" flag="16" />
+          <var_output name="OUT" type="$DEFAULT.INT" flag="32" />
+          <var name="C" type="$DEFAULT.BOOL" flag="0" />
+          <var name="OLD_STROBE" type="$DEFAULT.BOOL" flag="0" />
+          <var name="TMP" type="$DEFAULT.BOOL" flag="00000000" />
+          <var name="?L?CST001D" type="$DEFAULT.WORD" flag="1048576" />
+          <var name="?F?GET_STATUS_WORD1001E" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?F?AND001F" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?IF?B0021" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?AND0027" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?AND0028" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?OR0024" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?OR0025" type="$DEFAULT.BOOL" flag="2097152" />
+        </vars>
+        <init>
+          <![CDATA[:?$DEFAULT.NV_PAR_INT?INIT 
+$VMSYS.MCD OUT, #/02, #/0000
+$VMSYS.MCD C, #/01, #/00
+$VMSYS.MCD OLD_STROBE, #/01, #/00
+$VMSYS.MCD TMP, #/01, #/00
+$VMSYS.MCD ?L?CST001D, #/02, #/0800
+$VMSYS.RETURN 
+]]>
+        </init>
+        <code>
+          <![CDATA[:?$DEFAULT.NV_PAR_INT?CODE
+$DEFAULT.GET_STATUS_WORD1 ?F?GET_STATUS_WORD1001E
+$DEFAULT.AND ?F?AND001F, ?F?GET_STATUS_WORD1001E, ?L?CST001D
+$DEFAULT.EQ TMP, ?F?AND001F, ?L?CST001D
+$VMSYS.JNZ TMP, :?$DEFAULT.NV_PAR_INT?OR0023
+$VMSYS.JZ STROBE, :?$DEFAULT.NV_PAR_INT?AND0026
+$DEFAULT.NOT ?LR?AND0028, OLD_STROBE
+$VMSYS.JZ ?LR?AND0028, :?$DEFAULT.NV_PAR_INT?AND0026
+$VMSYS.MCD ?LR?OR0025, #/01, #/01
+$VMSYS.JMP :?$DEFAULT.NV_PAR_INT?EAND002B
+:?$DEFAULT.NV_PAR_INT?AND0026 
+$VMSYS.MCD ?LR?OR0025, #/01, #/00
+:?$DEFAULT.NV_PAR_INT?EAND002B 
+$VMSYS.JNZ ?LR?OR0025, :?$DEFAULT.NV_PAR_INT?OR0023
+$VMSYS.MCD ?IF?B0021, #/01, #/00
+$VMSYS.JMP :?$DEFAULT.NV_PAR_INT?EOR002D
+:?$DEFAULT.NV_PAR_INT?OR0023 
+$VMSYS.MCD ?IF?B0021, #/01, #/01
+:?$DEFAULT.NV_PAR_INT?EOR002D 
+$VMSYS.JZ ?IF?B0021, :?$DEFAULT.NV_PAR_INTIF?B0022
+$VMSYS.MEMCP OUT, IN, #/0200
+$VMSYS.FLASH_WRITE_ANY C, OUT, #/0200
+$VMSYS.JMP :?$DEFAULT.NV_PAR_INTIF?E002F
+:?$DEFAULT.NV_PAR_INTIF?B0022 
+$VMSYS.FLASH_READ_ANY C, OUT, #/0200
+:?$DEFAULT.NV_PAR_INTIF?E002F 
+$VMSYS.MEMCP OLD_STROBE, STROBE, #/0100
+$DEFAULT.NOT C, C
+$VMSYS.RETURN 
+]]>
+        </code>
+        <group>
+          <item value="13" mask="1"/>
+        </group>
+      </funblock>
+      <funblock name="NV_PAR_BOOL" flag="0">
+        <comment>Non-volatile memory BOOL</comment>
+        <vars>
+          <var_input name="IN" type="$DEFAULT.BOOL" flag="16"/>
+          <var_input name="STROBE" type="$DEFAULT.BOOL" flag="16" />
+          <var_output name="OUT" type="$DEFAULT.BOOL" flag="32" />
+          <var name="C" type="$DEFAULT.BOOL" flag="0" />
+          <var name="OLD_STROBE" type="$DEFAULT.BOOL" flag="0" />
+          <var name="TMP" type="$DEFAULT.BOOL" flag="00000000" />
+          <var name="?L?CST0082" type="$DEFAULT.WORD" flag="1048576" />
+          <var name="?F?GET_STATUS_WORD10083" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?F?AND0084" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?IF?B0086" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?AND008C" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?AND008D" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?OR0089" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?OR008A" type="$DEFAULT.BOOL" flag="2097152" />
+        </vars>
+        <init>
+          <![CDATA[:?$DEFAULT.NV_PAR_BOOL?INIT 
+$VMSYS.MCD OUT, #/01, #/00
+$VMSYS.MCD C, #/01, #/00
+$VMSYS.MCD OLD_STROBE, #/01, #/00
+$VMSYS.MCD TMP, #/01, #/00
+$VMSYS.MCD ?L?CST0082, #/02, #/0800
+$VMSYS.RETURN 
+]]>
+        </init>
+        <code>
+          <![CDATA[:?$DEFAULT.NV_PAR_BOOL?CODE 
+$DEFAULT.GET_STATUS_WORD1 ?F?GET_STATUS_WORD10083
+$DEFAULT.AND ?F?AND0084, ?F?GET_STATUS_WORD10083, ?L?CST0082
+$DEFAULT.EQ TMP, ?F?AND0084, ?L?CST0082
+$VMSYS.JNZ TMP, :?$DEFAULT.NV_PAR_BOOL?OR0088
+$VMSYS.JZ STROBE, :?$DEFAULT.NV_PAR_BOOL?AND008B
+$DEFAULT.NOT ?LR?AND008D, OLD_STROBE
+$VMSYS.JZ ?LR?AND008D, :?$DEFAULT.NV_PAR_BOOL?AND008B
+$VMSYS.MCD ?LR?OR008A, #/01, #/01
+$VMSYS.JMP :?$DEFAULT.NV_PAR_BOOL?EAND0090
+:?$DEFAULT.NV_PAR_BOOL?AND008B 
+$VMSYS.MCD ?LR?OR008A, #/01, #/00
+:?$DEFAULT.NV_PAR_BOOL?EAND0090 
+$VMSYS.JNZ ?LR?OR008A, :?$DEFAULT.NV_PAR_BOOL?OR0088
+$VMSYS.MCD ?IF?B0086, #/01, #/00
+$VMSYS.JMP :?$DEFAULT.NV_PAR_BOOL?EOR0092
+:?$DEFAULT.NV_PAR_BOOL?OR0088 
+$VMSYS.MCD ?IF?B0086, #/01, #/01
+:?$DEFAULT.NV_PAR_BOOL?EOR0092 
+$VMSYS.JZ ?IF?B0086, :?$DEFAULT.NV_PAR_BOOLIF?B0087
+$VMSYS.MEMCP OUT, IN, #/0100
+$VMSYS.FLASH_WRITE_ANY C, OUT, #/0100
+$VMSYS.JMP :?$DEFAULT.NV_PAR_BOOLIF?E0094
+:?$DEFAULT.NV_PAR_BOOLIF?B0087 
+$VMSYS.FLASH_READ_ANY C, OUT, #/0100
+:?$DEFAULT.NV_PAR_BOOLIF?E0094 
+$VMSYS.MEMCP OLD_STROBE, STROBE, #/0100
+$DEFAULT.NOT C, C
+$VMSYS.RETURN ]]>
+        </code>
+        <group>
+          <item value="13" mask="1"/>
+        </group>
+      </funblock>
+      <funblock name="NV_PAR_TIME" flag="0">
+        <comment>Non-volatile memory TIME</comment>
+        <vars>
+          <var_input name="IN" type="$DEFAULT.TIME" flag="16"/>
+          <var_input name="STROBE" type="$DEFAULT.BOOL" flag="16" />
+          <var_output name="OUT" type="$DEFAULT.TIME" flag="32" />
+          <var name="C" type="$DEFAULT.BOOL" flag="0" />
+          <var name="OLD_STROBE" type="$DEFAULT.BOOL" flag="0" />
+          <var name="TMP" type="$DEFAULT.BOOL" flag="0" />
+          <var name="?L?CST002C" type="$DEFAULT.WORD" flag="1048576" />
+          <var name="?F?GET_STATUS_WORD1002D" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?F?AND002E" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?IF?B0030" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?AND0036" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?AND0037" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?OR0033" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?OR0034" type="$DEFAULT.BOOL" flag="2097152" />
+        </vars>
+        <init>
+          <![CDATA[:?$DEFAULT.NV_PAR_TIME?INIT 
+$VMSYS.MCD OUT, #/04, #/00000000
+$VMSYS.MCD C, #/01, #/00
+$VMSYS.MCD OLD_STROBE, #/01, #/00
+$VMSYS.MCD TMP, #/01, #/00
+$VMSYS.MCD ?L?CST002C, #/02, #/0800
+$VMSYS.RETURN ]]>
+        </init>
+        <code>
+          <![CDATA[:?$DEFAULT.NV_PAR_TIME?CODE 
+$DEFAULT.GET_STATUS_WORD1 ?F?GET_STATUS_WORD1002D
+$DEFAULT.AND ?F?AND002E, ?F?GET_STATUS_WORD1002D, ?L?CST002C
+$DEFAULT.EQ TMP, ?F?AND002E, ?L?CST002C
+$VMSYS.JNZ TMP, :?$DEFAULT.NV_PAR_TIME?OR0032
+$VMSYS.JZ STROBE, :?$DEFAULT.NV_PAR_TIME?AND0035
+$DEFAULT.NOT ?LR?AND0037, OLD_STROBE
+$VMSYS.JZ ?LR?AND0037, :?$DEFAULT.NV_PAR_TIME?AND0035
+$VMSYS.MCD ?LR?OR0034, #/01, #/01
+$VMSYS.JMP :?$DEFAULT.NV_PAR_TIME?EAND003A
+:?$DEFAULT.NV_PAR_TIME?AND0035 
+$VMSYS.MCD ?LR?OR0034, #/01, #/00
+:?$DEFAULT.NV_PAR_TIME?EAND003A 
+$VMSYS.JNZ ?LR?OR0034, :?$DEFAULT.NV_PAR_TIME?OR0032
+$VMSYS.MCD ?IF?B0030, #/01, #/00
+$VMSYS.JMP :?$DEFAULT.NV_PAR_TIME?EOR003C
+:?$DEFAULT.NV_PAR_TIME?OR0032 
+$VMSYS.MCD ?IF?B0030, #/01, #/01
+:?$DEFAULT.NV_PAR_TIME?EOR003C 
+$VMSYS.JZ ?IF?B0030, :?$DEFAULT.NV_PAR_TIMEIF?B0031
+$VMSYS.MEMCP OUT, IN, #/0400
+$VMSYS.FLASH_WRITE_ANY C, OUT, #/0400
+$VMSYS.JMP :?$DEFAULT.NV_PAR_TIMEIF?E003E
+:?$DEFAULT.NV_PAR_TIMEIF?B0031 
+$VMSYS.FLASH_READ_ANY C, OUT, #/0400
+:?$DEFAULT.NV_PAR_TIMEIF?E003E 
+$VMSYS.MEMCP OLD_STROBE, STROBE, #/0100
+$DEFAULT.NOT C, C
+$VMSYS.RETURN ]]>
+        </code>
+        <group>
+          <item value="13" mask="1"/>
+        </group>
+      </funblock>
+      <funblock name="NV_PAR_REAL" flag="0">
+        <comment>Non-volatile memory REAL</comment>
+        <vars>
+          <var_input name="IN" type="$DEFAULT.REAL" flag="16"/>
+          <var_input name="STROBE" type="$DEFAULT.BOOL" flag="16" />
+          <var_output name="OUT" type="$DEFAULT.REAL" flag="32" />
+          <var name="C" type="$DEFAULT.BOOL" flag="0" />
+          <var name="OLD_STROBE" type="$DEFAULT.BOOL" flag="0" />
+          <var name="TMP" type="$DEFAULT.BOOL" flag="00000000" />
+          <var name="?L?CST0097" type="$DEFAULT.WORD" flag="1048576" />
+          <var name="?F?GET_STATUS_WORD10098" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?F?AND0099" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?IF?B009B" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?AND00A1" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?AND00A2" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?OR009E" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?LR?OR009F" type="$DEFAULT.BOOL" flag="2097152" />
+        </vars>
+        <init>
+          <![CDATA[:?$DEFAULT.NV_PAR_REAL?INIT 
+$VMSYS.MCD OUT, #/04, #/00000000
+$VMSYS.MCD C, #/01, #/00
+$VMSYS.MCD OLD_STROBE, #/01, #/00
+$VMSYS.MCD TMP, #/01, #/00
+$VMSYS.MCD ?L?CST0097, #/02, #/0800
+$VMSYS.RETURN 
+]]>
+        </init>
+        <code>
+          <![CDATA[:?$DEFAULT.NV_PAR_REAL?CODE 
+$DEFAULT.GET_STATUS_WORD1 ?F?GET_STATUS_WORD10098
+$DEFAULT.AND ?F?AND0099, ?F?GET_STATUS_WORD10098, ?L?CST0097
+$DEFAULT.EQ TMP, ?F?AND0099, ?L?CST0097
+$VMSYS.JNZ TMP, :?$DEFAULT.NV_PAR_REAL?OR009D
+$VMSYS.JZ STROBE, :?$DEFAULT.NV_PAR_REAL?AND00A0
+$DEFAULT.NOT ?LR?AND00A2, OLD_STROBE
+$VMSYS.JZ ?LR?AND00A2, :?$DEFAULT.NV_PAR_REAL?AND00A0
+$VMSYS.MCD ?LR?OR009F, #/01, #/01
+$VMSYS.JMP :?$DEFAULT.NV_PAR_REAL?EAND00A5
+:?$DEFAULT.NV_PAR_REAL?AND00A0 
+$VMSYS.MCD ?LR?OR009F, #/01, #/00
+:?$DEFAULT.NV_PAR_REAL?EAND00A5 
+$VMSYS.JNZ ?LR?OR009F, :?$DEFAULT.NV_PAR_REAL?OR009D
+$VMSYS.MCD ?IF?B009B, #/01, #/00
+$VMSYS.JMP :?$DEFAULT.NV_PAR_REAL?EOR00A7
+:?$DEFAULT.NV_PAR_REAL?OR009D 
+$VMSYS.MCD ?IF?B009B, #/01, #/01
+:?$DEFAULT.NV_PAR_REAL?EOR00A7 
+$VMSYS.JZ ?IF?B009B, :?$DEFAULT.NV_PAR_REALIF?B009C
+$VMSYS.MEMCP OUT, IN, #/0400
+$VMSYS.FLASH_WRITE_ANY C, OUT, #/0400
+$VMSYS.JMP :?$DEFAULT.NV_PAR_REALIF?E00A9
+:?$DEFAULT.NV_PAR_REALIF?B009C 
+$VMSYS.FLASH_READ_ANY C, OUT, #/0400
+:?$DEFAULT.NV_PAR_REALIF?E00A9 
+$VMSYS.MEMCP OLD_STROBE, STROBE, #/0100
+$DEFAULT.NOT C, C
+$VMSYS.RETURN 
+]]>
+        </code>
+        <group>
+          <item value="13" mask="1"/>
+        </group>
+      </funblock>
+      <funblock name="NV_PAR_I" flag="0">
+        <comment>Zapis do pamięci nieulotnej (FLASH) wartości typu INT</comment>
+        <vars>
+          <var_in_out name="INOUT" type="$DEFAULT.INT" flag="64">
+            <comment>Zmienna do zapisu/odczytu</comment>
+          </var_in_out>
+          <var_input name="LCK" type="$DEFAULT.BOOL" flag="32784" initval="FALSE">
+            <comment>Blokada zapisu</comment>
+          </var_input>
+          <var_output name="STA" type="$DEFAULT.BOOL" flag="32" >
+            <comment>Status</comment>
+          </var_output>
+          <var name="OLD_IN" type="$DEFAULT.INT" flag="00000000" />
+          <var name="RESTART" type="$DEFAULT.BOOL" flag="00000000" />
+          <var name="?IF?B00F1" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?I?FLASH_READ_INT00F4" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B00F6" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B00FA" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?L?CST00FC" type="$DEFAULT.WORD" flag="1048576" />
+          <var name="?F?GET_STATUS_WORD100FD" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?F?AND00FE" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?I?FLASH_WRITE_INT0100" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0102" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0106" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?F?$DEFAULT_NE0108" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?I?FLASH_WRITE_INT010A" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B010C" type="$DEFAULT.BOOL" flag="2097152" />
+        </vars>
+        <init>
+          <![CDATA[:?$DEFAULT.NV_PAR_I?INIT 
+$VMSYS.MCD STA, #/01, #/00
+$VMSYS.MCD OLD_IN, #/02, #/0000
+$VMSYS.MCD RESTART, #/01, #/01
+$VMSYS.MCD ?L?CST00FC, #/02, #/0800
+$VMSYS.RETURN 
+]]>
+        </init>
+        <code>
+          <![CDATA[:?$DEFAULT.NV_PAR_I?CODE 
+$DEFAULT.OR ?IF?B00F1, LCK, RESTART
+$VMSYS.JZ ?IF?B00F1, :?$DEFAULT.NV_PAR_IIF?B00F2
+$VMSYS.FLASH_READ_ANY ?I?FLASH_READ_INT00F4, INOUT, #/0200
+$DEFAULT.NOT STA, ?I?FLASH_READ_INT00F4
+$DEFAULT.NOT ?IF?B00F6, STA
+$VMSYS.JZ ?IF?B00F6, :?$DEFAULT.NV_PAR_IIF?B00F7
+$VMSYS.MEMCP OLD_IN, INOUT, #/0200
+$VMSYS.JMP :?$DEFAULT.NV_PAR_IIF?E00F9
+:?$DEFAULT.NV_PAR_IIF?B00F7 
+$DEFAULT.GET_STATUS_WORD1 ?F?GET_STATUS_WORD100FD
+$DEFAULT.AND ?F?AND00FE, ?F?GET_STATUS_WORD100FD, ?L?CST00FC
+$DEFAULT.EQ ?IF?B00FA, ?F?AND00FE, ?L?CST00FC
+$VMSYS.JZ ?IF?B00FA, :?$DEFAULT.NV_PAR_IIF?B00FB
+$VMSYS.FLASH_WRITE_ANY ?I?FLASH_WRITE_INT0100, INOUT, #/0200
+$DEFAULT.NOT STA, ?I?FLASH_WRITE_INT0100
+$DEFAULT.NOT ?IF?B0102, STA
+$VMSYS.JZ ?IF?B0102, :?$DEFAULT.NV_PAR_IIF?B0103
+$VMSYS.MEMCP OLD_IN, INOUT, #/0200
+:?$DEFAULT.NV_PAR_IIF?B0103 
+:?$DEFAULT.NV_PAR_IIF?B00FB 
+:?$DEFAULT.NV_PAR_IIF?E00F9 
+$VMSYS.MCD RESTART, #/01, #/00
+$VMSYS.JMP :?$DEFAULT.NV_PAR_IIF?E0105
+:?$DEFAULT.NV_PAR_IIF?B00F2 
+$DEFAULT.NE ?F?$DEFAULT_NE0108, INOUT, OLD_IN
+$DEFAULT.OR ?IF?B0106, ?F?$DEFAULT_NE0108, STA
+$VMSYS.JZ ?IF?B0106, :?$DEFAULT.NV_PAR_IIF?B0107
+$VMSYS.FLASH_WRITE_ANY ?I?FLASH_WRITE_INT010A, INOUT, #/0200
+$DEFAULT.NOT STA, ?I?FLASH_WRITE_INT010A
+$DEFAULT.NOT ?IF?B010C, STA
+$VMSYS.JZ ?IF?B010C, :?$DEFAULT.NV_PAR_IIF?B010D
+$VMSYS.MEMCP OLD_IN, INOUT, #/0200
+:?$DEFAULT.NV_PAR_IIF?B010D 
+:?$DEFAULT.NV_PAR_IIF?B0107 
+:?$DEFAULT.NV_PAR_IIF?E0105 
+$VMSYS.RETURN 
+]]>
+        </code>
+        <group>
+          <item value="13" mask="0"/>
+        </group>
+      </funblock>
+      <funblock name="NV_PAR_R" flag="0">
+        <comment>Zapis do pamięci nieulotnej (FLASH) wartości typu REAL</comment>
+        <vars>
+          <var_in_out name="INOUT" type="$DEFAULT.REAL" flag="64">
+            <comment>Zmienna do zapisu/odczytu</comment>
+          </var_in_out>
+          <var_input name="LCK" type="$DEFAULT.BOOL" flag="32784" initval="FALSE">
+            <comment>Blokada zapisu</comment>
+          </var_input>
+          <var_output name="STA" type="$DEFAULT.BOOL" flag="32" >
+            <comment>Status</comment>
+          </var_output>
+          <var name="OLD_IN" type="$DEFAULT.REAL" flag="00000000" />
+          <var name="RESTART" type="$DEFAULT.BOOL" flag="00000000" />
+          <var name="?IF?B010F" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?I?FLASH_READ_REAL0112" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0114" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0118" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?L?CST011A" type="$DEFAULT.WORD" flag="1048576" />
+          <var name="?F?GET_STATUS_WORD1011B" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?F?AND011C" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?I?FLASH_WRITE_REAL011E" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0120" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0124" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?F?$DEFAULT_NE0126" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?I?FLASH_WRITE_REAL0128" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B012A" type="$DEFAULT.BOOL" flag="2097152" />
+        </vars>
+        <init>
+          <![CDATA[:?$DEFAULT.NV_PAR_R?INIT 
+$VMSYS.MCD STA, #/01, #/00
+$VMSYS.MCD OLD_IN, #/04, #/00000000
+$VMSYS.MCD RESTART, #/01, #/01
+$VMSYS.MCD ?L?CST011A, #/02, #/0800
+$VMSYS.RETURN ]]>
+        </init>
+        <code>
+          <![CDATA[:?$DEFAULT.NV_PAR_R?CODE 
+$DEFAULT.OR ?IF?B010F, LCK, RESTART
+$VMSYS.JZ ?IF?B010F, :?$DEFAULT.NV_PAR_RIF?B0110
+$VMSYS.FLASH_READ_ANY ?I?FLASH_READ_REAL0112, INOUT, #/0400
+$DEFAULT.NOT STA, ?I?FLASH_READ_REAL0112
+$DEFAULT.NOT ?IF?B0114, STA
+$VMSYS.JZ ?IF?B0114, :?$DEFAULT.NV_PAR_RIF?B0115
+$VMSYS.MEMCP OLD_IN, INOUT, #/0400
+$VMSYS.JMP :?$DEFAULT.NV_PAR_RIF?E0117
+:?$DEFAULT.NV_PAR_RIF?B0115 
+$DEFAULT.GET_STATUS_WORD1 ?F?GET_STATUS_WORD1011B
+$DEFAULT.AND ?F?AND011C, ?F?GET_STATUS_WORD1011B, ?L?CST011A
+$DEFAULT.EQ ?IF?B0118, ?F?AND011C, ?L?CST011A
+$VMSYS.JZ ?IF?B0118, :?$DEFAULT.NV_PAR_RIF?B0119
+$VMSYS.FLASH_WRITE_ANY ?I?FLASH_WRITE_REAL011E, INOUT, #/0400
+$DEFAULT.NOT STA, ?I?FLASH_WRITE_REAL011E
+$DEFAULT.NOT ?IF?B0120, STA
+$VMSYS.JZ ?IF?B0120, :?$DEFAULT.NV_PAR_RIF?B0121
+$VMSYS.MEMCP OLD_IN, INOUT, #/0400
+:?$DEFAULT.NV_PAR_RIF?B0121 
+:?$DEFAULT.NV_PAR_RIF?B0119 
+:?$DEFAULT.NV_PAR_RIF?E0117 
+$VMSYS.MCD RESTART, #/01, #/00
+$VMSYS.JMP :?$DEFAULT.NV_PAR_RIF?E0123
+:?$DEFAULT.NV_PAR_RIF?B0110 
+$DEFAULT.NE ?F?$DEFAULT_NE0126, INOUT, OLD_IN
+$DEFAULT.OR ?IF?B0124, ?F?$DEFAULT_NE0126, STA
+$VMSYS.JZ ?IF?B0124, :?$DEFAULT.NV_PAR_RIF?B0125
+$VMSYS.FLASH_WRITE_ANY ?I?FLASH_WRITE_REAL0128, INOUT, #/0400
+$DEFAULT.NOT STA, ?I?FLASH_WRITE_REAL0128
+$DEFAULT.NOT ?IF?B012A, STA
+$VMSYS.JZ ?IF?B012A, :?$DEFAULT.NV_PAR_RIF?B012B
+$VMSYS.MEMCP OLD_IN, INOUT, #/0400
+:?$DEFAULT.NV_PAR_RIF?B012B 
+:?$DEFAULT.NV_PAR_RIF?B0125 
+:?$DEFAULT.NV_PAR_RIF?E0123 
+$VMSYS.RETURN 
+]]>
+        </code>
+        <group>
+          <item value="13" mask="0"/>
+        </group>
+      </funblock>
+      <funblock name="NV_PAR_B" flag="0">
+        <comment>Zapis do pamięci nieulotnej (FLASH) wartości typu BOOL</comment>
+        <vars>
+          <var_in_out name="INOUT" type="$DEFAULT.BOOL" flag="64">
+            <comment>Zmienna do zapisu/odczytu</comment>
+          </var_in_out>
+          <var_input name="LCK" type="$DEFAULT.BOOL" flag="32784" initval="FALSE">
+            <comment>Blokada zapisu</comment>
+          </var_input>
+          <var_output name="STA" type="$DEFAULT.BOOL" flag="32" >
+            <comment>Status</comment>
+          </var_output>
+          <var name="OLD_IN" type="$DEFAULT.BOOL" flag="00000000" />
+          <var name="RESTART" type="$DEFAULT.BOOL" flag="00000000" />
+          <var name="?IF?B012D" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?I?FLASH_READ_BOOL0130" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0132" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0136" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?L?CST0138" type="$DEFAULT.WORD" flag="1048576" />
+          <var name="?F?GET_STATUS_WORD10139" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?F?AND013A" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?I?FLASH_WRITE_BOOL013C" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B013E" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0142" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?F?$DEFAULT_NE0144" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?I?FLASH_WRITE_BOOL0146" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0148" type="$DEFAULT.BOOL" flag="2097152" />
+        </vars>
+        <init>
+          <![CDATA[:?$DEFAULT.NV_PAR_B?INIT 
+$VMSYS.MCD STA, #/01, #/00
+$VMSYS.MCD OLD_IN, #/01, #/00
+$VMSYS.MCD RESTART, #/01, #/01
+$VMSYS.MCD ?L?CST0138, #/02, #/0800
+$VMSYS.RETURN 
+]]>
+        </init>
+        <code>
+          <![CDATA[:?$DEFAULT.NV_PAR_B?CODE 
+$DEFAULT.OR ?IF?B012D, LCK, RESTART
+$VMSYS.JZ ?IF?B012D, :?$DEFAULT.NV_PAR_BIF?B012E
+$VMSYS.FLASH_READ_ANY ?I?FLASH_READ_BOOL0130, INOUT, #/0100
+$DEFAULT.NOT STA, ?I?FLASH_READ_BOOL0130
+$DEFAULT.NOT ?IF?B0132, STA
+$VMSYS.JZ ?IF?B0132, :?$DEFAULT.NV_PAR_BIF?B0133
+$VMSYS.MEMCP OLD_IN, INOUT, #/0100
+$VMSYS.JMP :?$DEFAULT.NV_PAR_BIF?E0135
+:?$DEFAULT.NV_PAR_BIF?B0133 
+$DEFAULT.GET_STATUS_WORD1 ?F?GET_STATUS_WORD10139
+$DEFAULT.AND ?F?AND013A, ?F?GET_STATUS_WORD10139, ?L?CST0138
+$DEFAULT.EQ ?IF?B0136, ?F?AND013A, ?L?CST0138
+$VMSYS.JZ ?IF?B0136, :?$DEFAULT.NV_PAR_BIF?B0137
+$VMSYS.FLASH_WRITE_ANY ?I?FLASH_WRITE_BOOL013C, INOUT, #/0100
+$DEFAULT.NOT STA, ?I?FLASH_WRITE_BOOL013C
+$DEFAULT.NOT ?IF?B013E, STA
+$VMSYS.JZ ?IF?B013E, :?$DEFAULT.NV_PAR_BIF?B013F
+$VMSYS.MEMCP OLD_IN, INOUT, #/0100
+:?$DEFAULT.NV_PAR_BIF?B013F 
+:?$DEFAULT.NV_PAR_BIF?B0137 
+:?$DEFAULT.NV_PAR_BIF?E0135 
+$VMSYS.MCD RESTART, #/01, #/00
+$VMSYS.JMP :?$DEFAULT.NV_PAR_BIF?E0141
+:?$DEFAULT.NV_PAR_BIF?B012E 
+$DEFAULT.NE ?F?$DEFAULT_NE0144, INOUT, OLD_IN
+$DEFAULT.OR ?IF?B0142, ?F?$DEFAULT_NE0144, STA
+$VMSYS.JZ ?IF?B0142, :?$DEFAULT.NV_PAR_BIF?B0143
+$VMSYS.FLASH_WRITE_ANY ?I?FLASH_WRITE_BOOL0146, INOUT, #/0100
+$DEFAULT.NOT STA, ?I?FLASH_WRITE_BOOL0146
+$DEFAULT.NOT ?IF?B0148, STA
+$VMSYS.JZ ?IF?B0148, :?$DEFAULT.NV_PAR_BIF?B0149
+$VMSYS.MEMCP OLD_IN, INOUT, #/0100
+:?$DEFAULT.NV_PAR_BIF?B0149 
+:?$DEFAULT.NV_PAR_BIF?B0143 
+:?$DEFAULT.NV_PAR_BIF?E0141 
+$VMSYS.RETURN 
+]]>
+        </code>
+        <group>
+          <item value="13" mask="0"/>
+        </group>
+      </funblock>
+      <funblock name="NV_PAR_T" flag="0">
+        <comment>Zapis do pamięci nieulotnej (FLASH) wartości typu TIME</comment>
+        <vars>
+          <var_in_out name="INOUT" type="$DEFAULT.TIME" flag="64">
+            <comment>Zmienna do zapisu/odczytu</comment>
+          </var_in_out>
+          <var_input name="LCK" type="$DEFAULT.BOOL" flag="32784" initval="FALSE">
+            <comment>Blokada zapisu</comment>
+          </var_input>
+          <var_output name="STA" type="$DEFAULT.BOOL" flag="32" >
+            <comment>Status</comment>
+          </var_output>
+          <var name="OLD_IN" type="$DEFAULT.TIME" flag="00000000" />
+          <var name="RESTART" type="$DEFAULT.BOOL" flag="00000000" />
+          <var name="?IF?B014B" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?I?FLASH_READ_TIME014E" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0150" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0154" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?L?CST0156" type="$DEFAULT.WORD" flag="1048576" />
+          <var name="?F?GET_STATUS_WORD10157" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?F?AND0158" type="$DEFAULT.WORD" flag="2097152" />
+          <var name="?I?FLASH_WRITE_TIME015A" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B015C" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0160" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?F?$DEFAULT_NE0162" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?I?FLASH_WRITE_TIME0164" type="$DEFAULT.BOOL" flag="2097152" />
+          <var name="?IF?B0166" type="$DEFAULT.BOOL" flag="2097152" />
+        </vars>
+        <init>
+          <![CDATA[:?$DEFAULT.NV_PAR_T?INIT 
+$VMSYS.MCD STA, #/01, #/00
+$VMSYS.MCD OLD_IN, #/04, #/00000000
+$VMSYS.MCD RESTART, #/01, #/01
+$VMSYS.MCD ?L?CST0156, #/02, #/0800
+$VMSYS.RETURN 
+]]>
+        </init>
+        <code>
+          <![CDATA[:?$DEFAULT.NV_PAR_T?CODE 
+$DEFAULT.OR ?IF?B014B, LCK, RESTART
+$VMSYS.JZ ?IF?B014B, :?$DEFAULT.NV_PAR_TIF?B014C
+$VMSYS.FLASH_READ_ANY ?I?FLASH_READ_TIME014E, INOUT, #/0400
+$DEFAULT.NOT STA, ?I?FLASH_READ_TIME014E
+$DEFAULT.NOT ?IF?B0150, STA
+$VMSYS.JZ ?IF?B0150, :?$DEFAULT.NV_PAR_TIF?B0151
+$VMSYS.MEMCP OLD_IN, INOUT, #/0400
+$VMSYS.JMP :?$DEFAULT.NV_PAR_TIF?E0153
+:?$DEFAULT.NV_PAR_TIF?B0151 
+$DEFAULT.GET_STATUS_WORD1 ?F?GET_STATUS_WORD10157
+$DEFAULT.AND ?F?AND0158, ?F?GET_STATUS_WORD10157, ?L?CST0156
+$DEFAULT.EQ ?IF?B0154, ?F?AND0158, ?L?CST0156
+$VMSYS.JZ ?IF?B0154, :?$DEFAULT.NV_PAR_TIF?B0155
+$VMSYS.FLASH_WRITE_ANY ?I?FLASH_WRITE_TIME015A, INOUT, #/0400
+$DEFAULT.NOT STA, ?I?FLASH_WRITE_TIME015A
+$DEFAULT.NOT ?IF?B015C, STA
+$VMSYS.JZ ?IF?B015C, :?$DEFAULT.NV_PAR_TIF?B015D
+$VMSYS.MEMCP OLD_IN, INOUT, #/0400
+:?$DEFAULT.NV_PAR_TIF?B015D 
+:?$DEFAULT.NV_PAR_TIF?B0155 
+:?$DEFAULT.NV_PAR_TIF?E0153 
+$VMSYS.MCD RESTART, #/01, #/00
+$VMSYS.JMP :?$DEFAULT.NV_PAR_TIF?E015F
+:?$DEFAULT.NV_PAR_TIF?B014C 
+$DEFAULT.NE ?F?$DEFAULT_NE0162, INOUT, OLD_IN
+$DEFAULT.OR ?IF?B0160, ?F?$DEFAULT_NE0162, STA
+$VMSYS.JZ ?IF?B0160, :?$DEFAULT.NV_PAR_TIF?B0161
+$VMSYS.FLASH_WRITE_ANY ?I?FLASH_WRITE_TIME0164, INOUT, #/0400
+$DEFAULT.NOT STA, ?I?FLASH_WRITE_TIME0164
+$DEFAULT.NOT ?IF?B0166, STA
+$VMSYS.JZ ?IF?B0166, :?$DEFAULT.NV_PAR_TIF?B0167
+$VMSYS.MEMCP OLD_IN, INOUT, #/0400
+:?$DEFAULT.NV_PAR_TIF?B0167 
+:?$DEFAULT.NV_PAR_TIF?B0161 
+:?$DEFAULT.NV_PAR_TIF?E015F 
+$VMSYS.RETURN 
+]]>
+        </code>
+        <group>
+          <item value="13" mask="0"/>
+        </group>
+      </funblock>
+    </FUN_BLOCKS>
+  </VMSPEC>
+</CPDEV>

@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CPDEV version="1.0">
+  <VMSPEC>
+    <USER>
+      <title>Functions for LREAL type support</title>
+      <version>2.6.0</version>
+      <extraver/>
+      <builddate>2009.07-13 21:24</builddate>
+      <exportdate>#now</exportdate>
+    </USER>
+    <FUNCTIONS>
+      <function name="REAL_TO_LREAL" vmcode="190D" return="LREAL">
+        <args>
+          <arg no="0" name="INP" type="REAL"/>
+        </args>
+        <comment>Converts REAL value to LREAL value</comment>
+      </function>
+      <function name="LREAL_TO_REAL" vmcode="190E" return="REAL">
+        <args>
+          <arg no="0" name="INP" type="LREAL"/>
+        </args>
+        <comment>Converts LREAL value to REAL value</comment>
+      </function>
+      <function name="LINT_TO_LREAL" vmcode="190F" return="LREAL">
+        <args>
+          <arg no="0" name="INP" type="LINT"/>
+        </args>
+        <comment>Converts LREAL value to REAL value</comment>
+      </function>
+      <function name="ADD" vmcode="01*A" return="LREAL">
+        <args>
+          <arg no="*" name="summand*" type="LREAL"/>
+        </args>
+        <comment>Adds two or more LREAL operands</comment>
+      </function>
+      <function name="SUB" vmcode="020A" return="LREAL">
+        <args>
+          <arg no="0" name="minuend" type="LREAL"/>
+          <arg no="1" name="subtrahend" type="LREAL"/>
+        </args>
+        <comment>Calculates subtract between first and second argument</comment>
+      </function>
+      <function name="MUL" vmcode="03*A" return="LREAL">
+        <args>
+          <arg no="*" name="factor*" type="LREAL"/>
+        </args>
+        <comment>Multiplies two or more LREAL factors</comment>
+      </function>
+      <function name="DIV" vmcode="040A" return="LREAL">
+        <args>
+          <arg no="0" name="dividend" type="LREAL"/>
+          <arg no="1" name="divisor" type="LREAL"/>
+        </args>
+        <comment>Divides dividend by divisor</comment>
+      </function>
+      <function name="NEG" vmcode="0509" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Changes sign of the signed value</comment>
+      </function>
+      <function name="EXPT" vmcode="0608" return="LREAL">
+        <args>
+          <arg no="0" name="X" type="LREAL"/>
+          <arg no="1" name="Y" type="LREAL"/>
+        </args>
+        <comment>Returns X raised to the specified power (Y)</comment>
+        <group>
+          <item value="1" mask="0"/>
+        </group>
+      </function>
+      <function name="ABS" vmcode="061A" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Returns the absolute value of a specified number</comment>
+      </function>
+      <function name="SQRT" vmcode="0621" return="LREAL">
+        <args>
+          <arg no="0" name="D" type="LREAL"/>
+        </args>
+        <comment>Returns the square root of a specified number</comment>
+      </function>
+      <function name="LN" vmcode="0623" return="LREAL">
+        <args>
+          <arg no="0" name="D" type="LREAL"/>
+        </args>
+        <comment>Returns the natural (base e) logarithm of a specified number</comment>
+      </function>
+      <function name="LOG" vmcode="0625" return="LREAL">
+        <args>
+          <arg no="0" name="D" type="LREAL"/>
+        </args>
+        <comment>Returns the base 10 logarithm of a specified number</comment>
+      </function>
+      <function name="EXP" vmcode="0627" return="LREAL">
+        <args>
+          <arg no="0" name="Y" type="LREAL"/>
+        </args>
+        <comment>Returns e raised to the specified power (Y)</comment>
+      </function>
+      <function name="SIN" vmcode="0629" return="LREAL">
+        <args>
+          <arg no="0" name="A" type="LREAL">
+            <comment>An angle, measured in radians</comment>
+          </arg>
+        </args>
+        <comment>Returns the sine of the specified angle</comment>
+      </function>
+      <function name="COS" vmcode="062B" return="LREAL">
+        <args>
+          <arg no="0" name="A" type="LREAL">
+            <comment>An angle, measured in radians</comment>
+          </arg>
+        </args>
+        <comment>Returns the cosine of the specified angle</comment>
+      </function>
+      <function name="TAN" vmcode="062D" return="LREAL">
+        <args>
+          <arg no="0" name="A" type="LREAL">
+            <comment>An angle, measured in radians</comment>
+          </arg>
+        </args>
+        <comment>Returns the tangent of the specified angle</comment>
+      </function>
+      <function name="ASIN" vmcode="062F" return="LREAL">
+        <args>
+          <arg no="0" name="D" type="LREAL">
+            <comment>A number representing a sine, where -1 &lt;= D &lt;= 1</comment>
+          </arg>
+        </args>
+        <comment>Returns the angle PHI (measured in radians, such that -PI/2 &lt;= PHI &lt;= PI/2) whose sine is the specified number.</comment>
+      </function>
+      <function name="ACOS" vmcode="0631" return="LREAL">
+        <args>
+          <arg no="0" name="D" type="LREAL">
+            <comment>A number representing a sine, where -1 &lt;= D &lt;= 1</comment>
+          </arg>
+        </args>
+        <comment>Returns the angle PHI (measured in radians, such that 0 &lt;= PHI &lt;= PI) whose cosine is the specified number.</comment>
+      </function>
+      <function name="ATAN" vmcode="0633" return="LREAL">
+        <args>
+          <arg no="0" name="D" type="LREAL">
+            <comment>A number representing a tangent</comment>
+          </arg>
+        </args>
+        <comment>Returns the angle PHI (measured in radians, such that -PI/2 &lt;= PHI &lt;= PI/2) whose tangent is the specified number.</comment>
+      </function>
+      <function name="TRUNC" vmcode="0635" return="LINT">
+        <args>
+          <arg no="0" name="D" type="LREAL"/>
+        </args>
+        <comment>Calculates the integral part of LREAL number to LINT value</comment>
+      </function>
+      <function name="ROUND" vmcode="0637" return="LINT">
+        <args>
+          <arg no="0" type="LREAL"/>
+        </args>
+        <comment>Rounds a value to the nearest integer</comment>
+      </function>
+      <function name="SEL" vmcode="0C0A" return="LREAL">
+        <args>
+          <arg no="0" name="selector" type="BOOL"/>
+          <arg no="1" name="case_false" type="LREAL"/>
+          <arg no="2" name="case_true"  type="LREAL"/>
+        </args>
+        <comment>Selects one of two arguments</comment>
+      </function>
+      <function name="LIMIT" vmcode="0D0A" return="LREAL">
+        <args>
+          <arg no="0" name="value" type="LREAL"/>
+          <arg no="1" name="min" type="LREAL"/>
+          <arg no="2" name="max" type="LREAL"/>
+        </args>
+        <comment>Limits the value between two bounds</comment>
+      </function>
+      <function name="MAX" vmcode="0E0A" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Selects maximum between two values</comment>
+      </function>
+      <function name="MIN" vmcode="0F0A" return="LREAL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Selects minimum between two values</comment>
+      </function>
+      <function name="GT" vmcode="100A" return="BOOL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Checks if first argument is grater than second</comment>
+      </function>
+      <function name="GE" vmcode="110A" return="BOOL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Checks if first argument is grater or equal than second</comment>
+      </function>
+      <function name="EQ" vmcode="120A" return="BOOL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Checks if first argument is equal to second</comment>
+      </function>
+      <function name="LE" vmcode="130A" return="BOOL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Checks if first argument is less or equal than second</comment>
+      </function>
+      <function name="LT" vmcode="140A" return="BOOL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Checks if first argument is less than second</comment>
+      </function>
+      <function name="NE" vmcode="150A" return="BOOL">
+        <args>
+          <arg no="0" type="LREAL"/>
+          <arg no="1" type="LREAL"/>
+        </args>
+        <comment>Checks if first argument is not equal to second</comment>
+      </function>
+      <function name="MUX" vmcode="16*A" return="LREAL">
+        <args>
+          <arg no="0" type="INT"/>
+          <arg no="*" type="LREAL"/>
+        </args>
+        <comment>Selects one of the values</comment>
+      </function>
+    </FUNCTIONS>
+    <INLINE>
+      <function name="LREAL_TO_LINT" return="LINT">
+        <args>
+          <arg no="0" name="V" type="LREAL"/>
+        </args>
+        <comment>Truncates LREAL parameter to LINT</comment>
+        <vars>
+        </vars>
+        <code>
+          <![CDATA[  TRUNC/0635 LREAL_TO_LINT, V ]]>
+        </code>
+        <group>
+          <item value="3" mask="0"/>
+        </group>
+      </function>
+    </INLINE>
+    <CONVERSIONS>
+      <conv from="REAL" to="LREAL" method="single">
+        <funcall param="REAL">REAL_TO_LREAL</funcall>
+      </conv>
+      <conv from="INT" to="LREAL" method="multiple">
+        <funcall param="INT">INT_TO_REAL</funcall>
+        <funcall param="REAL">REAL_TO_LREAL</funcall>
+      </conv>
+      <conv from="DINT" to="LREAL" method="multiple">
+        <funcall param="DINT">DINT_TO_REAL</funcall>
+        <funcall param="REAL">REAL_TO_LREAL</funcall>
+      </conv>
+      <conv from="LINT" to="LREAL" method="single">
+        <funcall param="LINT">LINT_TO_LREAL</funcall>
+      </conv>      
+    </CONVERSIONS>
+  </VMSPEC>
+</CPDEV>

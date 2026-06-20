@@ -71,7 +71,10 @@ fn set_input_writes_through_to_vm() {
     engine.run_scans(25);
     let watch = engine.watch();
     // ONOF reads back exactly what we wrote; the run stays well-formed.
-    assert!(watch.contains(&"ONOF = TRUE".to_owned()), "watch: {watch:#?}");
+    assert!(
+        watch.contains(&"ONOF = TRUE".to_owned()),
+        "watch: {watch:#?}"
+    );
     assert_eq!(watch.len(), 5);
 }
 

@@ -27,6 +27,18 @@ pub use engine::ScanRuntimeEngine;
 pub use timers::{Tof, Ton, Tp};
 pub use value::Value;
 
+/// The Structured Text AST and its parser, shared with code-generation backends
+/// (e.g. `plc_cpdev_backend`). [`ast::build_program`] parses ST source into an
+/// [`ast::Program`] (declarations + a statement tree) that both the interpreter
+/// and the backends consume.
+pub mod ast {
+    pub use crate::interp::{
+        BinOp, CallArg, CaseLabel, Expr, Program, Stmt, StmtKind, UnOp, Unit, VarDecl,
+        build_program, build_units,
+    };
+    pub use plc_syntax::PouKind;
+}
+
 /// The phase of a single scan cycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScanPhase {

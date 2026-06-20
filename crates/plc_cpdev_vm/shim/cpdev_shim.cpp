@@ -13,9 +13,15 @@
 #include "vm_variable.h"
 
 #include <cstdio>
-#include <fcntl.h>
-#include <unistd.h>
 #include <vector>
+// POSIX/Windows headers for the StdoutSilencer fd redirection below.
+#if defined(_WIN32)
+#include <fcntl.h> // _O_WRONLY
+#include <io.h>    // _dup, _dup2, _open, _close
+#else
+#include <fcntl.h>  // O_WRONLY
+#include <unistd.h> // dup, dup2, open, close, STDOUT_FILENO
+#endif
 
 struct CpdevVm {
     VMLinux vm;
@@ -43,18 +49,32 @@ struct StdoutSilencer {
     int saved = -1;
     StdoutSilencer() {
         fflush(stdout);
+#if defined(_WIN32)
+        saved = _dup(_fileno(stdout));
+        int devnull = _open("NUL", _O_WRONLY);
+        if (devnull >= 0) {
+            _dup2(devnull, _fileno(stdout));
+            _close(devnull);
+        }
+#else
         saved = dup(STDOUT_FILENO);
         int devnull = open("/dev/null", O_WRONLY);
         if (devnull >= 0) {
             dup2(devnull, STDOUT_FILENO);
             close(devnull);
         }
+#endif
     }
     ~StdoutSilencer() {
         if (saved >= 0) {
             fflush(stdout);
+#if defined(_WIN32)
+            _dup2(saved, _fileno(stdout));
+            _close(saved);
+#else
             dup2(saved, STDOUT_FILENO);
             close(saved);
+#endif
         }
     }
 };

@@ -37,8 +37,8 @@ pub struct CpdevVm {
 unsafe extern "C" {
     fn cpdev_open() -> *mut CpdevVm;
     fn cpdev_free(vm: *mut CpdevVm);
-    fn cpdev_load_xcp_file(vm: *mut CpdevVm, path: *const c_char) -> i32;
-    fn cpdev_load_xcp(vm: *mut CpdevVm, code: *const u8, len: i32) -> i32;
+    fn cpdev_load_xcp_file(vm: *mut CpdevVm, path: *const c_char, datasize: i32) -> i32;
+    fn cpdev_load_xcp(vm: *mut CpdevVm, code: *const u8, len: i32, datasize: i32) -> i32;
     fn cpdev_load_dcp(vm: *mut CpdevVm, path: *const c_char) -> i32;
     fn cpdev_var(vm: *mut CpdevVm, name: *const c_char) -> *mut c_void;
     fn cpdev_var_size(var: *mut c_void) -> i32;
@@ -112,9 +112,20 @@ impl IecType {
             Self::Real => Some(text.parse::<f32>().ok()?.to_le_bytes().to_vec()),
             Self::Lreal => Some(text.parse::<f64>().ok()?.to_le_bytes().to_vec()),
             Self::Str => {
-                let mut bytes = text.as_bytes().to_vec();
-                bytes.resize(size, 0);
-                Some(bytes)
+                // Build the inline CPDev STRING image: [length][chars_size]
+                // [padding:2][chars padded to capacity]. `size` is 4 + capacity.
+                if size < 4 {
+                    return None;
+                }
+                let capacity = (size - 4).min(255);
+                let chars = text.as_bytes();
+                let length = chars.len().min(capacity);
+                let mut buf = vec![0u8; size];
+                buf[0] = length as u8;
+                buf[1] = capacity as u8;
+                // buf[2..4] padding stays zero.
+                buf[4..4 + length].copy_from_slice(&chars[..length]);
+                Some(buf)
             }
             Self::Unknown => None,
         }
@@ -152,8 +163,16 @@ impl IecType {
                 time_to_string(u64::from_le_bytes(buf) as i64)
             }
             Self::Str => {
-                let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
-                String::from_utf8_lossy(&bytes[..end]).into_owned()
+                // CPDev on-data STRING layout: [length:1][chars_size:1][padding:2]
+                // followed by the inline characters (see vm/vmlib/vmc_string.h
+                // getSTRING). The display value is the first `length` characters.
+                if bytes.len() < 4 {
+                    return String::new();
+                }
+                let length = bytes[0] as usize;
+                let chars = &bytes[4..];
+                let end = length.min(chars.len());
+                String::from_utf8_lossy(&chars[..end]).into_owned()
             }
             Self::Unknown => {
                 // No type info: show raw little-endian hex so nothing is hidden.
@@ -253,6 +272,27 @@ fn parse_dcp_vars(xml: &str) -> Vec<DcpVar> {
         }
     }
     vars
+}
+
+/// Read the program's data-segment size (bytes) from the `.DCP` data
+/// `MEMORY_MAP`: `<MEMORY_MAP Type="data"><file ... Size="N">`. Returns 0 when
+/// the sidecar is missing or has no data map (the shim then floors at the VM
+/// default), so this can never make loading fail on its own.
+fn dcp_data_size(dcp_path: &Path) -> i32 {
+    let Ok(xml) = std::fs::read_to_string(dcp_path) else {
+        return 0;
+    };
+    // Find the `Type="data"` MEMORY_MAP, then the `Size="N"` of its `<file>`.
+    let Some(data_at) = xml.find("Type=\"data\"") else {
+        return 0;
+    };
+    let after = &xml[data_at..];
+    let Some(size_at) = after.find("Size=\"") else {
+        return 0;
+    };
+    let digits = &after[size_at + "Size=\"".len()..];
+    let end = digits.find('"').unwrap_or(0);
+    digits[..end].parse::<i32>().unwrap_or(0)
 }
 
 /// Read a `key="value"` attribute out of an XML start-tag's attribute text.
@@ -406,9 +446,10 @@ impl ExecutionEngine for XcpEngine {
     fn load(&mut self, document: &SourceDocument) -> Result<(), Vec<Diagnostic>> {
         let xcp_path = uri_to_path(document.uri());
         self.reset()?;
+        let datasize = dcp_data_size(&xcp_path.with_extension("dcp"));
         let xcp_c = path_to_cstring(&xcp_path)?;
         // SAFETY: vm non-null (reset ran); xcp_c is a valid NUL-terminated path.
-        let rc = unsafe { cpdev_load_xcp_file(self.vm, xcp_c.as_ptr()) };
+        let rc = unsafe { cpdev_load_xcp_file(self.vm, xcp_c.as_ptr(), datasize) };
         if rc != 0 {
             return Err(err(
                 "E_XCP_LOAD",
@@ -423,11 +464,12 @@ impl ExecutionEngine for XcpEngine {
     fn load_artifact(&mut self, bytes: &[u8], uri: &str) -> Result<(), Vec<Diagnostic>> {
         let xcp_path = uri_to_path(uri);
         self.reset()?;
+        let datasize = dcp_data_size(&xcp_path.with_extension("dcp"));
         let len = i32::try_from(bytes.len())
             .map_err(|_| err("E_XCP_TOOBIG", "XCP image exceeds 2 GiB".to_owned()))?;
         // SAFETY: vm non-null; bytes/len describe a valid readable slice that the
         // shim copies into its own buffer before returning.
-        let rc = unsafe { cpdev_load_xcp(self.vm, bytes.as_ptr(), len) };
+        let rc = unsafe { cpdev_load_xcp(self.vm, bytes.as_ptr(), len, datasize) };
         if rc != 0 {
             return Err(err(
                 "E_XCP_LOAD",

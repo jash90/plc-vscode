@@ -26,9 +26,14 @@ void cpdev_free(CpdevVm *vm);
 
 /* Load the compiled program. Either from a file path (the VM reads + copies it
  * itself) or from a byte buffer (the shim copies it into a buffer that outlives
- * the VM). Both return 0 on success, negative on error. */
-int cpdev_load_xcp_file(CpdevVm *vm, const char *path);
-int cpdev_load_xcp(CpdevVm *vm, const unsigned char *code, int len);
+ * the VM). Both return 0 on success, negative on error.
+ *
+ * `datasize` is the program's data-segment size in bytes (from the .DCP data
+ * MEMORY_MAP). It is floored at the VM's default (256) and the shim owns a
+ * heap data buffer of that size, so programs are not capped at the vendored
+ * 256-byte static buffer. Pass 0 to use the default. */
+int cpdev_load_xcp_file(CpdevVm *vm, const char *path, int datasize);
+int cpdev_load_xcp(CpdevVm *vm, const unsigned char *code, int len, int datasize);
 
 /* Load the .DCP variable map (XML). 0 on success, negative on error. */
 int cpdev_load_dcp(CpdevVm *vm, const char *path);

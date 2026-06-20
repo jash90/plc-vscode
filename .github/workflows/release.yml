@@ -26,10 +26,9 @@ jobs:
       matrix:
         include:
           # `plc_features` enables the CPDev VM (`cpdev`) in the bundled `plc` so
-          # `plc run <file>.xcp` works locally. The vendored VM is a POSIX/Linux
-          # port (unistd.h / clock_gettime), so it is enabled only on macOS +
-          # Linux; on Windows the CLI still compiles .xcp (pure Rust) but prints a
-          # clear message for `run .xcp`.
+          # `plc run <file>.xcp` works locally. Enabled on all targets: macOS +
+          # Linux use the POSIX VM port, Windows uses the upstream MSVC port
+          # (build.rs selects the platform layer by target OS).
           - os: macos-latest
             rust_target: aarch64-apple-darwin
             vsce_target: darwin-arm64
@@ -54,7 +53,7 @@ jobs:
             rust_target: x86_64-pc-windows-msvc
             vsce_target: win32-x64
             ext: ".exe"
-            plc_features: ""
+            plc_features: "--features cpdev"
           # Windows on ARM. Cross-compiled from the x64 windows-latest runner
           # (MSVC links ARM64 natively); best-effort — fail-fast: false keeps the
           # other platform VSIXs publishing if this leg ever fails.
@@ -62,7 +61,7 @@ jobs:
             rust_target: aarch64-pc-windows-msvc
             vsce_target: win32-arm64
             ext: ".exe"
-            plc_features: ""
+            plc_features: "--features cpdev"
     steps:
       - uses: actions/checkout@v4
 

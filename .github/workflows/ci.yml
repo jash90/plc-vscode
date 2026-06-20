@@ -97,7 +97,10 @@ jobs:
       - name: Clippy
         run: cargo clippy --manifest-path crates/plc_cpdev_vm/Cargo.toml --all-targets -- -D warnings
       - name: Test
-        run: cargo test --manifest-path crates/plc_cpdev_vm/Cargo.toml
+        # Single-threaded: the shim's StdoutSilencer swaps the process-wide
+        # stdout fd around the vendored VM's progress prints, which races when
+        # tests run on parallel threads (production runs one VM at a time).
+        run: cargo test --manifest-path crates/plc_cpdev_vm/Cargo.toml -- --test-threads=1
 
   # VS Code extension client checks (ubuntu only, fast feedback on every run).
   vscode:

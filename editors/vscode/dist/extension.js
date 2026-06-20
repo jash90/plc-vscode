@@ -129,6 +129,8 @@ async function activate(context) {
         await runCurrentStructuredTextFile(context, resource);
     }), vscode.commands.registerCommand('plc-vscode.debugCurrentFile', async (resource) => {
         await debugCurrentStructuredTextFile(resource);
+    }), vscode.commands.registerCommand('plc-vscode.buildCpdev', async (resource) => {
+        await compileCurrentFileToCpdev(context, resource);
     }));
     // Stepping debugger: contribute the `plc-st` debug type. The provider fills a
     // default launch config for F5-without-launch.json; the factory spawns the
@@ -195,6 +197,42 @@ async function runCurrentStructuredTextFile(context, resource) {
             }
             else {
                 await vscode.window.showErrorMessage(`PLC VS Code run failed with exit code ${code}.`);
+            }
+            resolve();
+        });
+    });
+}
+async function compileCurrentFileToCpdev(context, resource) {
+    const target = await resolveStructuredTextTarget(resource);
+    if (!target) {
+        await vscode.window.showWarningMessage('Open a Structured Text file before compiling to CPDev .xcp.');
+        return;
+    }
+    // `plc build` defaults to `--target cpdev` and writes `<file>.xcp` plus its
+    // `.dcp` sidecar next to the source. It is pure Rust, so it works on every
+    // platform regardless of whether the VM (`cpdev` feature) is bundled.
+    const invocation = resolveRunInvocation(context, 'build', [target]);
+    const command = invocation.command;
+    const args = invocation.args;
+    const spawnOptions = invocation.cwd ? { cwd: invocation.cwd } : {};
+    outputChannel?.clear();
+    outputChannel?.appendLine(`$ ${command} ${args.join(' ')}`);
+    outputChannel?.show(true);
+    await new Promise((resolve) => {
+        const child = (0, node_child_process_1.spawn)(command, args, spawnOptions);
+        child.stdout.on('data', (chunk) => outputChannel?.append(chunk.toString()));
+        child.stderr.on('data', (chunk) => outputChannel?.append(chunk.toString()));
+        child.on('error', async (error) => {
+            outputChannel?.appendLine(`Failed to compile to CPDev .xcp: ${error.message}`);
+            await vscode.window.showErrorMessage(`PLC VS Code compile failed: ${error.message}`);
+            resolve();
+        });
+        child.on('close', async (code) => {
+            if (code === 0) {
+                await vscode.window.showInformationMessage('Compiled to CPDev .xcp (with .dcp sidecar).');
+            }
+            else {
+                await vscode.window.showErrorMessage(`PLC VS Code compile failed with exit code ${code}.`);
             }
             resolve();
         });

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 mod dap;
 
-const USAGE: &str = "usage:\n  plc run <file.st> [scans]\n  plc convert <from-id> <to-id> <file>   (ids: plc languages)\n  plc debug                              (Debug Adapter Protocol over stdio)";
+const USAGE: &str = "usage:\n  plc run <file.st> [scans]\n  plc build <file.st> [--target cpdev] [-o <out.xcp>]\n  plc convert <from-id> <to-id> <file>   (ids: plc languages)\n  plc debug                              (Debug Adapter Protocol over stdio)";
 
 fn main() {
     if let Err(error) = run() {
@@ -31,6 +31,26 @@ fn run() -> Result<(), String> {
                 .and_then(|value| value.parse::<u64>().ok())
                 .unwrap_or(DEFAULT_SCANS);
             run_file(path, scans)
+        }
+        Some("build") => {
+            let path = args
+                .next()
+                .map(PathBuf::from)
+                .ok_or_else(|| USAGE.to_owned())?;
+            let mut output = None;
+            let mut target = "cpdev".to_owned();
+            while let Some(flag) = args.next() {
+                match flag.as_str() {
+                    "-o" | "--output" => output = args.next().map(PathBuf::from),
+                    "--target" => {
+                        if let Some(value) = args.next() {
+                            target = value;
+                        }
+                    }
+                    other => return Err(format!("unknown build option `{other}`\n{USAGE}")),
+                }
+            }
+            build_file(path, output, &target)
         }
         Some("convert") => {
             let from = args.next().ok_or_else(|| USAGE.to_owned())?;
@@ -72,6 +92,47 @@ fn run_file(path: PathBuf, scans: u64) -> Result<(), String> {
     let service = CompilerCore;
     let mut engine = ScanRuntimeEngine::default();
     run_with(&service, &mut engine, &document, scans)
+}
+
+/// `plc build <file.st> [--target cpdev] [-o <out.xcp>]`: compile Structured Text
+/// to a CPDev `.xcp` bytecode file plus its `.dcp` variable-map sidecar. Runs the
+/// same diagnostics gate as `run`, then emits with `plc_cpdev_backend` (pure Rust,
+/// no C++ toolchain). Run the result with `plc run <out.xcp>` (needs `--features cpdev`).
+fn build_file(path: PathBuf, output: Option<PathBuf>, target: &str) -> Result<(), String> {
+    if target != "cpdev" {
+        return Err(format!(
+            "unknown build target `{target}` (supported: cpdev)"
+        ));
+    }
+    let text = read_source(&path)?;
+    let document = SourceDocument::new(format!("file://{}", path.display()), 0, text.clone());
+
+    // Diagnostics gate, identical to `run`: don't emit bytecode for broken source.
+    let analysis = CompilerCore.analyze(&document);
+    if !analysis.diagnostics().is_empty() {
+        for diagnostic in analysis.diagnostics() {
+            eprintln!("{}: {}", diagnostic.code, diagnostic.message);
+        }
+        return Err("build failed due to diagnostics".to_owned());
+    }
+
+    let artifacts = plc_cpdev_backend::compile(&text)
+        .map_err(|error| format!("cpdev codegen failed: {error}"))?;
+
+    let xcp_path = output.unwrap_or_else(|| path.with_extension("xcp"));
+    let dcp_path = xcp_path.with_extension("dcp");
+    fs::write(&xcp_path, &artifacts.xcp)
+        .map_err(|error| format!("failed to write {}: {error}", xcp_path.display()))?;
+    fs::write(&dcp_path, &artifacts.dcp)
+        .map_err(|error| format!("failed to write {}: {error}", dcp_path.display()))?;
+
+    eprintln!(
+        "wrote {} ({} bytes) and {}",
+        xcp_path.display(),
+        artifacts.xcp.len(),
+        dcp_path.display()
+    );
+    Ok(())
 }
 
 /// `plc convert <from-id> <to-id> <file>`: transpile one PLC language into

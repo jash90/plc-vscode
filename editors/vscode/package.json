@@ -2,7 +2,7 @@
   "name": "plc-vscode",
   "displayName": "PLC VS Code",
   "description": "Structured Text / IEC 61131-3 support backed by the PLC VS Code Rust language server.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "raccoonsoftware",
   "private": true,
   "engines": {

@@ -33,24 +33,8 @@ fn run() -> Result<(), String> {
             run_file(path, scans)
         }
         Some("build") => {
-            let path = args
-                .next()
-                .map(PathBuf::from)
-                .ok_or_else(|| USAGE.to_owned())?;
-            let mut output = None;
-            let mut target = "cpdev".to_owned();
-            while let Some(flag) = args.next() {
-                match flag.as_str() {
-                    "-o" | "--output" => output = args.next().map(PathBuf::from),
-                    "--target" => {
-                        if let Some(value) = args.next() {
-                            target = value;
-                        }
-                    }
-                    other => return Err(format!("unknown build option `{other}`\n{USAGE}")),
-                }
-            }
-            build_file(path, output, &target)
+            let parsed = parse_build_args(args)?;
+            build_file(parsed.path, parsed.output, &parsed.target)
         }
         Some("convert") => {
             let from = args.next().ok_or_else(|| USAGE.to_owned())?;
@@ -74,6 +58,54 @@ fn run() -> Result<(), String> {
     }
 }
 
+/// Parsed `plc build` arguments. The path may appear before or after the flags.
+struct BuildArgs {
+    path: PathBuf,
+    output: Option<PathBuf>,
+    target: String,
+}
+
+/// Parse the arguments after `plc build`, accepting the file path in any
+/// position relative to the flags (`-o`/`--output`, `--target`). The default
+/// target is `cpdev`.
+fn parse_build_args(args: impl Iterator<Item = String>) -> Result<BuildArgs, String> {
+    let mut args = args;
+    let mut path: Option<PathBuf> = None;
+    let mut output = None;
+    let mut target = "cpdev".to_owned();
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "-o" | "--output" => {
+                output = Some(
+                    args.next()
+                        .map(PathBuf::from)
+                        .ok_or_else(|| format!("`{arg}` needs a file path\n{USAGE}"))?,
+                );
+            }
+            "--target" => {
+                target = args
+                    .next()
+                    .ok_or_else(|| format!("`--target` needs a value\n{USAGE}"))?;
+            }
+            flag if flag.starts_with('-') => {
+                return Err(format!("unknown build option `{flag}`\n{USAGE}"));
+            }
+            _ => {
+                if path.is_some() {
+                    return Err(format!("unexpected extra argument `{arg}`\n{USAGE}"));
+                }
+                path = Some(PathBuf::from(arg));
+            }
+        }
+    }
+    let path = path.ok_or_else(|| USAGE.to_owned())?;
+    Ok(BuildArgs {
+        path,
+        output,
+        target,
+    })
+}
+
 fn run_file(path: PathBuf, scans: u64) -> Result<(), String> {
     // Compiled CPDev bytecode is a binary artifact: skip the text decode and the
     // ST analysis gate, and drive the vendored VM. Built only with `--features cpdev`.
@@ -82,6 +114,21 @@ fn run_file(path: PathBuf, scans: u64) -> Result<(), String> {
         let document = SourceDocument::new(format!("file://{}", path.display()), 0, String::new());
         let mut engine = plc_cpdev_vm::XcpEngine::default();
         return plc_cli::run_artifact(&mut engine, &document, scans);
+    }
+
+    // Without the `cpdev` feature the VM is not built in, so `.xcp` bytecode
+    // cannot be executed. Detect it and explain, instead of letting the binary
+    // fall through to the Structured Text parser (which emits noise like
+    // `SYN0000: Invalid token`).
+    #[cfg(not(feature = "cpdev"))]
+    if path.extension().and_then(|ext| ext.to_str()) == Some("xcp") {
+        return Err(format!(
+            "`{}` is CPDev .xcp bytecode, which this `plc` build cannot execute \
+             (compiled without the `cpdev` feature). Compile to .xcp with \
+             `plc build` and run it on a CPDev target, or rebuild the CLI with \
+             `--features cpdev` to execute .xcp locally.",
+            path.display()
+        ));
     }
 
     let text = read_source(&path)?;
@@ -194,7 +241,47 @@ fn decode_source(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::decode_source;
+    use super::{decode_source, parse_build_args};
+    use std::path::PathBuf;
+
+    fn build(args: &[&str]) -> Result<super::BuildArgs, String> {
+        parse_build_args(args.iter().map(|s| s.to_string()))
+    }
+
+    #[test]
+    fn build_args_path_first() {
+        let a = build(&["prog.st", "--target", "cpdev"]).unwrap();
+        assert_eq!(a.path, PathBuf::from("prog.st"));
+        assert_eq!(a.target, "cpdev");
+        assert_eq!(a.output, None);
+    }
+
+    #[test]
+    fn build_args_flags_before_path() {
+        // The bug this fixes: `plc build --target cpdev prog.st` used to fail.
+        let a = build(&["--target", "cpdev", "prog.st"]).unwrap();
+        assert_eq!(a.path, PathBuf::from("prog.st"));
+        assert_eq!(a.target, "cpdev");
+    }
+
+    #[test]
+    fn build_args_output_and_default_target() {
+        let a = build(&["-o", "out.xcp", "prog.st"]).unwrap();
+        assert_eq!(a.path, PathBuf::from("prog.st"));
+        assert_eq!(a.output, Some(PathBuf::from("out.xcp")));
+        assert_eq!(a.target, "cpdev"); // default
+    }
+
+    #[test]
+    fn build_args_missing_path_errors() {
+        assert!(build(&["--target", "cpdev"]).is_err());
+    }
+
+    #[test]
+    fn build_args_unknown_flag_and_extra_positional_error() {
+        assert!(build(&["prog.st", "--bogus"]).is_err());
+        assert!(build(&["a.st", "b.st"]).is_err());
+    }
 
     #[test]
     fn decodes_utf16_le_with_bom() {

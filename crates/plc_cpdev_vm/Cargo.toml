@@ -17,3 +17,4 @@ cc = "1"
 
 [dev-dependencies]
 tempfile = "3"
+plc_cpdev_backend = { path = "../plc_cpdev_backend" }

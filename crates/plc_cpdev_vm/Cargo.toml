@@ -1,0 +1,19 @@
+[package]
+name = "plc_cpdev_vm"
+version = "0.1.0"
+edition = "2024"
+license-file = "../../LICENSE"
+publish = false
+description = "CPDev IEC 61131-3 bytecode (.XCP) virtual machine as a pluggable ExecutionEngine, via FFI."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+plc_api = { path = "../plc_api" }
+
+[build-dependencies]
+cc = "1"
+
+[dev-dependencies]
+tempfile = "3"

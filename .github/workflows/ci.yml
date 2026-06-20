@@ -72,6 +72,33 @@ jobs:
       - name: Test native backend
         run: cargo test --manifest-path crates/plc_llvm_backend/Cargo.toml
 
+  # Isolated CPDev VM job: builds/tests the crate that vendors the CPDev C++ VM
+  # (excluded from the workspace, so the lightweight jobs stay C++-free). The
+  # vendored sources are POSIX-only (clock_gettime/unistd/usleep), so this runs on
+  # Linux + macOS, never Windows. GitHub runners ship clang, so no install step.
+  #   - pull_request : ubuntu-latest ONLY -> 1x  (cheap breakage check)
+  #   - push to main : ubuntu + macos            (cross-platform, pre-merge)
+  cpdev-vm:
+    name: cpdev-vm (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ github.event_name == 'pull_request' && fromJSON('["ubuntu-latest"]') || fromJSON('["ubuntu-latest", "macos-latest"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --manifest-path crates/plc_cpdev_vm/Cargo.toml -- --check
+      - name: Clippy
+        run: cargo clippy --manifest-path crates/plc_cpdev_vm/Cargo.toml --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --manifest-path crates/plc_cpdev_vm/Cargo.toml
+
   # VS Code extension client checks (ubuntu only, fast feedback on every run).
   vscode:
     name: vscode-client

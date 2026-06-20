@@ -55,6 +55,15 @@ fn run() -> Result<(), String> {
 }
 
 fn run_file(path: PathBuf, scans: u64) -> Result<(), String> {
+    // Compiled CPDev bytecode is a binary artifact: skip the text decode and the
+    // ST analysis gate, and drive the vendored VM. Built only with `--features cpdev`.
+    #[cfg(feature = "cpdev")]
+    if path.extension().and_then(|ext| ext.to_str()) == Some("xcp") {
+        let document = SourceDocument::new(format!("file://{}", path.display()), 0, String::new());
+        let mut engine = plc_cpdev_vm::XcpEngine::default();
+        return plc_cli::run_artifact(&mut engine, &document, scans);
+    }
+
     let text = read_source(&path)?;
     let document = SourceDocument::new(format!("file://{}", path.display()), 0, text);
 

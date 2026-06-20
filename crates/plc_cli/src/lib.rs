@@ -58,6 +58,39 @@ pub fn run_with(
     Ok(())
 }
 
+/// Execute a **prebuilt artifact** (e.g. compiled bytecode) through an engine,
+/// bypassing the source-analysis gate — binary artifacts are not ST text, so
+/// there is nothing for a `LanguageService` to analyze — then print the watch
+/// snapshot. Used for `.xcp` and other compiled inputs.
+///
+/// Mirrors [`run_with`] minus the diagnostics gate; the engine surfaces its own
+/// load/build errors via `load`.
+pub fn run_artifact(
+    engine: &mut dyn ExecutionEngine,
+    document: &SourceDocument,
+    scans: u64,
+) -> Result<(), String> {
+    if let Err(diagnostics) = engine.load(document) {
+        for diagnostic in &diagnostics {
+            eprintln!("{}: {}", diagnostic.code, diagnostic.message);
+        }
+        return Err("execution failed due to diagnostics".to_owned());
+    }
+
+    engine.set_scan_interval_ms(SCAN_INTERVAL_MS);
+    engine.run_scans(scans);
+
+    let watch = engine.watch();
+    if watch.is_empty() {
+        println!("(no output)");
+    } else {
+        for line in watch {
+            println!("{line}");
+        }
+    }
+    Ok(())
+}
+
 /// Language-aware variant: pick the analyzer for `document` from `registry`
 /// (by file extension), then run it through `engine` via [`run_with`]. Errors if
 /// the document's language has no executable analyzer/service.

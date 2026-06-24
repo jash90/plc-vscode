@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import * as vscode from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node';
 import { CLI_BINARY, SERVER_BINARY, bundledBinaryRelativePath } from './bundled';
+import { LdEditorProvider } from './ldEditor';
 
 let client: LanguageClient | undefined;
 let outputChannel: vscode.OutputChannel | undefined;
@@ -135,6 +136,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await compileCurrentFileToCpdev(context, resource);
       },
     ),
+    vscode.commands.registerCommand(
+      'plc-vscode.runLdFile',
+      async (resource?: vscode.Uri) => {
+        if (resource && resource.scheme === 'file') {
+          const ldInvocation = resolveRunInvocation(context, 'ld', [resource.fsPath]);
+          const spawnOpts: { cwd?: string } = ldInvocation.cwd ? { cwd: ldInvocation.cwd } : {};
+          outputChannel?.clear();
+          outputChannel?.appendLine(`$ ${ldInvocation.command} ${ldInvocation.args.join(' ')}`);
+          outputChannel?.show(true);
+          const child = spawn(ldInvocation.command, ldInvocation.args, spawnOpts);
+          child.stdout.on('data', (chunk: Buffer) => outputChannel?.append(chunk.toString()));
+          child.stderr.on('data', (chunk: Buffer) => outputChannel?.append(chunk.toString()));
+          child.on('close', (code: number | null) => {
+            if (code === 0) {
+              void vscode.window.showInformationMessage('PLC LD run completed.');
+            } else {
+              void vscode.window.showErrorMessage(`PLC LD run failed with exit code ${code}.`);
+            }
+          });
+        }
+      },
+    ),
   );
 
   // Stepping debugger: contribute the `plc-st` debug type. The provider fills a
@@ -151,6 +174,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.debug.registerDebugAdapterDescriptorFactory(
       'plc-st',
       new PlcDebugAdapterFactory(context),
+    ),
+  );
+
+
+  // Ladder Diagram custom editor for .ld files.
+  context.subscriptions.push(
+    vscode.window.registerCustomEditorProvider(
+      'plc-vscode.ldEditor',
+      new LdEditorProvider(context),
+      {
+        webviewOptions: { retainContextWhenHidden: true },
+        supportsMultipleEditorsPerDocument: false,
+      },
     ),
   );
 

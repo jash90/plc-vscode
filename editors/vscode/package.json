@@ -13,6 +13,7 @@
   ],
   "activationEvents": [
     "onLanguage:structured-text",
+    "onCustomEditor:plc-vscode.ldEditor",
     "onCommand:plc-vscode.showStatus",
     "onCommand:plc-vscode.runCurrentFile",
     "onCommand:plc-vscode.debugCurrentFile",
@@ -36,6 +37,28 @@
           ".plcst"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "ladder-diagram",
+        "aliases": [
+          "Ladder Diagram",
+          "LD"
+        ],
+        "extensions": [
+          ".ld"
+        ]
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "plc-vscode.ldEditor",
+        "displayName": "Ladder Diagram Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.ld"
+          }
+        ],
+        "priority": "default"
       }
     ],
     "grammars": [
@@ -113,6 +136,10 @@
       {
         "command": "plc-vscode.buildCpdev",
         "title": "PLC VS Code: Compile to CPDev .xcp"
+      },
+      {
+        "command": "plc-vscode.runLdFile",
+        "title": "PLC VS Code: Run Ladder Diagram"
       }
     ],
     "menus": {

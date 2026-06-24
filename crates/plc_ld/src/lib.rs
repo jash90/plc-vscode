@@ -16,7 +16,7 @@ pub mod power_flow;
 
 pub use lower::lower_ld_program;
 pub use model::*;
-pub use power_flow::evaluate_power_flow;
+pub use power_flow::{evaluate_power_flow, var_state_from_watch};
 
 /// Parse an [`LdProgram`] from a JSON string.
 pub fn parse_ld_json(text: &str) -> Result<LdProgram, serde_json::Error> {

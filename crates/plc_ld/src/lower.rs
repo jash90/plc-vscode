@@ -147,19 +147,33 @@ fn lower_output(output: &OutputElement, rung_logic: &HirExpr) -> HirStmt {
         },
         OutputElement::Block {
             instance,
+            fb_type,
             inputs,
             ..
         } => {
             let args = inputs
                 .iter()
-                .map(|arg| HirCallArg {
-                    name: Some(arg.name.clone()),
-                    value: HirExpr::Var(arg.value.clone()),
+                .map(|arg| {
+                    // The IN pin of a timer/counter receives the rung logic,
+                    // not the literal variable name. Other pins (PT, PV, etc.)
+                    // pass through as variable references.
+                    let value = if arg.name.eq_ignore_ascii_case("IN")
+                        || arg.name.eq_ignore_ascii_case("CU")
+                        || arg.name.eq_ignore_ascii_case("CD")
+                    {
+                        rung_logic.clone()
+                    } else {
+                        HirExpr::Var(arg.value.clone())
+                    };
+                    HirCallArg {
+                        name: Some(arg.name.clone()),
+                        value,
+                    }
                 })
                 .collect();
             HirStmt::FbCall {
                 instance: instance.clone(),
-                fb_type: String::new(), // filled by caller context if needed
+                fb_type: fb_type.clone(),
                 args,
             }
         }

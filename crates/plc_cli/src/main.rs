@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 mod dap;
 
-const USAGE: &str = "usage:\n  plc run <file.st> [scans]\n  plc build <file.st> [--target cpdev] [-o <out.xcp>]\n  plc convert <from-id> <to-id> <file>   (ids: plc languages)\n  plc debug                              (Debug Adapter Protocol over stdio)";
+const USAGE: &str = "usage:\n  plc run <file.st> [scans]\n  plc build <file.st> [--target cpdev] [-o <out.xcp>]\n  plc convert <from-id> <to-id> <file>   (ids: plc languages)\n  plc ld <file.ld> [--watch]             (compile+run LD, or emit power-flow JSON)\n  plc debug                              (Debug Adapter Protocol over stdio)";
 
 fn main() {
     if let Err(error) = run() {
@@ -50,6 +50,17 @@ fn run() -> Result<(), String> {
                 println!("{id}");
             }
             Ok(())
+        }
+        Some("ld") => {
+            let path = args
+                .next()
+                .map(PathBuf::from)
+                .ok_or_else(|| USAGE.to_owned())?;
+            let watch = args
+                .next()
+                .map(|flag| flag == "--watch")
+                .unwrap_or(false);
+            run_ld_file(path, watch)
         }
         // Debug Adapter Protocol server over stdio; the program path arrives in
         // the DAP `launch` request, so no file argument here.
@@ -202,6 +213,58 @@ fn convert_file(from: &str, to: &str, path: PathBuf) -> Result<(), String> {
         return Err(format!("conversion {from} -> {to} failed: {error:?}"));
     }
     print!("{}", result.text);
+    Ok(())
+}
+
+/// `plc ld <file.ld> [--watch]`: compile a Ladder Diagram file to ST through
+/// the IR hub, execute it via the runtime, and either print the watch table or
+/// emit power-flow JSON for the VS Code editor.
+fn run_ld_file(path: PathBuf, watch: bool) -> Result<(), String> {
+    let text = read_source(&path)?;
+    let document = SourceDocument::new(format!("file://{}", path.display()), 0, text);
+
+    let registry = LanguageRegistry::with_builtins();
+
+    // Convert LD → ST through the IR hub.
+    let result = registry.convert("ld", "st", &document);
+    if let Some(error) = result.error {
+        for diagnostic in &result.diagnostics {
+            eprintln!("{}: {}", diagnostic.code, diagnostic.message);
+        }
+        return Err(format!("ld -> st conversion failed: {error:?}"));
+    }
+
+    let st_text = &result.text;
+    eprintln!("LD compiled to ST:\n{}", st_text);
+
+    if watch {
+        // Parse the LD model for power-flow evaluation.
+        let ld_program = plc_ld::parse_ld_json(document.text())
+            .map_err(|error| format!("invalid LD JSON: {error}"))?;
+
+        // Execute the ST program to get variable values.
+        let mut runtime = plc_runtime::Runtime::from_source(st_text);
+        runtime.run_scans(DEFAULT_SCANS);
+        let watch_lines = runtime.watch();
+
+        // Evaluate power-flow.
+        let state = plc_ld::var_state_from_watch(&watch_lines);
+        let power_flow = plc_ld::evaluate_power_flow(&ld_program, &state);
+        let json = serde_json::to_string_pretty(&power_flow)
+            .map_err(|error| format!("power-flow serialization failed: {error}"))?;
+        println!("{json}");
+    } else {
+        // Execute the ST program.
+        let st_doc = SourceDocument::new(
+            format!("file://{}", path.with_extension("st").display()),
+            0,
+            st_text.clone(),
+        );
+        let service = CompilerCore;
+        let mut engine = ScanRuntimeEngine::default();
+        return run_with(&service, &mut engine, &st_doc, DEFAULT_SCANS);
+    }
+
     Ok(())
 }
 

@@ -508,6 +508,7 @@ dependencies = [
  "plc_cpdev_backend",
  "plc_cpdev_vm",
  "plc_lang",
+ "plc_ld",
  "plc_runtime",
  "serde",
  "serde_json",

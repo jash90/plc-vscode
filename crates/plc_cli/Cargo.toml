@@ -11,6 +11,7 @@ plc_api = { path = "../plc_api" }
 plc_compiler_core = { path = "../plc_compiler_core" }
 plc_runtime = { path = "../plc_runtime" }
 plc_lang = { path = "../plc_lang" }
+plc_ld = { path = "../plc_ld" }
 # CPDev .xcp emitter. Pure Rust (no C++), so `plc build --target cpdev` is always
 # available; only *running* the .xcp needs the VM behind the `cpdev` feature.
 plc_cpdev_backend = { path = "../plc_cpdev_backend" }

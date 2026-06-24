@@ -552,7 +552,17 @@ dependencies = [
  "plc_api",
  "plc_compiler_core",
  "plc_hir",
+ "plc_ld",
  "plc_syntax",
+]
+
+[[package]]
+name = "plc_ld"
+version = "0.1.0"
+dependencies = [
+ "plc_hir",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

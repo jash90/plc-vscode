@@ -12,6 +12,7 @@ members = [
     "crates/plc_compiler_core",
     "crates/plc_cli",
     "crates/plc_cpdev_backend",
+    "crates/plc_ld",
 ]
 # These crates carry heavyweight native toolchains and are isolated from the
 # default workspace build so the rest of the suite stays fast and dependency-light.

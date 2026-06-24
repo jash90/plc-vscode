@@ -29,11 +29,15 @@ use plc_hir::HirModule;
 
 #[cfg(feature = "il")]
 mod il;
+#[cfg(feature = "ld")]
+mod ld;
 #[cfg(feature = "st")]
 mod st;
 
 #[cfg(feature = "il")]
 pub use il::IlFrontend;
+#[cfg(feature = "ld")]
+pub use ld::LdFrontend;
 #[cfg(feature = "st")]
 pub use st::StFrontend;
 
@@ -148,6 +152,8 @@ impl LanguageRegistry {
         registry.register(Box::new(StFrontend));
         #[cfg(feature = "il")]
         registry.register(Box::new(IlFrontend));
+        #[cfg(feature = "ld")]
+        registry.register(Box::new(LdFrontend));
         registry
     }
 

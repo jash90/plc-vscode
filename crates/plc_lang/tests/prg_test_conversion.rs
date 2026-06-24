@@ -47,19 +47,15 @@ fn subtraction_statement_lowers_to_sub() {
 }
 
 #[test]
-fn unsupported_operator_becomes_one_opaque_load() {
-    // `*` is not modeled by the IR, so the whole RHS becomes one operand.
+fn multiplication_statement_lowers_to_mul() {
+    // `*` is now modeled by the IR as BinaryOp::Mul.
     let lines = il_lines(&program(
         "iWynik := iA * iB;",
         " iA:INT:=2; iB:INT:=3; iWynik:INT;",
     ));
-    assert!(lines.contains(&"LD iA * iB".to_owned()), "{lines:?}");
+    assert!(lines.contains(&"LD iA".to_owned()), "{lines:?}");
+    assert!(lines.contains(&"MUL iB".to_owned()), "{lines:?}");
     assert!(lines.contains(&"ST iWynik".to_owned()), "{lines:?}");
-    assert!(
-        !lines
-            .iter()
-            .any(|l| l.starts_with("ADD") || l.starts_with("SUB"))
-    );
 }
 
 #[test]

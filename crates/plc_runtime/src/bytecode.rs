@@ -6,7 +6,7 @@
 //! be persisted and rendered by an external VS Code bytecode viewer; the viewer
 //! contract is the [`BytecodeModule::disassemble`] mnemonic listing.
 
-use plc_hir::{BinaryOp, HirExpr, HirModule, HirProgram};
+use plc_hir::{BinaryOp, HirExpr, HirModule, HirProgram, UnaryOp};
 use serde::{Deserialize, Serialize};
 
 /// A single stack-machine instruction.
@@ -18,8 +18,26 @@ pub enum Instruction {
     PushStr(String),
     LoadVar(String),
     StoreVar(String),
+    // Arithmetic
     Add,
     Sub,
+    Mul,
+    Div,
+    Mod,
+    // Boolean logic
+    And,
+    Or,
+    Xor,
+    // Comparison
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    // Unary
+    Not,
+    Neg,
 }
 
 impl Instruction {
@@ -34,6 +52,20 @@ impl Instruction {
             Instruction::StoreVar(name) => format!("STORE_VAR {name}"),
             Instruction::Add => "ADD".to_owned(),
             Instruction::Sub => "SUB".to_owned(),
+            Instruction::Mul => "MUL".to_owned(),
+            Instruction::Div => "DIV".to_owned(),
+            Instruction::Mod => "MOD".to_owned(),
+            Instruction::And => "AND".to_owned(),
+            Instruction::Or => "OR".to_owned(),
+            Instruction::Xor => "XOR".to_owned(),
+            Instruction::Eq => "EQ".to_owned(),
+            Instruction::Ne => "NE".to_owned(),
+            Instruction::Lt => "LT".to_owned(),
+            Instruction::Le => "LE".to_owned(),
+            Instruction::Gt => "GT".to_owned(),
+            Instruction::Ge => "GE".to_owned(),
+            Instruction::Not => "NOT".to_owned(),
+            Instruction::Neg => "NEG".to_owned(),
         }
     }
 }
@@ -101,7 +133,30 @@ fn lower_expr(expr: &HirExpr, out: &mut Vec<Instruction>) {
             out.push(match op {
                 BinaryOp::Add => Instruction::Add,
                 BinaryOp::Sub => Instruction::Sub,
+                BinaryOp::Mul => Instruction::Mul,
+                BinaryOp::Div => Instruction::Div,
+                BinaryOp::Mod => Instruction::Mod,
+                BinaryOp::And => Instruction::And,
+                BinaryOp::Or => Instruction::Or,
+                BinaryOp::Xor => Instruction::Xor,
+                BinaryOp::Eq => Instruction::Eq,
+                BinaryOp::Ne => Instruction::Ne,
+                BinaryOp::Lt => Instruction::Lt,
+                BinaryOp::Le => Instruction::Le,
+                BinaryOp::Gt => Instruction::Gt,
+                BinaryOp::Ge => Instruction::Ge,
             });
         }
+        HirExpr::Unary { op, expr } => {
+            lower_expr(expr, out);
+            out.push(match op {
+                UnaryOp::Not => Instruction::Not,
+                UnaryOp::Neg => Instruction::Neg,
+            });
+        }
+        // Calls are not lowered in the bytecode VM (they require the runtime
+        // interpreter's FB state).  We emit a LoadVar of the instance name as a
+        // best-effort so the module still serializes without panicking.
+        HirExpr::Call { name, .. } => out.push(Instruction::LoadVar(name.clone())),
     }
 }

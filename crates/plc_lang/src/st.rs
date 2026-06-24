@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use plc_api::{Analysis, LanguageService, SourceDocument};
 use plc_compiler_core::CompilerCore;
-use plc_hir::{BinaryOp, HirExpr, HirModule, HirPouKind, HirType, lower_source};
+use plc_hir::{BinaryOp, HirExpr, HirModule, HirPouKind, HirStmt, HirType, UnaryOp, lower_source};
 use plc_syntax::{StatementKind, parse_source};
 
 use crate::{LanguageFrontend, LoweringResult, RenderResult};
@@ -114,6 +114,10 @@ fn render_structured_text(module: &HirModule) -> RenderResult {
             ));
         }
 
+        for stmt in &program.statements {
+            render_stmt(stmt, &mut out, &mut fidelity);
+        }
+
         out.push_str(end_kw);
         out.push('\n');
     }
@@ -142,10 +146,81 @@ fn render_expr(expr: &HirExpr) -> String {
             let operator = match op {
                 BinaryOp::Add => "+",
                 BinaryOp::Sub => "-",
+                BinaryOp::Mul => "*",
+                BinaryOp::Div => "/",
+                BinaryOp::Mod => "MOD",
+                BinaryOp::And => "AND",
+                BinaryOp::Or => "OR",
+                BinaryOp::Xor => "XOR",
+                BinaryOp::Eq => "=",
+                BinaryOp::Ne => "<>",
+                BinaryOp::Lt => "<",
+                BinaryOp::Le => "<=",
+                BinaryOp::Gt => ">",
+                BinaryOp::Ge => ">=",
             };
             format!("{} {} {}", render_expr(lhs), operator, render_expr(rhs))
         }
+        HirExpr::Unary { op, expr } => {
+            let operator = match op {
+                UnaryOp::Not => "NOT ",
+                UnaryOp::Neg => "-",
+            };
+            format!("{operator}{}", render_expr(expr))
+        }
+        HirExpr::Call { name, args } => {
+            let rendered_args: Vec<String> = args
+                .iter()
+                .map(|arg| match &arg.name {
+                    Some(n) => format!("{n} := {}", render_expr(&arg.value)),
+                    None => render_expr(&arg.value),
+                })
+                .collect();
+            format!("{name}({})", rendered_args.join(", "))
+        }
     }
+}
+
+fn render_stmt(stmt: &HirStmt, out: &mut String, fidelity: &mut Vec<String>) {
+    match stmt {
+        HirStmt::Assign(assign) => {
+            out.push_str(&format!(
+                "    {} := {};\n",
+                assign.target,
+                render_expr(&assign.value)
+            ));
+        }
+        HirStmt::Set { target, value } => {
+            out.push_str(&format!(
+                "    IF {} THEN {target} := TRUE; END_IF;\n",
+                render_expr(value)
+            ));
+        }
+        HirStmt::Reset { target, value } => {
+            out.push_str(&format!(
+                "    IF {} THEN {target} := FALSE; END_IF;\n",
+                render_expr(value)
+            ));
+        }
+        HirStmt::FbCall {
+            instance,
+            fb_type,
+            args,
+        } => {
+            let rendered_args: Vec<String> = args
+                .iter()
+                .map(|arg| match &arg.name {
+                    Some(n) => format!("{n} := {}", render_expr(&arg.value)),
+                    None => render_expr(&arg.value),
+                })
+                .collect();
+            out.push_str(&format!(
+                "    {instance}({}); (* {fb_type} *)\n",
+                rendered_args.join(", ")
+            ));
+        }
+    }
+    let _ = fidelity; // reserved for future fidelity notes
 }
 
 fn pou_keywords(kind: HirPouKind) -> (&'static str, &'static str) {

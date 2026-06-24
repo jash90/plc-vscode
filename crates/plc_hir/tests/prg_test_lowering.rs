@@ -1,7 +1,8 @@
-//! HIR lowering coverage derived from `PRG_Test_ST.st`. The MVP HIR only models
-//! assignment bodies and `+`/`-`; everything else lowers to an opaque `Var`.
+//! HIR lowering coverage derived from `PRG_Test_ST.st`. The HIR now models
+//! assignment bodies with a full operator set (`+`/`-`/`*`/`/`/`MOD`,
+//! `AND`/`OR`/`XOR`, comparisons, `NOT`, and function calls).
 
-use plc_hir::{BinaryOp, HirExpr, HirPouKind, HirType, lower_expression, lower_source};
+use plc_hir::{BinaryOp, HirCallArg, HirExpr, HirPouKind, HirType, UnaryOp, lower_expression, lower_source};
 
 const FIXTURE: &str = include_str!("fixtures/prg_test_st.st");
 
@@ -34,29 +35,72 @@ fn subtraction_lowers_to_binary_sub() {
 }
 
 #[test]
-fn multiplication_lowers_to_opaque_var() {
-    assert_eq!(lower_expression("iA * iB"), var("iA * iB"));
+fn multiplication_lowers_to_binary_mul() {
+    assert_eq!(
+        lower_expression("iA * iB"),
+        binary(BinaryOp::Mul, var("iA"), var("iB"))
+    );
 }
 
 #[test]
-fn mod_lowers_to_opaque_var() {
-    assert_eq!(lower_expression("17 MOD 5"), var("17 MOD 5"));
+fn mod_lowers_to_binary_mod() {
+    assert_eq!(
+        lower_expression("17 MOD 5"),
+        binary(BinaryOp::Mod, HirExpr::Int(17), HirExpr::Int(5))
+    );
 }
 
 #[test]
-fn comparison_lowers_to_opaque_var() {
-    assert_eq!(lower_expression("(iA < iB)"), var("(iA < iB)"));
+fn comparison_lowers_to_binary_lt() {
+    assert_eq!(
+        lower_expression("iA < iB"),
+        binary(BinaryOp::Lt, var("iA"), var("iB"))
+    );
 }
 
 #[test]
-fn division_lowers_to_opaque_var() {
-    assert_eq!(lower_expression("rA / rB"), var("rA / rB"));
+fn division_lowers_to_binary_div() {
+    assert_eq!(
+        lower_expression("rA / rB"),
+        binary(BinaryOp::Div, var("rA"), var("rB"))
+    );
 }
 
 #[test]
-fn function_calls_lower_to_opaque_var() {
-    assert_eq!(lower_expression("SHL(wA, 4)"), var("SHL(wA, 4)"));
-    assert_eq!(lower_expression("EXPT(2.0, 10.0)"), var("EXPT(2.0, 10.0)"));
+fn function_calls_lower_to_call_expr() {
+    assert_eq!(
+        lower_expression("SHL(wA, 4)"),
+        HirExpr::Call {
+            name: "SHL".to_owned(),
+            args: vec![
+                HirCallArg { name: None, value: var("wA") },
+                HirCallArg { name: None, value: HirExpr::Int(4) },
+            ],
+        }
+    );
+}
+
+#[test]
+fn boolean_operators_lower_correctly() {
+    assert_eq!(
+        lower_expression("A AND B"),
+        binary(BinaryOp::And, var("A"), var("B"))
+    );
+    assert_eq!(
+        lower_expression("A OR B"),
+        binary(BinaryOp::Or, var("A"), var("B"))
+    );
+}
+
+#[test]
+fn not_lowers_to_unary_not() {
+    assert_eq!(
+        lower_expression("NOT A"),
+        HirExpr::Unary {
+            op: UnaryOp::Not,
+            expr: Box::new(var("A")),
+        }
+    );
 }
 
 #[test]

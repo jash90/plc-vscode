@@ -72,10 +72,10 @@ fn st_il_round_trip_preserves_ir_on_supported_subset() {
 fn unknown_target_errors_loudly_without_panicking() {
     let registry = LanguageRegistry::with_builtins();
     let document = SourceDocument::new("file:///main.st", 0, SRC);
-    let out = registry.convert("st", "ld", &document); // LD not registered
+    let out = registry.convert("st", "fbd", &document); // FBD not registered
     assert_eq!(
         out.error,
-        Some(ConversionError::UnknownTarget("ld".to_owned()))
+        Some(ConversionError::UnknownTarget("fbd".to_owned()))
     );
     assert!(out.text.is_empty());
 }

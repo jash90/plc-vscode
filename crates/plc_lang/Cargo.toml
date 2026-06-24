@@ -15,10 +15,12 @@ plc_hir = { path = "../plc_hir" }
 # Optional: the ST frontend delegates analysis/IDE features to CompilerCore.
 # Activated by the default `st` feature; the IR-only/convert path and the IL
 # frontend never pull it in, so `plc_lang` stays runtime-free.
+plc_ld = { path = "../plc_ld", optional = true }
 plc_compiler_core = { path = "../plc_compiler_core", optional = true }
 plc_syntax = { path = "../plc_syntax", optional = true }
 
 [features]
-default = ["st", "il"]
+default = ["st", "il", "ld"]
 st = ["dep:plc_compiler_core", "dep:plc_syntax"]
 il = []
+ld = ["dep:plc_ld"]

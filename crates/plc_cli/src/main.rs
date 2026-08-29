@@ -56,10 +56,7 @@ fn run() -> Result<(), String> {
                 .next()
                 .map(PathBuf::from)
                 .ok_or_else(|| USAGE.to_owned())?;
-            let watch = args
-                .next()
-                .map(|flag| flag == "--watch")
-                .unwrap_or(false);
+            let watch = args.next().map(|flag| flag == "--watch").unwrap_or(false);
             run_ld_file(path, watch)
         }
         // Debug Adapter Protocol server over stdio; the program path arrives in
@@ -279,17 +276,13 @@ fn read_source(path: &Path) -> Result<String, String> {
 
 fn decode_source(bytes: &[u8]) -> String {
     if let [0xFF, 0xFE, rest @ ..] = bytes {
-        let units: Vec<u16> = rest
-            .chunks_exact(2)
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .collect();
+        let (pairs, _) = rest.as_chunks::<2>();
+        let units: Vec<u16> = pairs.iter().map(|pair| u16::from_le_bytes(*pair)).collect();
         return String::from_utf16_lossy(&units);
     }
     if let [0xFE, 0xFF, rest @ ..] = bytes {
-        let units: Vec<u16> = rest
-            .chunks_exact(2)
-            .map(|pair| u16::from_be_bytes([pair[0], pair[1]]))
-            .collect();
+        let (pairs, _) = rest.as_chunks::<2>();
+        let units: Vec<u16> = pairs.iter().map(|pair| u16::from_be_bytes(*pair)).collect();
         return String::from_utf16_lossy(&units);
     }
 

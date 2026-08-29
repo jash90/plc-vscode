@@ -40,6 +40,7 @@ const node_child_process_1 = require("node:child_process");
 const vscode = __importStar(require("vscode"));
 const node_1 = require("vscode-languageclient/node");
 const bundled_1 = require("./bundled");
+const ldEditor_1 = require("./ldEditor");
 let client;
 let outputChannel;
 function workspaceRoot(context) {
@@ -131,12 +132,36 @@ async function activate(context) {
         await debugCurrentStructuredTextFile(resource);
     }), vscode.commands.registerCommand('plc-vscode.buildCpdev', async (resource) => {
         await compileCurrentFileToCpdev(context, resource);
+    }), vscode.commands.registerCommand('plc-vscode.runLdFile', async (resource) => {
+        if (resource && resource.scheme === 'file') {
+            const ldInvocation = resolveRunInvocation(context, 'ld', [resource.fsPath]);
+            const spawnOpts = ldInvocation.cwd ? { cwd: ldInvocation.cwd } : {};
+            outputChannel?.clear();
+            outputChannel?.appendLine(`$ ${ldInvocation.command} ${ldInvocation.args.join(' ')}`);
+            outputChannel?.show(true);
+            const child = (0, node_child_process_1.spawn)(ldInvocation.command, ldInvocation.args, spawnOpts);
+            child.stdout.on('data', (chunk) => outputChannel?.append(chunk.toString()));
+            child.stderr.on('data', (chunk) => outputChannel?.append(chunk.toString()));
+            child.on('close', (code) => {
+                if (code === 0) {
+                    void vscode.window.showInformationMessage('PLC LD run completed.');
+                }
+                else {
+                    void vscode.window.showErrorMessage(`PLC LD run failed with exit code ${code}.`);
+                }
+            });
+        }
     }));
     // Stepping debugger: contribute the `plc-st` debug type. The provider fills a
     // default launch config for F5-without-launch.json; the factory spawns the
     // `plc debug` DAP adapter.
     const debugProvider = new PlcDebugConfigurationProvider();
     context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('plc-st', debugProvider), vscode.debug.registerDebugConfigurationProvider('plc-st', debugProvider, vscode.DebugConfigurationProviderTriggerKind.Dynamic), vscode.debug.registerDebugAdapterDescriptorFactory('plc-st', new PlcDebugAdapterFactory(context)));
+    // Ladder Diagram custom editor for .ld files.
+    context.subscriptions.push(vscode.window.registerCustomEditorProvider('plc-vscode.ldEditor', new ldEditor_1.LdEditorProvider(context), {
+        webviewOptions: { retainContextWhenHidden: true },
+        supportsMultipleEditorsPerDocument: false,
+    }));
     if (vscode.workspace.getConfiguration('plcVscode').get('autoRunOnOpen', false)) {
         const activeEditor = vscode.window.activeTextEditor;
         if (activeEditor && activeEditor.document.languageId === 'structured-text') {

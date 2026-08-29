@@ -2,8 +2,8 @@
 //! evaluate power-flow over variable states.
 
 use plc_ld::{
-    CoilVariant, ContactElement, LdProgram, OutputElement, Rung, SeriesBranch,
-    evaluate_power_flow, lower_ld_program, parse_ld_json, var_state_from_watch,
+    CoilVariant, ContactElement, LdProgram, OutputElement, Rung, SeriesBranch, evaluate_power_flow,
+    lower_ld_program, parse_ld_json, var_state_from_watch,
 };
 
 const MOTOR_LD: &str = include_str!("../../../tests/ld/motor_control.ld");

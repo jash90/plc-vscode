@@ -126,9 +126,15 @@ pub struct HirAssign {
 pub enum HirStmt {
     Assign(HirAssign),
     /// SET coil (`S` variant) — force a variable to TRUE.
-    Set { target: String, value: HirExpr },
+    Set {
+        target: String,
+        value: HirExpr,
+    },
     /// RESET coil (`R` variant) — force a variable to FALSE when condition is met.
-    Reset { target: String, value: HirExpr },
+    Reset {
+        target: String,
+        value: HirExpr,
+    },
     /// Function-block call (`TON_inst(IN := x, PT := T#2s);`).
     FbCall {
         instance: String,
@@ -234,8 +240,8 @@ pub fn lower_expression(expression: &str) -> HirExpr {
 /// Minimal token for expression lowering.
 #[derive(Debug, Clone, PartialEq)]
 enum Tok {
-    Word(String),   // identifier, keyword, or literal
-    Op(String),     // operator symbol
+    Word(String), // identifier, keyword, or literal
+    Op(String),   // operator symbol
 }
 
 /// Tokenize an expression string into words and operators.
@@ -361,22 +367,22 @@ impl ExprParser {
             Tok::Op(o) if o == "(" => {
                 self.pos += 1;
                 let inner = self.parse_binary(0)?;
-                if let Some(Tok::Op(o)) = self.peek() {
-                    if o == ")" {
-                        self.pos += 1;
-                    }
+                if let Some(Tok::Op(o)) = self.peek()
+                    && o == ")"
+                {
+                    self.pos += 1;
                 }
                 Some(inner)
             }
             Tok::Word(name) => {
                 self.pos += 1;
                 // Check for call: Word followed by '('
-                if let Some(Tok::Op(o)) = self.peek() {
-                    if o == "(" {
-                        self.pos += 1;
-                        let args = self.parse_call_args();
-                        return Some(HirExpr::Call { name, args });
-                    }
+                if let Some(Tok::Op(o)) = self.peek()
+                    && o == "("
+                {
+                    self.pos += 1;
+                    let args = self.parse_call_args();
+                    return Some(HirExpr::Call { name, args });
                 }
                 Some(lower_operand(&name))
             }
@@ -478,4 +484,3 @@ fn lower_operand(token: &str) -> HirExpr {
     }
     HirExpr::Var(token.to_owned())
 }
-

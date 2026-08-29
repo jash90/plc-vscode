@@ -31,6 +31,23 @@ exports.commands = {
     addContact(rung, branch, name, negated) {
         return { type: 'addContact', label: `Add contact ${name}`, rung, branch, index: -1, name, negated };
     },
+    /** Insert a contact at a specific position in a branch (drop target). */
+    insertContact(rung, branch, index, name, negated) {
+        return { type: 'insertContact', label: `Insert contact ${name}`, rung, branch, index, name, negated };
+    },
+    /** Move an element to a series position (reorder/branch change). */
+    moveElement(from, to) {
+        return {
+            type: 'moveElement',
+            label: 'Move element',
+            rung: from.rung,
+            branch: from.branch,
+            index: from.index,
+            toRung: to.rung,
+            toBranch: to.branch,
+            toIndex: to.index,
+        };
+    },
     insertParallelBranch(rung, contactName) {
         return {
             type: 'insertParallelBranch',
@@ -206,6 +223,46 @@ function mutate(program, command) {
             });
             return;
         }
+        case 'insertContact': {
+            if (!rung) {
+                return;
+            }
+            while (rung.branches.length <= command.branch) {
+                rung.branches.push({ elements: [] });
+            }
+            rung.branches[command.branch].elements.splice(Math.max(command.index, 0), 0, { name: command.name, negated: Boolean(command.negated) });
+            return;
+        }
+        case 'moveElement': {
+            const fromRung = program.rungs[command.rung];
+            const toRung = program.rungs[command.toRung];
+            if (!fromRung || !toRung) {
+                return;
+            }
+            if (command.branch === -1) {
+                // Move an output to another output slot.
+                const [output] = fromRung.outputs.splice(command.index, 1);
+                if (output) {
+                    toRung.outputs.splice(Math.max(command.toIndex, 0), 0, output);
+                }
+                return;
+            }
+            const sourceBranch = fromRung.branches[command.branch];
+            const [contact] = sourceBranch?.elements.splice(command.index, 1) ?? [];
+            if (!contact) {
+                return;
+            }
+            // Prune the emptied source branch — an empty branch is an LD0001
+            // error state the editor must never create.
+            if (sourceBranch && sourceBranch.elements.length === 0) {
+                fromRung.branches.splice(command.branch, 1);
+            }
+            while (toRung.branches.length <= command.toBranch) {
+                toRung.branches.push({ elements: [] });
+            }
+            toRung.branches[command.toBranch]?.elements.splice(Math.max(command.toIndex, 0), 0, contact);
+            return;
+        }
         case 'insertParallelBranch': {
             if (!rung) {
                 return;
@@ -241,7 +298,11 @@ function mutate(program, command) {
                 rung.outputs.splice(command.index, 1);
             }
             else {
-                rung.branches[command.branch]?.elements.splice(command.index, 1);
+                const branch = rung.branches[command.branch];
+                branch?.elements.splice(command.index, 1);
+                if (branch && branch.elements.length === 0) {
+                    rung.branches.splice(command.branch, 1);
+                }
             }
             return;
         }

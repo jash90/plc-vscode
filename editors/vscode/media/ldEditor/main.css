@@ -137,3 +137,38 @@ body {
   border: 1px solid var(--vscode-focusBorder, #0e639c);
   padding: 2px 4px;
 }
+
+/* Selection + completion (PLC-112) */
+.ld-diagram .element.selected rect {
+  stroke: var(--vscode-focusBorder, #0e639c);
+  stroke-width: 2;
+}
+
+.completion-list {
+  position: absolute;
+  z-index: 20;
+  background: var(--vscode-editorWidget-background, #252526);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 3px;
+  min-width: 120px;
+  max-height: 180px;
+  overflow: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.completion-item {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-family: var(--vscode-font-family, monospace);
+  cursor: pointer;
+}
+
+.completion-item:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+/* Pointer-drag visual cue (PLC-112) */
+.ld-diagram .element.dragging rect {
+  stroke-dasharray: 4 2;
+  opacity: 0.6;
+}

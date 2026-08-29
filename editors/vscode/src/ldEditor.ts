@@ -15,6 +15,7 @@ import { spawn } from 'node:child_process';
 import { parseWebviewMessage } from './ldWebview/protocol';
 import { LdDocument } from './ldDocument';
 import { resolveRunInvocation } from './ldCli';
+import { SimClient, asSimChild, ServeEvent } from './ld/simClient';
 
 /** Open documents by URI so split views share one undo stack. */
 const documents = new Map<string, LdDocument>();
@@ -121,6 +122,12 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<LdDocument>
     this.panels.get(key)?.add(webviewPanel);
     webviewPanel.onDidDispose(() => {
       this.panels.get(key)?.delete(webviewPanel);
+      // Kill the simulation child when the last panel for the file closes —
+      // no orphan `plc` processes.
+      if ((this.panels.get(key)?.size ?? 0) === 0) {
+        this.simulations.get(key)?.client.dispose();
+        this.simulations.delete(key);
+      }
     });
 
     const post = (message: unknown): void => {
@@ -163,6 +170,39 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<LdDocument>
           case 'run':
             await this.runLdFile(document.uri);
             break;
+          case 'simStart':
+          case 'simStop':
+          case 'simStep':
+          case 'simReset':
+          case 'simInput': {
+            const sim = await this.ensureSim(document);
+            switch (message.type) {
+              case 'simStart':
+                // Live model, no save required: reload carries the current
+                // program, then continuous ticks (host-paced).
+                sim.client.reload(JSON.stringify(document.current));
+                sim.client.run(100);
+                break;
+              case 'simStop':
+                sim.client.stop();
+                break;
+              case 'simStep':
+                sim.client.stop();
+                sim.client.reload(JSON.stringify(document.current));
+                sim.client.tick();
+                break;
+              case 'simReset':
+                sim.client.stop();
+                sim.client.reload(JSON.stringify(document.current));
+                break;
+              case 'simInput':
+                sim.client.setInput(message.name, message.value);
+                break;
+              default:
+                break;
+            }
+            break;
+          }
           default:
             break;
         }
@@ -173,6 +213,73 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<LdDocument>
   }
 
   /** Compile LD → ST, run, and send power-flow JSON back to the webview. */
+  /** Live simulations by document URI (lazy-started, disposed with panels). */
+  private readonly simulations = new Map<string, { client: SimClient }>();
+
+  /**
+   * Lazily spawn the `plc ld --serve` child for a document and forward its
+   * events to the webview as protocol messages.
+   */
+  private async ensureSim(document: LdDocument): Promise<{ client: SimClient }> {
+    const key = document.uri.toString();
+    const existing = this.simulations.get(key);
+    if (existing) {
+      return existing;
+    }
+    const invocation = resolveRunInvocation(this.context, 'ld', ['--serve']);
+    const child = spawn(
+      invocation.command,
+      invocation.args,
+      invocation.cwd ? { cwd: invocation.cwd } : undefined,
+    );
+    const client = new SimClient(asSimChild(child), (event: ServeEvent) => {
+      this.forwardServeEvent(key, event);
+    });
+    client.start();
+    const entry = { client };
+    this.simulations.set(key, entry);
+    this.context.subscriptions.push({
+      dispose: () => {
+        entry.client.dispose();
+        this.simulations.delete(key);
+      },
+    });
+    return entry;
+  }
+
+  /** Translate serve events into webview protocol messages for all panels. */
+  private forwardServeEvent(key: string, event: ServeEvent): void {
+    const panels = this.panels.get(key) ?? new Set<vscode.WebviewPanel>();
+    switch (event.event) {
+      case 'state':
+        for (const panel of panels) {
+          void panel.webview.postMessage({
+            type: 'simState',
+            scan: event.scan,
+            timeMs: event.timeMs,
+            watch: event.watch,
+            forced: event.forced,
+          });
+        }
+        break;
+      case 'powerFlow':
+        for (const panel of panels) {
+          void panel.webview.postMessage({
+            type: 'powerFlow',
+            json: JSON.stringify({ rungs: event.rungs }),
+          });
+        }
+        break;
+      case 'error':
+        for (const panel of panels) {
+          void panel.webview.postMessage({ type: 'error', message: String(event.message) });
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
   private async updatePowerFlow(
     post: (message: unknown) => void,
     uri: vscode.Uri,
@@ -245,6 +352,10 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<LdDocument>
   <div class="spacer"></div>
   <button id="btn-save">Save</button>
   <button id="btn-run">Run</button>
+  <button id="btn-sim-run" title="Run the simulation continuously (no save needed)">▶ Sim</button>
+  <button id="btn-sim-pause" title="Pause the simulation">⏸</button>
+  <button id="btn-sim-step" title="One scan">⏭</button>
+  <button id="btn-sim-reset" title="Reset the simulation">⟲</button>
   <button id="btn-toggle-json">JSON</button>
 </div>
 <div id="canvas-container">
@@ -252,6 +363,7 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<LdDocument>
   <textarea id="ld-textarea" spellcheck="false"></textarea>
 </div>
 <div id="status-bar">Ready.</div>
+<div id="sim-panel"></div>
 <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

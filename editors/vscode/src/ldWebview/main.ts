@@ -7,7 +7,7 @@
  */
 
 import { parseHostMessage, WebviewToHost } from './protocol';
-import { LdProgram, normalizeIds, parseProgram, serializeProgram } from './model';
+import { LdProgram, allVariables, normalizeIds, parseProgram, serializeProgram } from './model';
 import { LdCommand, commands, paletteCommands } from './commands';
 import { layout, hitTest } from './layout';
 import { variables as completeVariables } from './completion';
@@ -24,6 +24,9 @@ let powerFlow: PowerFlow | undefined;
 
 /** Keyboard selection: (rung, branch, index); branch -1 = output. */
 let selection: { rung: number; branch: number; index: number } | undefined;
+
+/** Latest simulation snapshot (PLC-114). */
+let simState: { scan: number; timeMs: number; watch: string[]; forced: string[] } | undefined;
 
 function byId<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -430,6 +433,19 @@ function wire(): void {
     vscode.postMessage({ type: 'run' });
   });
 
+  byId('btn-sim-run').addEventListener('click', () => {
+    vscode.postMessage({ type: 'simStart' });
+  });
+  byId('btn-sim-pause').addEventListener('click', () => {
+    vscode.postMessage({ type: 'simStop' });
+  });
+  byId('btn-sim-step').addEventListener('click', () => {
+    vscode.postMessage({ type: 'simStep' });
+  });
+  byId('btn-sim-reset').addEventListener('click', () => {
+    vscode.postMessage({ type: 'simReset' });
+  });
+
   byId('btn-toggle-json').addEventListener('click', () => {
     const textarea = byId<HTMLTextAreaElement>('ld-textarea');
     textarea.style.display = textarea.style.display === 'none' ? 'block' : 'none';
@@ -552,6 +568,16 @@ function wire(): void {
         revalidateSelection();
         render();
         break;
+      case 'simState':
+        simState = {
+          scan: message.scan,
+          timeMs: message.timeMs,
+          watch: message.watch,
+          forced: message.forced,
+        };
+        renderSimPanel();
+        updateStatus();
+        break;
       case 'powerFlow':
         try {
           powerFlow = JSON.parse(message.json) as PowerFlow;
@@ -607,4 +633,47 @@ function attachCompletion(input: HTMLInputElement): void {
     window.setTimeout(() => list!.remove(), 150);
   });
   refresh();
+}
+
+/** The simulation panel: transport info, input toggles, watch table. */
+function renderSimPanel(): void {
+  const panel = document.getElementById('sim-panel');
+  if (!panel || !simState) {
+    return;
+  }
+  const forcedSet = new Set(simState.forced.map((name) => name.toLowerCase()));
+  const inputs = allVariables(program).slice(0, 12);
+  const watchRows = simState.watch
+    .map((line) => {
+      const separator = line.indexOf('=');
+      const name = separator === -1 ? line : line.slice(0, separator).trim();
+      const value = separator === -1 ? '' : line.slice(separator + 1).trim();
+      const forced = forcedSet.has(name.toLowerCase());
+      const forcedMark = forced ? '⚠' : '';
+      return `<tr class="${forced ? 'forced' : ''}"><td>${name}</td><td>${value}</td><td>${forcedMark}</td></tr>`;
+    })
+    .join('');
+  panel.innerHTML = `
+    <div class="sim-header">scan ${simState.scan} · t=${simState.timeMs}ms</div>
+    <div class="sim-inputs">
+      ${inputs
+        .map(
+          (name) =>
+            `<label class="sim-input"><input type="checkbox" data-var="${name}" /> ${name}</label>`,
+        )
+        .join('')}
+    </div>
+    <table class="sim-watch">
+      <thead><tr><th>variable</th><th>value</th><th></th></tr></thead>
+      <tbody>${watchRows}</tbody>
+    </table>`;
+  panel.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((box) => {
+    box.addEventListener('change', () => {
+      vscode.postMessage({
+        type: 'simInput',
+        name: box.getAttribute('data-var') ?? '',
+        value: box.checked,
+      });
+    });
+  });
 }

@@ -50,6 +50,7 @@ const node_child_process_1 = require("node:child_process");
 const protocol_1 = require("./ldWebview/protocol");
 const ldDocument_1 = require("./ldDocument");
 const ldCli_1 = require("./ldCli");
+const simClient_1 = require("./ld/simClient");
 /** Open documents by URI so split views share one undo stack. */
 const documents = new Map();
 class LdEditorProvider {
@@ -122,6 +123,12 @@ class LdEditorProvider {
         this.panels.get(key)?.add(webviewPanel);
         webviewPanel.onDidDispose(() => {
             this.panels.get(key)?.delete(webviewPanel);
+            // Kill the simulation child when the last panel for the file closes —
+            // no orphan `plc` processes.
+            if ((this.panels.get(key)?.size ?? 0) === 0) {
+                this.simulations.get(key)?.client.dispose();
+                this.simulations.delete(key);
+            }
         });
         const post = (message) => {
             void webviewPanel.webview.postMessage(message);
@@ -163,6 +170,39 @@ class LdEditorProvider {
                     case 'run':
                         await this.runLdFile(document.uri);
                         break;
+                    case 'simStart':
+                    case 'simStop':
+                    case 'simStep':
+                    case 'simReset':
+                    case 'simInput': {
+                        const sim = await this.ensureSim(document);
+                        switch (message.type) {
+                            case 'simStart':
+                                // Live model, no save required: reload carries the current
+                                // program, then continuous ticks (host-paced).
+                                sim.client.reload(JSON.stringify(document.current));
+                                sim.client.run(100);
+                                break;
+                            case 'simStop':
+                                sim.client.stop();
+                                break;
+                            case 'simStep':
+                                sim.client.stop();
+                                sim.client.reload(JSON.stringify(document.current));
+                                sim.client.tick();
+                                break;
+                            case 'simReset':
+                                sim.client.stop();
+                                sim.client.reload(JSON.stringify(document.current));
+                                break;
+                            case 'simInput':
+                                sim.client.setInput(message.name, message.value);
+                                break;
+                            default:
+                                break;
+                        }
+                        break;
+                    }
                     default:
                         break;
                 }
@@ -173,6 +213,66 @@ class LdEditorProvider {
         });
     }
     /** Compile LD → ST, run, and send power-flow JSON back to the webview. */
+    /** Live simulations by document URI (lazy-started, disposed with panels). */
+    simulations = new Map();
+    /**
+     * Lazily spawn the `plc ld --serve` child for a document and forward its
+     * events to the webview as protocol messages.
+     */
+    async ensureSim(document) {
+        const key = document.uri.toString();
+        const existing = this.simulations.get(key);
+        if (existing) {
+            return existing;
+        }
+        const invocation = (0, ldCli_1.resolveRunInvocation)(this.context, 'ld', ['--serve']);
+        const child = (0, node_child_process_1.spawn)(invocation.command, invocation.args, invocation.cwd ? { cwd: invocation.cwd } : undefined);
+        const client = new simClient_1.SimClient((0, simClient_1.asSimChild)(child), (event) => {
+            this.forwardServeEvent(key, event);
+        });
+        client.start();
+        const entry = { client };
+        this.simulations.set(key, entry);
+        this.context.subscriptions.push({
+            dispose: () => {
+                entry.client.dispose();
+                this.simulations.delete(key);
+            },
+        });
+        return entry;
+    }
+    /** Translate serve events into webview protocol messages for all panels. */
+    forwardServeEvent(key, event) {
+        const panels = this.panels.get(key) ?? new Set();
+        switch (event.event) {
+            case 'state':
+                for (const panel of panels) {
+                    void panel.webview.postMessage({
+                        type: 'simState',
+                        scan: event.scan,
+                        timeMs: event.timeMs,
+                        watch: event.watch,
+                        forced: event.forced,
+                    });
+                }
+                break;
+            case 'powerFlow':
+                for (const panel of panels) {
+                    void panel.webview.postMessage({
+                        type: 'powerFlow',
+                        json: JSON.stringify({ rungs: event.rungs }),
+                    });
+                }
+                break;
+            case 'error':
+                for (const panel of panels) {
+                    void panel.webview.postMessage({ type: 'error', message: String(event.message) });
+                }
+                break;
+            default:
+                break;
+        }
+    }
     async updatePowerFlow(post, uri) {
         try {
             const invocation = (0, ldCli_1.resolveRunInvocation)(this.context, 'ld', [uri.fsPath, '--watch']);
@@ -228,6 +328,10 @@ class LdEditorProvider {
   <div class="spacer"></div>
   <button id="btn-save">Save</button>
   <button id="btn-run">Run</button>
+  <button id="btn-sim-run" title="Run the simulation continuously (no save needed)">▶ Sim</button>
+  <button id="btn-sim-pause" title="Pause the simulation">⏸</button>
+  <button id="btn-sim-step" title="One scan">⏭</button>
+  <button id="btn-sim-reset" title="Reset the simulation">⟲</button>
   <button id="btn-toggle-json">JSON</button>
 </div>
 <div id="canvas-container">
@@ -235,6 +339,7 @@ class LdEditorProvider {
   <textarea id="ld-textarea" spellcheck="false"></textarea>
 </div>
 <div id="status-bar">Ready.</div>
+<div id="sim-panel"></div>
 <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

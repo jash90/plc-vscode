@@ -7,6 +7,7 @@
  * unknown types instead of silently dropping messages.
  */
 
+import { LdCommand } from './commands';
 import { LdProgram } from './model';
 
 /** Messages the extension host sends to the webview. */
@@ -21,7 +22,10 @@ export type WebviewToHost =
   | { type: 'ready' }
   | { type: 'save'; text: string }
   | { type: 'run' }
-  | { type: 'modelChanged'; program: LdProgram };
+  | { type: 'modelChanged'; program: LdProgram }
+  | { type: 'edit'; command: LdCommand }
+  | { type: 'undo' }
+  | { type: 'redo' };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
@@ -59,6 +63,12 @@ export function parseWebviewMessage(value: unknown): WebviewToHost {
       return { type: 'run' };
     case 'modelChanged':
       return { type: 'modelChanged', program: record.program as LdProgram };
+    case 'edit':
+      return { type: 'edit', command: record.command as LdCommand };
+    case 'undo':
+      return { type: 'undo' };
+    case 'redo':
+      return { type: 'redo' };
     default:
       throw new Error(`unknown webview message: ${JSON.stringify(value)}`);
   }

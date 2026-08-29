@@ -44,6 +44,12 @@ function parseWebviewMessage(value) {
             return { type: 'run' };
         case 'modelChanged':
             return { type: 'modelChanged', program: record.program };
+        case 'edit':
+            return { type: 'edit', command: record.command };
+        case 'undo':
+            return { type: 'undo' };
+        case 'redo':
+            return { type: 'redo' };
         default:
             throw new Error(`unknown webview message: ${JSON.stringify(value)}`);
     }

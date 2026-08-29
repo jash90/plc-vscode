@@ -47,9 +47,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.LdEditorProvider = void 0;
 const vscode = __importStar(require("vscode"));
 const node_child_process_1 = require("node:child_process");
-const path = __importStar(require("node:path"));
 const protocol_1 = require("./ldWebview/protocol");
+const ldDocument_1 = require("./ldDocument");
 const ldCli_1 = require("./ldCli");
+/** Open documents by URI so split views share one undo stack. */
+const documents = new Map();
 class LdEditorProvider {
     context;
     _onDidChange = new vscode.EventEmitter();
@@ -58,36 +60,55 @@ class LdEditorProvider {
         this.context = context;
     }
     async openCustomDocument(uri, _openContext, _token) {
-        return {
-            uri,
-            fileName: path.basename(uri.fsPath),
-            dispose: () => { },
-        };
+        const key = uri.toString();
+        const existing = documents.get(key);
+        if (existing) {
+            return existing;
+        }
+        const document = await ldDocument_1.LdDocument.open(uri);
+        documents.set(key, document);
+        document.onDidChange((event) => this._onDidChange.fire(event));
+        return document;
     }
-    async saveCustomDocument(_document, _cancellation) {
-        // Delegated to the standard document save in resolveCustomEditor.
+    async saveCustomDocument(document, _cancellation) {
+        await document.save();
     }
-    async revertCustomDocument(_document, _cancellation) {
-        // No-op: the webview is the source of truth.
+    async revertCustomDocument(document, _cancellation) {
+        await document.revert();
+        for (const panel of this.panelsOf(document)) {
+            this.postState(panel, document);
+        }
     }
-    async backupCustomDocument(_document, _context, _cancellation) {
-        return { id: '', delete: () => { } };
+    async backupCustomDocument(document, context, _cancellation) {
+        return document.backup(context);
     }
-    async saveCustomDocumentAs(_document, _destination, _cancellation) {
-        // No-op: handled via WorkspaceEdit in resolveCustomEditor.
+    async saveCustomDocumentAs(document, destination, _cancellation) {
+        await document.saveAs(destination);
+        documents.delete(document.uri.toString());
+        documents.set(destination.toString(), document);
+    }
+    /** Webview panels resolved for a document (for state pushes). */
+    panels = new Map();
+    panelsOf(document) {
+        return this.panels.get(document.uri.toString()) ?? new Set();
+    }
+    postState(panel, document) {
+        void panel.webview.postMessage({ type: 'state', program: document.current });
     }
     async resolveCustomEditor(document, webviewPanel, _token) {
         webviewPanel.webview.options = { enableScripts: true };
         webviewPanel.webview.html = this.getHtml(webviewPanel.webview);
+        const key = document.uri.toString();
+        if (!this.panels.has(key)) {
+            this.panels.set(key, new Set());
+        }
+        this.panels.get(key)?.add(webviewPanel);
+        webviewPanel.onDidDispose(() => {
+            this.panels.get(key)?.delete(webviewPanel);
+        });
         const post = (message) => {
             void webviewPanel.webview.postMessage(message);
         };
-        // Cache the file text up front; deliver `load` when the webview signals
-        // `ready`. Posting immediately after setting html races content load —
-        // a dropped load would leave the default empty program, and one Save
-        // click would overwrite the user's file with it.
-        const content = await vscode.workspace.fs.readFile(document.uri);
-        const text = Buffer.from(content).toString('utf8');
         webviewPanel.webview.onDidReceiveMessage(async (data) => {
             let message;
             try {
@@ -99,11 +120,31 @@ class LdEditorProvider {
             }
             switch (message.type) {
                 case 'ready':
-                    post({ type: 'load', text });
+                    post({ type: 'load', text: JSON.stringify(document.current) });
+                    break;
+                case 'edit':
+                    document.applyEdit(message.command);
+                    this.postState(webviewPanel, document);
+                    break;
+                case 'undo':
+                case 'redo': {
+                    if (message.type === 'undo') {
+                        document.undo();
+                    }
+                    else {
+                        document.redo();
+                    }
+                    this.postState(webviewPanel, document);
+                    break;
+                }
+                case 'modelChanged':
+                    document.replaceProgram(message.program);
+                    this.postState(webviewPanel, document);
                     break;
                 case 'save': {
                     const buffer = Buffer.from(message.text, 'utf8');
                     await vscode.workspace.fs.writeFile(document.uri, buffer);
+                    await document.revertToText(buffer.toString('utf8'));
                     await this.updatePowerFlow(post, document.uri);
                     break;
                 }
@@ -151,7 +192,9 @@ class LdEditorProvider {
         const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'ldEditor', 'main.css'));
         const csp = [
             "default-src 'none'",
-            `style-src ${webview.cspSource}`,
+            // 'unsafe-inline' covers style *attributes* — the inline-rename overlay
+            // positions itself dynamically. Scripts stay nonce-gated.
+            `style-src ${webview.cspSource} 'unsafe-inline'`,
             `script-src 'nonce-${nonce}'`,
             `img-src ${webview.cspSource} data:`,
         ].join('; ');

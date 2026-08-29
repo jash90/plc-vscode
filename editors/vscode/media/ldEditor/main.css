@@ -125,3 +125,15 @@ body {
   font-size: 10px;
   font-family: var(--vscode-font-family, monospace);
 }
+
+/* Inline rename overlay (PLC-111) */
+.rename-input {
+  position: absolute;
+  z-index: 10;
+  font-family: var(--vscode-font-family, monospace);
+  font-size: 11px;
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #d4d4d4);
+  border: 1px solid var(--vscode-focusBorder, #0e639c);
+  padding: 2px 4px;
+}

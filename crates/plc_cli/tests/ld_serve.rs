@@ -315,3 +315,134 @@ fn unknown_op_emits_error() {
     assert_eq!(error["event"], "error", "{error}");
     session.expect_exhausted();
 }
+
+#[test]
+fn set_interval_survives_reload() {
+    let mut session = Session::new();
+    session.hello();
+    session.load(TIMER_LD);
+    session.set_interval(50);
+    session.tick();
+    session.load(TIMER_LD);
+    session.tick();
+    session.run();
+
+    session.expect_ready();
+    session.expect_loaded();
+    let (state1, _) = session.expect_state_and_flow();
+    assert_eq!(state1["timeMs"], 50, "interval 50 applies");
+    session.expect_loaded();
+    let (state2, _) = session.expect_state_and_flow();
+    assert_eq!(state2["timeMs"], 50, "interval kept across reload");
+    session.expect_exhausted();
+}
+
+#[test]
+fn error_diagnostics_reach_client_when_conversion_fails() {
+    let mut session = Session::new();
+    session.hello();
+    // Unknown FB type → LD0003 error → conversion fails, but the codes
+    // must still reach the client.
+    session.load(
+        r#"{"name":"P","rungs":[{"branches":[{"elements":[{"name":"A","negated":false}]}],
+            "outputs":[{"kind":"block","fb_type":"NOPE","instance":"T1","inputs":[],"outputs":[]}]}]}"#,
+    );
+    session.run();
+
+    session.expect_ready();
+    let diagnostics = session.next_event();
+    assert_eq!(diagnostics["event"], "diagnostics", "{diagnostics}");
+    assert!(
+        diagnostics["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d["code"] == "LD0003"),
+        "{diagnostics}"
+    );
+    let error = session.next_event();
+    assert_eq!(error["event"], "error", "{error}");
+    session.expect_exhausted();
+}
+
+#[test]
+fn unforce_removes_the_force() {
+    let mut session = Session::new();
+    session.hello();
+    session.load(TIMER_LD);
+    session.set_interval(100);
+    session.force("Start", true);
+    session.tick();
+    session.send(json!({"op": "unforce", "name": "Start"}));
+    session.tick();
+    session.run();
+
+    session.expect_ready();
+    session.expect_loaded();
+    let (state1, _) = session.expect_state_and_flow();
+    assert!(
+        state1["forced"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f.as_str() == Some("start")),
+        "force listed: {}",
+        state1["forced"]
+    );
+    let (state2, _) = session.expect_state_and_flow();
+    assert_eq!(
+        state2["forced"].as_array().unwrap().len(),
+        0,
+        "unforce clears the list: {}",
+        state2["forced"]
+    );
+    session.expect_exhausted();
+}
+
+#[test]
+fn ready_catalog_lists_every_standard_fb() {
+    let mut session = Session::new();
+    session.hello();
+    session.run();
+    let ready = session.next_event();
+    let catalog = ready["fbCatalog"].as_array().unwrap();
+    assert_eq!(catalog.len(), 8, "all standard FBs present: {catalog:?}");
+    session.expect_exhausted();
+}
+
+#[test]
+fn mutating_op_without_load_emits_error() {
+    let mut session = Session::new();
+    session.hello();
+    session.set_input("Start", true);
+    session.run();
+    session.expect_ready();
+    let error = session.next_event();
+    assert_eq!(error["event"], "error", "{error}");
+    assert!(
+        error["message"].as_str().unwrap().contains("no program"),
+        "{error}"
+    );
+    session.expect_exhausted();
+}
+
+/// Regression (PLC-113 review): `plc ld <file> --watch` must emit the
+/// power-flow JSON — an `args.any()` scan used to eat the --watch flag.
+#[test]
+fn ld_watch_flag_dispatches_to_power_flow() {
+    let binary = env!("CARGO_BIN_EXE_plc");
+    let fixture = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tests/ld/motor_control.ld"
+    );
+    let output = std::process::Command::new(binary)
+        .args(["ld", fixture, "--watch"])
+        .output()
+        .expect("spawn plc");
+    assert!(output.status.success(), "exit: {}", output.status);
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("\"rungs\""),
+        "--watch must print power-flow JSON, got: {stdout}"
+    );
+}

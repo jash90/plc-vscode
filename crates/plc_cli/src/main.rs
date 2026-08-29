@@ -52,19 +52,23 @@ fn run() -> Result<(), String> {
             Ok(())
         }
         Some("ld") => {
-            let path = args
-                .next()
-                .map(PathBuf::from)
-                .ok_or_else(|| USAGE.to_owned())?;
-            let serve = args.any(|flag| flag == "--serve");
+            // Collect first: Iterator::any would consume the tail and eat
+            // --watch when --serve is absent.
+            let rest: Vec<String> = args.collect();
+            let serve = rest.iter().any(|flag| flag == "--serve");
             if serve {
-                // The program arrives via the `load` op, not the file
-                // argument (kept for CLI shape compatibility).
+                // The program arrives via the `load` op; no file argument
+                // is needed (mirrors `plc debug`).
                 let stdin = std::io::BufReader::new(std::io::stdin());
                 return plc_cli::run_ld_serve(stdin, std::io::stdout())
                     .map_err(|error| format!("serve loop failed: {error}"));
             }
-            let watch = args.next().map(|flag| flag == "--watch").unwrap_or(false);
+            let path = rest
+                .iter()
+                .find(|flag| !flag.starts_with("--"))
+                .map(PathBuf::from)
+                .ok_or_else(|| USAGE.to_owned())?;
+            let watch = rest.iter().any(|flag| flag == "--watch");
             run_ld_file(path, watch)
         }
         // Debug Adapter Protocol server over stdio; the program path arrives in

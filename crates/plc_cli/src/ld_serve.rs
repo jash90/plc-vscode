@@ -64,23 +64,49 @@ pub fn run_ld_serve<R: BufRead, W: Write>(input: R, mut output: W) -> std::io::R
             )?,
             Op::Load { json } | Op::Reload { json } => session.load(json, &mut output)?,
             Op::SetInterval { ms } => {
-                if let Some(runtime) = session.runtime.as_mut() {
+                if ms < 0 {
+                    emit(
+                        &mut output,
+                        json!({"event": "error", "message": "setInterval: ms must be >= 0"}),
+                    )?;
+                    continue;
+                }
+                session.interval_ms = Some(ms);
+                if let Some(runtime) = session.runtime_mut() {
                     runtime.set_scan_interval_ms(ms);
                 }
             }
             Op::SetInput { name, value } => {
-                if let Some(runtime) = session.runtime.as_mut() {
+                if let Some(runtime) = session.runtime_mut() {
                     runtime.set_input(&name, json_to_value(&value));
+                } else {
+                    emit(
+                        &mut output,
+                        json!({"event": "error", "message": "setInput: no program loaded"}),
+                    )?;
+                    continue;
                 }
             }
             Op::Force { name, value } => {
-                if let Some(runtime) = session.runtime.as_mut() {
+                if let Some(runtime) = session.runtime_mut() {
                     runtime.force(&name, json_to_value(&value));
+                } else {
+                    emit(
+                        &mut output,
+                        json!({"event": "error", "message": "force: no program loaded"}),
+                    )?;
+                    continue;
                 }
             }
             Op::Unforce { name } => {
-                if let Some(runtime) = session.runtime.as_mut() {
+                if let Some(runtime) = session.runtime_mut() {
                     runtime.unforce(&name);
+                } else {
+                    emit(
+                        &mut output,
+                        json!({"event": "error", "message": "unforce: no program loaded"}),
+                    )?;
+                    continue;
                 }
             }
             Op::Tick => session.tick(&mut output)?,
@@ -90,12 +116,19 @@ pub fn run_ld_serve<R: BufRead, W: Write>(input: R, mut output: W) -> std::io::R
     Ok(())
 }
 
-/// Server state: the loaded LD model and its runtime.
+/// Server state: the loaded (model, runtime) pair — set and cleared
+/// together — plus the client's chosen scan interval (kept across reloads).
 #[derive(Default)]
 struct Session {
-    ld: Option<LdProgram>,
-    runtime: Option<Runtime>,
+    loaded: Option<(LdProgram, Runtime)>,
     scan: u64,
+    interval_ms: Option<i64>,
+}
+
+impl Session {
+    fn runtime_mut(&mut self) -> Option<&mut Runtime> {
+        self.loaded.as_mut().map(|(_ld, runtime)| runtime)
+    }
 }
 
 impl Session {
@@ -112,25 +145,15 @@ impl Session {
         normalize_ids(&mut program);
         let diagnostics = validate(&program);
 
-        // LD → ST → runtime, exactly like `plc ld`.
-        let registry = LanguageRegistry::with_builtins();
-        let document = plc_api::SourceDocument::new("file:///served.ld".to_owned(), 0, json);
-        let result = registry.convert("ld", "st", &document);
-        if let Some(error) = result.error {
-            return emit(
-                output,
-                json!({"event": "error", "message": format!("ld → st conversion failed: {error:?}")}),
-            );
-        }
-        let mut runtime = Runtime::from_source(&result.text);
-        runtime.set_scan_interval_ms(SCAN_INTERVAL_MS);
-        self.ld = Some(program);
-        self.runtime = Some(runtime);
-        self.scan = 0;
-        emit(output, json!({"event": "loaded", "ok": true}))?;
-
-        // Warnings ride along after `loaded` (errors already failed above).
-        if !diagnostics.is_empty() {
+        // Diagnostics first — errors fail the conversion below, and the
+        // LD codes must reach the client either way.
+        fn emit_diagnostics(
+            diagnostics: &[plc_ld::LdDiagnostic],
+            output: &mut impl Write,
+        ) -> std::io::Result<()> {
+            if diagnostics.is_empty() {
+                return Ok(());
+            }
             let items: Vec<Value> = diagnostics
                 .iter()
                 .map(|d| {
@@ -146,13 +169,32 @@ impl Session {
                     })
                 })
                 .collect();
-            emit(output, json!({"event": "diagnostics", "items": items}))?;
+            emit(output, json!({"event": "diagnostics", "items": items}))
         }
+
+        // LD → ST → runtime, exactly like `plc ld`.
+        let registry = LanguageRegistry::with_builtins();
+        let document = plc_api::SourceDocument::new("file:///served.ld".to_owned(), 0, json);
+        let result = registry.convert("ld", "st", &document);
+        if result.error.is_some() {
+            emit_diagnostics(&diagnostics, output)?;
+            return emit(
+                output,
+                json!({"event": "error", "message": "ld → st conversion failed: see diagnostics"}),
+            );
+        }
+        let mut runtime = Runtime::from_source(&result.text);
+        runtime.set_scan_interval_ms(self.interval_ms.unwrap_or(SCAN_INTERVAL_MS));
+        self.loaded = Some((program, runtime));
+        self.scan = 0;
+        emit(output, json!({"event": "loaded", "ok": true}))?;
+        emit_diagnostics(&diagnostics, output)?;
+
         Ok(())
     }
 
     fn tick(&mut self, output: &mut impl Write) -> std::io::Result<()> {
-        let Some(runtime) = self.runtime.as_mut() else {
+        let Some((program, runtime)) = self.loaded.as_mut() else {
             return emit(
                 output,
                 json!({"event": "error", "message": "no program loaded"}),
@@ -179,10 +221,7 @@ impl Session {
             }),
         )?;
 
-        let flow = match self.ld.as_ref() {
-            Some(program) => evaluate_power_flow(program, &var_state_from_watch(&runtime.watch())),
-            None => return Ok(()),
-        };
+        let flow = evaluate_power_flow(program, &var_state_from_watch(&watch));
         emit(output, json!({"event": "powerFlow", "rungs": flow.rungs}))
     }
 }

@@ -128,9 +128,10 @@ fn hir_type_from_name_divergences_used_by_the_file() {
     assert_eq!(HirType::from_name("REAL"), HirType::Real);
     assert_eq!(HirType::from_name("STRING"), HirType::Str);
     assert_eq!(HirType::from_name("TIME"), HirType::Time);
-    // Bit-strings and FB instance types are not modeled by the HIR type set.
+    // Bit-strings are not modeled by the HIR type set.
     assert_eq!(HirType::from_name("WORD"), HirType::Unknown);
-    assert_eq!(HirType::from_name("TON"), HirType::Unknown);
+    // FB instance types are modeled as Named so ST rendering preserves them.
+    assert_eq!(HirType::from_name("TON"), HirType::Named("TON".to_owned()));
 }
 
 #[test]
@@ -146,14 +147,14 @@ fn lowers_var_types_for_mixed_declarations() {
     let src = "PROGRAM P\nVAR\n iA:INT; rA:REAL; xA:BOOL; sImie:STRING[20]; tA:TIME; wA:WORD; fbTON:TON;\nEND_VAR\nEND_PROGRAM\n";
     let module = lower_source(src);
     let vars = &module.programs[0].vars;
-    let ty = |name: &str| vars.iter().find(|v| v.name == name).unwrap().ty;
+    let ty = |name: &str| vars.iter().find(|v| v.name == name).unwrap().ty.clone();
     assert_eq!(ty("iA"), HirType::Int);
     assert_eq!(ty("rA"), HirType::Real);
     assert_eq!(ty("xA"), HirType::Bool);
     assert_eq!(ty("sImie"), HirType::Str);
     assert_eq!(ty("tA"), HirType::Time);
     assert_eq!(ty("wA"), HirType::Unknown);
-    assert_eq!(ty("fbTON"), HirType::Unknown);
+    assert_eq!(ty("fbTON"), HirType::Named("TON".to_owned()));
 }
 
 #[test]

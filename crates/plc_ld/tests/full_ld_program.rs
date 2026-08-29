@@ -18,9 +18,9 @@ fn fixture_parses_and_lowers() {
     assert_eq!(module.programs.len(), 1);
     let prog = &module.programs[0];
 
-    // Seal-in rung + timer rung + counter rung + reset rung = 4 statements.
-    // (normal coil + FbCall + FbCall + Reset)
-    assert_eq!(prog.statements.len(), 4);
+    // Seal-in rung (coil) + timer rung (FbCall + Done := Timer.Q) + counter
+    // rung (FbCall + Reached := Counter.Q) + reset rung = 6 statements.
+    assert_eq!(prog.statements.len(), 6);
 }
 
 #[test]

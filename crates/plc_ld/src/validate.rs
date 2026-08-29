@@ -247,8 +247,37 @@ fn validate_output(
                     });
                 }
             }
+
+            // Output-pin values become assignment targets (`Done := Inst.Q;`),
+            // so they must be identifiers — a literal would render an ST
+            // statement the runtime silently skips.
+            for arg in outputs {
+                if !is_identifier(&arg.value) {
+                    diagnostics.push(LdDiagnostic {
+                        code: "LD0006",
+                        severity: LdSeverity::Error,
+                        element_id: id.clone(),
+                        rung: rung_index,
+                        message: format!(
+                            "output pin '{}' must be wired to a variable name, \
+                             got '{}'",
+                            arg.name, arg.value
+                        ),
+                    });
+                }
+            }
         }
     }
+}
+
+/// True for IEC-style identifiers: letter/underscore, then alnum/underscore.
+fn is_identifier(name: &str) -> bool {
+    let mut chars = name.trim().chars();
+    match chars.next() {
+        Some(first) if first.is_ascii_alphabetic() || first == '_' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 /// Pin-name acceptance matching the runtime: case-insensitive, with the

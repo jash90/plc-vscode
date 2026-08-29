@@ -14,13 +14,15 @@
 use plc_syntax::{PouKind, StatementKind, parse_source};
 
 /// HIR scalar type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HirType {
     Bool,
     Int,
     Real,
     Str,
     Time,
+    /// A named type — function-block (TON, CTU, …) or user-defined.
+    Named(String),
     Unknown,
 }
 
@@ -32,6 +34,11 @@ impl HirType {
             "REAL" | "LREAL" => HirType::Real,
             "STRING" | "WSTRING" => HirType::Str,
             "TIME" | "DATE" | "TIME_OF_DAY" | "TOD" | "DATE_AND_TIME" | "DT" => HirType::Time,
+            // Standard IEC 61131-3 function-block types keep their name so the
+            // rendered ST declares the instance correctly (e.g. `Delay : TON;`).
+            "TON" | "TOF" | "TP" | "CTU" | "CTD" | "CTUD" | "R_TRIG" | "F_TRIG" => {
+                HirType::Named(name.trim().to_ascii_uppercase())
+            }
             _ => HirType::Unknown,
         }
     }

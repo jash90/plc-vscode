@@ -91,14 +91,14 @@ fn render_structured_text(module: &HirModule) -> RenderResult {
         if !program.vars.is_empty() {
             out.push_str("VAR\n");
             for var in &program.vars {
-                let type_name = match hir_type_name(var.ty) {
+                let type_name = match hir_type_name(var.ty.clone()) {
                     Some(name) => name,
                     None => {
                         fidelity.push(format!(
                             "variable `{}` has a type not modeled by the IR; rendered as INT",
                             var.name
                         ));
-                        "INT"
+                        "INT".to_owned()
                     }
                 };
                 out.push_str(&format!("    {} : {};\n", var.name, type_name));
@@ -232,13 +232,14 @@ fn pou_keywords(kind: HirPouKind) -> (&'static str, &'static str) {
     }
 }
 
-fn hir_type_name(ty: HirType) -> Option<&'static str> {
+fn hir_type_name(ty: HirType) -> Option<String> {
     match ty {
-        HirType::Bool => Some("BOOL"),
-        HirType::Int => Some("INT"),
-        HirType::Real => Some("REAL"),
-        HirType::Str => Some("STRING"),
-        HirType::Time => Some("TIME"),
+        HirType::Bool => Some("BOOL".to_owned()),
+        HirType::Int => Some("INT".to_owned()),
+        HirType::Real => Some("REAL".to_owned()),
+        HirType::Str => Some("STRING".to_owned()),
+        HirType::Time => Some("TIME".to_owned()),
+        HirType::Named(name) => Some(name),
         HirType::Unknown => None,
     }
 }

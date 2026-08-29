@@ -63,7 +63,11 @@ fn render_il(module: &HirModule) -> RenderResult {
         if !program.vars.is_empty() {
             out.push_str("VAR\n");
             for var in &program.vars {
-                out.push_str(&format!("    {} : {};\n", var.name, hir_type_name(var.ty)));
+                out.push_str(&format!(
+                    "    {} : {};\n",
+                    var.name,
+                    hir_type_name(var.ty.clone())
+                ));
             }
             out.push_str("END_VAR\n");
         }
@@ -340,14 +344,16 @@ fn pou_keywords(kind: HirPouKind) -> (&'static str, &'static str) {
     }
 }
 
-fn hir_type_name(ty: HirType) -> &'static str {
+fn hir_type_name(ty: HirType) -> String {
     match ty {
-        HirType::Bool => "BOOL",
-        HirType::Int => "INT",
-        HirType::Real => "REAL",
-        HirType::Str => "STRING",
-        HirType::Time => "TIME",
-        HirType::Unknown => "INT",
+        HirType::Bool => "BOOL".to_owned(),
+        HirType::Int => "INT".to_owned(),
+        HirType::Real => "REAL".to_owned(),
+        HirType::Str => "STRING".to_owned(),
+        HirType::Time => "TIME".to_owned(),
+        // FB instance types keep their name in the IL rendering too.
+        HirType::Named(name) => name,
+        HirType::Unknown => "INT".to_owned(),
     }
 }
 

@@ -51,6 +51,7 @@ const protocol_1 = require("./ldWebview/protocol");
 const ldDocument_1 = require("./ldDocument");
 const ldCli_1 = require("./ldCli");
 const simClient_1 = require("./ld/simClient");
+const ldCapture_1 = require("./ldCapture");
 /** Open documents by URI so split views share one undo stack. */
 const documents = new Map();
 class LdEditorProvider {
@@ -308,7 +309,7 @@ class LdEditorProvider {
     async updatePowerFlow(post, uri) {
         try {
             const invocation = (0, ldCli_1.resolveRunInvocation)(this.context, 'ld', [uri.fsPath, '--watch']);
-            const result = await capture(invocation);
+            const result = await (0, ldCapture_1.capture)(invocation);
             post({ type: 'powerFlow', json: result });
         }
         catch (error) {
@@ -387,26 +388,4 @@ function getNonce() {
     return text;
 }
 /** Run an invocation and resolve with stdout (reject on non-zero exit). */
-function capture(invocation) {
-    return new Promise((resolve, reject) => {
-        const child = (0, node_child_process_1.spawn)(invocation.command, invocation.args, invocation.cwd ? { cwd: invocation.cwd } : undefined);
-        let stdout = '';
-        let stderr = '';
-        child.stdout.on('data', (chunk) => {
-            stdout += chunk.toString();
-        });
-        child.stderr.on('data', (chunk) => {
-            stderr += chunk.toString();
-        });
-        child.on('close', (code) => {
-            if (code === 0) {
-                resolve(stdout);
-            }
-            else {
-                reject(new Error(stderr || `Exit code ${code}`));
-            }
-        });
-        child.on('error', reject);
-    });
-}
 //# sourceMappingURL=ldEditor.js.map

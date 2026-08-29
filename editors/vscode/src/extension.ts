@@ -5,6 +5,7 @@ import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-lan
 import { CLI_BINARY, SERVER_BINARY, bundledBinaryRelativePath } from './bundled';
 import { resolveRunInvocation } from './ldCli';
 import { LdEditorProvider } from './ldEditor';
+import { exportPlcopen, importPlcopen } from './plcopen';
 
 let client: LanguageClient | undefined;
 let outputChannel: vscode.OutputChannel | undefined;
@@ -134,7 +135,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Ladder Diagram custom editor for .ld files.
   context.subscriptions.push(
-    vscode.window.registerCustomEditorProvider(
+vscode.commands.registerCommand('plc-vscode.exportPlcopen', () => exportPlcopen(context)),
+    vscode.commands.registerCommand('plc-vscode.importPlcopen', () => importPlcopen(context)),
+        vscode.window.registerCustomEditorProvider(
       'plc-vscode.ldEditor',
       new LdEditorProvider(context),
       {

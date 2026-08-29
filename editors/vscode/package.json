@@ -252,11 +252,12 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
+    "compile": "npm run build:webview && tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node test/package-contract.test.js && node test/verify-vsix.test.js",
+    "test": "npm run compile && node test/package-contract.test.js && node test/verify-vsix.test.js && node test/ldWebview/protocol.test.js && node test/ldWebview/model.test.js && node test/ldWebview/layout.test.js && node test/ldWebview/render.test.js",
     "verify-vsix": "node scripts/verify-vsix.js",
-    "package": "vsce package --no-dependencies"
+    "package": "vsce package --no-dependencies",
+    "build:webview": "node esbuild.js"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
@@ -265,6 +266,7 @@
     "@types/node": "^22.10.0",
     "@types/vscode": "^1.92.0",
     "@vscode/vsce": "^3.2.1",
+    "esbuild": "^0.28.2",
     "typescript": "^5.7.2"
   },
   "repository": {

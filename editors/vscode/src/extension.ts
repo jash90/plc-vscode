@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import * as vscode from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node';
 import { CLI_BINARY, SERVER_BINARY, bundledBinaryRelativePath } from './bundled';
+import { resolveRunInvocation } from './ldCli';
 import { LdEditorProvider } from './ldEditor';
 
 let client: LanguageClient | undefined;
@@ -15,53 +16,6 @@ function workspaceRoot(context: vscode.ExtensionContext): string {
 /** Installed (Marketplace) extensions run in Production mode. */
 function isProduction(context: vscode.ExtensionContext): boolean {
   return context.extensionMode === vscode.ExtensionMode.Production;
-}
-
-interface RunInvocation {
-  command: string;
-  args: string[];
-  cwd?: string;
-}
-
-/**
- * Build the command/args to invoke a `plc` subcommand (`run`, `debug`, …),
- * shared by the run command and the debug adapter so both resolve the dev
- * (cargo) vs production (bundled binary) launch the same way.
- */
-function resolveRunInvocation(
-  context: vscode.ExtensionContext,
-  subcommand: string,
-  extraArgs: string[],
-): RunInvocation {
-  if (isProduction(context)) {
-    // Installed extension: run the bundled CLI binary directly.
-    return {
-      command: context.asAbsolutePath(bundledBinaryRelativePath(CLI_BINARY)),
-      args: [subcommand, ...extraArgs],
-    };
-  }
-
-  // Development: drive the workspace CLI via cargo. `cliArgs` ends with the
-  // `run` subcommand by default; swap that trailing subcommand for the
-  // requested one so `run` and `debug` share the same cargo prefix.
-  const config = vscode.workspace.getConfiguration('plcVscode');
-  const command = config.get<string>('cliCommand', 'cargo');
-  const cliArgs = config.get<string[]>('cliArgs', [
-    'run',
-    '--quiet',
-    '--package',
-    'plc_cli',
-    '--',
-    'run',
-  ]);
-  const cargoPrefix = cliArgs.slice(0, -1);
-  const repositoryRoot = config.get<string>('repositoryRoot', '') || workspaceRoot(context);
-
-  return {
-    command,
-    args: [...cargoPrefix, subcommand, ...extraArgs],
-    cwd: repositoryRoot,
-  };
 }
 
 function serverOptions(context: vscode.ExtensionContext): ServerOptions {

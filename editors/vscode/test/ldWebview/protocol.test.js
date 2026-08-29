@@ -29,8 +29,7 @@ check('host powerFlow message round-trips', () => {
 });
 
 check('webview save message round-trips', () => {
-  const message = { type: 'save', text: '{}' };
-  assert.deepStrictEqual(parseWebviewMessage(message), message);
+  assert.deepStrictEqual(parseWebviewMessage({ type: 'save' }), { type: 'save' });
 });
 
 check('webview run message round-trips', () => {
@@ -47,6 +46,17 @@ check('non-object host message throws', () => {
 
 check('unknown webview message type throws', () => {
   assert.throws(() => parseWebviewMessage({ type: 'nope' }), /unknown webview message/);
+});
+
+
+check('webview edit message round-trips with its command', () => {
+  const message = { type: 'edit', command: { type: 'addContact', label: 'Add contact A', rung: 0, branch: 0, index: -1, name: 'A', negated: false } };
+  assert.deepStrictEqual(parseWebviewMessage(message), message);
+});
+
+check('webview undo and redo round-trip', () => {
+  assert.deepStrictEqual(parseWebviewMessage({ type: 'undo' }), { type: 'undo' });
+  assert.deepStrictEqual(parseWebviewMessage({ type: 'redo' }), { type: 'redo' });
 });
 
 if (failures > 0) {

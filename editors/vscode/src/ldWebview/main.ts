@@ -1,17 +1,14 @@
 /**
- * LD webview UI glue: owns the in-memory program, renders SVG, and talks to
- * the extension host exclusively through the typed protocol. DOM-heavy by
- * design — everything testable lives in the pure sibling modules. Bundled by
- * esbuild (excluded from tsc; no vscode import).
+ * LD webview UI glue: renders SVG and forwards user edits to the extension
+ * host as typed commands. The host owns the document and its undo history
+ * (PLC-111); the webview never mutates state it cannot undo. DOM-heavy by
+ * design — everything testable lives in the pure sibling modules. Bundled
+ * by esbuild (excluded from tsc; no vscode import).
  */
 
 import { parseHostMessage, WebviewToHost } from './protocol';
-import {
-  LdProgram,
-  normalizeIds,
-  parseProgram,
-  serializeProgram,
-} from './model';
+import { LdProgram, normalizeIds, parseProgram, serializeProgram } from './model';
+import { LdCommand, commands, paletteCommands } from './commands';
 import { layout } from './layout';
 import { PowerFlow, renderSvg } from './render';
 
@@ -32,7 +29,7 @@ function byId<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
-/** Palette of LD elements (kept identical to the PLC-105 editor). */
+/** Palette of LD elements. */
 const ELEMENT_PALETTE = [
   { type: 'no-contact', label: '| |', title: 'Normally-Open Contact' },
   { type: 'nc-contact', label: '|/|', title: 'Normally-Closed Contact' },
@@ -42,6 +39,14 @@ const ELEMENT_PALETTE = [
   { type: 'ton', label: 'TON', title: 'Timer On Delay' },
   { type: 'ctu', label: 'CTU', title: 'Count Up' },
 ];
+
+function send(command: LdCommand): void {
+  vscode.postMessage({ type: 'edit', command });
+}
+
+function sendReplace(next: LdProgram): void {
+  vscode.postMessage({ type: 'modelChanged', program: next });
+}
 
 function render(): void {
   normalizeIds(program);
@@ -74,81 +79,71 @@ function bindElementClicks(): void {
       const rung = Number(node.getAttribute('data-rung'));
       const branch = Number(node.getAttribute('data-branch'));
       const index = Number(node.getAttribute('data-index'));
-      renameElement(rung, branch, index);
+      beginRename(rung, branch, index, node as SVGElement);
     });
   });
 }
 
-function renameElement(rung: number, branch: number, index: number): void {
-  // Feature parity with the PLC-105 editor: rename via prompt(). The
-  // document-lifecycle task (PLC-111) replaces this with inline editing.
-  const output = program.rungs[rung]?.outputs[index];
-  if (output && branch === -1) {
-    if (output.kind === 'coil') {
-      const name = window.prompt('Variable name:', output.name);
-      if (name !== null && name.trim().length > 0) {
-        output.name = name.trim();
-        modelChanged();
-      }
-    }
+/**
+ * Inline rename: an overlay input over the element (PLC-111 replaces the
+ * old prompt() dialogs). Enter commits a rename command; Escape cancels.
+ * Positioning uses style attributes (allowed for styles by the CSP).
+ */
+function beginRename(rung: number, branch: number, index: number, node: SVGElement): void {
+  const existing = document.getElementById('rename-input');
+  if (existing) {
+    existing.remove();
     return;
   }
-  const contact = program.rungs[rung]?.branches[branch]?.elements[index];
+  const contact =
+    branch === -1 ? undefined : program.rungs[rung]?.branches[branch]?.elements[index];
+  const output = branch === -1 ? program.rungs[rung]?.outputs[index] : undefined;
   if (contact) {
-    const name = window.prompt('Variable name:', contact.name);
-    if (name !== null && name.trim().length > 0) {
-      contact.name = name.trim();
-      modelChanged();
-    }
+    // Contacts rename directly.
+  } else if (output && output.kind === 'coil') {
+    // Coils rename directly.
+  } else {
+    return; // blocks (and missing elements) rename in a later task
   }
-}
+  const currentName = contact ? contact.name : (output as { name: string }).name;
+  const box = (node as unknown as SVGGraphicsElement).getBBox();
+  const input = document.createElement('input');
+  input.id = 'rename-input';
+  input.className = 'rename-input';
+  input.value = currentName;
+  input.style.left = `${box.x}px`;
+  input.style.top = `${box.y}px`;
+  input.style.width = `${Math.max(box.width, 90)}px`;
+  const container = byId('canvas-container');
+  container.style.position = 'relative';
+  container.appendChild(input);
+  input.focus();
+  input.select();
 
-function modelChanged(): void {
-  render();
-  vscode.postMessage({ type: 'modelChanged', program });
-}
-
-function addElement(type: string): void {
-  if (program.rungs.length === 0) {
-    program.rungs.push({ branches: [{ elements: [] }], outputs: [] });
-  }
-  const last = program.rungs[program.rungs.length - 1];
-
-  switch (type) {
-    case 'no-contact':
-    case 'nc-contact':
-      if (last.branches.length === 0) {
-        last.branches.push({ elements: [] });
-      }
-      last.branches[0].elements.push({ name: 'NewVar', negated: type === 'nc-contact' });
-      break;
-    case 'coil':
-    case 'set-coil':
-    case 'reset-coil':
-      last.outputs.push({
-        kind: 'coil',
-        name: 'OutVar',
-        variant: type === 'coil' ? 'normal' : type === 'set-coil' ? 'set' : 'reset',
-      });
-      break;
-    case 'ton':
-    case 'ctu': {
-      const isTon = type === 'ton';
-      last.outputs.push({
-        kind: 'block',
-        fb_type: isTon ? 'TON' : 'CTU',
-        instance: isTon ? 'TON_inst' : 'CTU_inst',
-        inputs: isTon
-          ? [{ name: 'IN', value: 'NewVar' }, { name: 'PT', value: 'T#1s' }]
-          : [{ name: 'CU', value: 'NewVar' }, { name: 'PV', value: '10' }],
-        outputs: [{ name: 'Q', value: 'Done' }],
-      });
-      break;
-    }
-    default:
+  // One-shot guard: removing a focused input fires blur, which would
+  // otherwise commit twice; Escape cancels without committing.
+  let settled = false;
+  const close = (commit: boolean): void => {
+    if (settled) {
       return;
-  }
-  modelChanged();
+    }
+    settled = true;
+    const name = input.value.trim();
+    input.remove();
+    if (commit && name.length > 0 && name !== currentName) {
+      send(commands.renameVariable(rung, branch, index, name));
+    }
+  };
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      close(true);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      close(false);
+    }
+  });
+  input.addEventListener('blur', () => close(true));
 }
 
 function wire(): void {
@@ -158,17 +153,22 @@ function wire(): void {
     node.className = 'palette-item';
     node.title = item.title;
     node.textContent = item.label;
-    node.addEventListener('click', () => addElement(item.type));
+    node.addEventListener('click', () => {
+      // The whole sequence is computed up front against the current program
+      // (pure paletteCommands) — a not-yet-synced local model cannot
+      // corrupt the addressing of the follow-up command.
+      for (const command of paletteCommands(program, item.type)) {
+        send(command);
+      }
+    });
     palette.appendChild(node);
   }
 
   byId('btn-save').addEventListener('click', () => {
-    const textarea = byId<HTMLTextAreaElement>('ld-textarea');
-    const text =
-      textarea.style.display !== 'none'
-        ? textarea.value
-        : serializeProgram(program);
-    vscode.postMessage({ type: 'save', text });
+    // Clicking the button blurs the JSON textarea first, committing its
+    // content via the change event; the host then routes through VS Code's
+    // save flow, which serializes the document's canonical model.
+    vscode.postMessage({ type: 'save' });
   });
 
   byId('btn-run').addEventListener('click', () => {
@@ -185,11 +185,42 @@ function wire(): void {
 
   byId('ld-textarea').addEventListener('input', (event) => {
     try {
-      program = parseProgram((event.target as HTMLTextAreaElement).value);
-      byId('ld-canvas').innerHTML = renderSvg(layout(program), program, powerFlow);
+      const next = parseProgram((event.target as HTMLTextAreaElement).value);
+      byId('ld-canvas').innerHTML = renderSvg(layout(next), next, powerFlow);
+      program = next;
       updateStatus();
     } catch {
       // Ignore parse errors while typing.
+    }
+  });
+
+  byId('ld-textarea').addEventListener('change', (event) => {
+    // Committing the JSON edit pushes it through the document as one
+    // undoable replacement.
+    try {
+      sendReplace(parseProgram((event.target as HTMLTextAreaElement).value));
+    } catch {
+      // Leave the document untouched on invalid JSON.
+    }
+  });
+
+  // Undo/redo: VS Code handles them when focus is outside the webview;
+  // forward them when it is inside — but never hijack text editing (the
+  // rename input and JSON textarea keep their native undo).
+  window.addEventListener('keydown', (event) => {
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+      return;
+    }
+    const meta = event.metaKey || event.ctrlKey;
+    if (!meta || event.key.toLowerCase() !== 'z') {
+      return;
+    }
+    event.preventDefault();
+    if (event.shiftKey) {
+      vscode.postMessage({ type: 'redo' });
+    } else {
+      vscode.postMessage({ type: 'undo' });
     }
   });
 

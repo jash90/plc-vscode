@@ -109,6 +109,117 @@
 `;
   }
 
+  // src/ldWebview/commands.ts
+  var commands = {
+    addRung() {
+      return { type: "addRung", label: "Add rung", rung: -1, branch: -1, index: -1 };
+    },
+    deleteRung(rung) {
+      return { type: "deleteRung", label: `Delete rung ${rung + 1}`, rung, branch: -1, index: -1 };
+    },
+    setRungComment(rung, comment) {
+      return { type: "setRungComment", label: "Comment rung", rung, branch: -1, index: -1, comment };
+    },
+    addContact(rung, branch, name, negated) {
+      return { type: "addContact", label: `Add contact ${name}`, rung, branch, index: -1, name, negated };
+    },
+    insertParallelBranch(rung, contactName) {
+      return {
+        type: "insertParallelBranch",
+        label: "Add parallel branch",
+        rung,
+        branch: -1,
+        index: -1,
+        name: contactName
+      };
+    },
+    addCoil(rung, name, variant) {
+      return { type: "addCoil", label: `Add coil ${name}`, rung, branch: -1, index: -1, name, variant };
+    },
+    addBlock(rung, output) {
+      return { type: "addBlock", label: `Add ${output.fb_type}`, rung, branch: -1, index: -1, output };
+    },
+    deleteElement(rung, branch, index) {
+      return { type: "deleteElement", label: "Delete element", rung, branch, index };
+    },
+    toggleNegate(rung, branch, index) {
+      return { type: "toggleNegate", label: "Toggle contact type", rung, branch, index };
+    },
+    renameVariable(rung, branch, index, name) {
+      return { type: "renameVariable", label: `Rename to ${name}`, rung, branch, index, name };
+    },
+    setCoilVariant(rung, outputIndex, variant) {
+      return {
+        type: "setCoilVariant",
+        label: `Coil \u2192 (${variant})`,
+        rung,
+        branch: -1,
+        index: outputIndex,
+        variant
+      };
+    },
+    /** Wholesale model replacement (the JSON textarea path), one undo step. */
+    replaceProgram(program2) {
+      return {
+        type: "replaceProgram",
+        label: "Edit JSON",
+        rung: -1,
+        branch: -1,
+        index: -1,
+        program: program2
+      };
+    }
+  };
+  function paletteCommands(program2, paletteType) {
+    const elementCommand = (rung) => {
+      switch (paletteType) {
+        case "no-contact":
+        case "nc-contact": {
+          const branches = program2.rungs[rung]?.branches.length ?? 0;
+          return commands.addContact(rung, Math.max(branches - 1, 0), "NewVar", paletteType === "nc-contact");
+        }
+        case "coil":
+        case "set-coil":
+        case "reset-coil":
+          return commands.addCoil(
+            rung,
+            "OutVar",
+            paletteType === "coil" ? "normal" : paletteType === "set-coil" ? "set" : "reset"
+          );
+        case "ton":
+          return commands.addBlock(rung, {
+            kind: "block",
+            fb_type: "TON",
+            instance: "TON_inst",
+            inputs: [
+              { name: "IN", value: "NewVar" },
+              { name: "PT", value: "T#1s" }
+            ],
+            outputs: [{ name: "Q", value: "Done" }]
+          });
+        case "ctu":
+          return commands.addBlock(rung, {
+            kind: "block",
+            fb_type: "CTU",
+            instance: "CTU_inst",
+            inputs: [
+              { name: "CU", value: "NewVar" },
+              { name: "PV", value: "10" }
+            ],
+            outputs: [{ name: "Q", value: "Done" }]
+          });
+        default:
+          return void 0;
+      }
+    };
+    if (program2.rungs.length === 0) {
+      const element2 = elementCommand(0);
+      return element2 ? [commands.addRung(), element2] : [];
+    }
+    const element = elementCommand(program2.rungs.length - 1);
+    return element ? [element] : [];
+  }
+
   // src/ldWebview/layout.ts
   var CELL = {
     contactW: 72,
@@ -445,6 +556,12 @@
     { type: "ton", label: "TON", title: "Timer On Delay" },
     { type: "ctu", label: "CTU", title: "Count Up" }
   ];
+  function send(command) {
+    vscode.postMessage({ type: "edit", command });
+  }
+  function sendReplace(next) {
+    vscode.postMessage({ type: "modelChanged", program: next });
+  }
   function render() {
     normalizeIds(program);
     byId("ld-canvas").innerHTML = renderSvg(layout(program), program, powerFlow);
@@ -473,73 +590,59 @@
         const rung = Number(node.getAttribute("data-rung"));
         const branch = Number(node.getAttribute("data-branch"));
         const index = Number(node.getAttribute("data-index"));
-        renameElement(rung, branch, index);
+        beginRename(rung, branch, index, node);
       });
     });
   }
-  function renameElement(rung, branch, index) {
-    const output = program.rungs[rung]?.outputs[index];
-    if (output && branch === -1) {
-      if (output.kind === "coil") {
-        const name = window.prompt("Variable name:", output.name);
-        if (name !== null && name.trim().length > 0) {
-          output.name = name.trim();
-          modelChanged();
-        }
-      }
+  function beginRename(rung, branch, index, node) {
+    const existing = document.getElementById("rename-input");
+    if (existing) {
+      existing.remove();
       return;
     }
-    const contact = program.rungs[rung]?.branches[branch]?.elements[index];
+    const contact = branch === -1 ? void 0 : program.rungs[rung]?.branches[branch]?.elements[index];
+    const output = branch === -1 ? program.rungs[rung]?.outputs[index] : void 0;
     if (contact) {
-      const name = window.prompt("Variable name:", contact.name);
-      if (name !== null && name.trim().length > 0) {
-        contact.name = name.trim();
-        modelChanged();
-      }
+    } else if (output && output.kind === "coil") {
+    } else {
+      return;
     }
-  }
-  function modelChanged() {
-    render();
-    vscode.postMessage({ type: "modelChanged", program });
-  }
-  function addElement(type) {
-    if (program.rungs.length === 0) {
-      program.rungs.push({ branches: [{ elements: [] }], outputs: [] });
-    }
-    const last = program.rungs[program.rungs.length - 1];
-    switch (type) {
-      case "no-contact":
-      case "nc-contact":
-        if (last.branches.length === 0) {
-          last.branches.push({ elements: [] });
-        }
-        last.branches[0].elements.push({ name: "NewVar", negated: type === "nc-contact" });
-        break;
-      case "coil":
-      case "set-coil":
-      case "reset-coil":
-        last.outputs.push({
-          kind: "coil",
-          name: "OutVar",
-          variant: type === "coil" ? "normal" : type === "set-coil" ? "set" : "reset"
-        });
-        break;
-      case "ton":
-      case "ctu": {
-        const isTon = type === "ton";
-        last.outputs.push({
-          kind: "block",
-          fb_type: isTon ? "TON" : "CTU",
-          instance: isTon ? "TON_inst" : "CTU_inst",
-          inputs: isTon ? [{ name: "IN", value: "NewVar" }, { name: "PT", value: "T#1s" }] : [{ name: "CU", value: "NewVar" }, { name: "PV", value: "10" }],
-          outputs: [{ name: "Q", value: "Done" }]
-        });
-        break;
-      }
-      default:
+    const currentName = contact ? contact.name : output.name;
+    const box = node.getBBox();
+    const input = document.createElement("input");
+    input.id = "rename-input";
+    input.className = "rename-input";
+    input.value = currentName;
+    input.style.left = `${box.x}px`;
+    input.style.top = `${box.y}px`;
+    input.style.width = `${Math.max(box.width, 90)}px`;
+    const container = byId("canvas-container");
+    container.style.position = "relative";
+    container.appendChild(input);
+    input.focus();
+    input.select();
+    let settled = false;
+    const close = (commit) => {
+      if (settled) {
         return;
-    }
-    modelChanged();
+      }
+      settled = true;
+      const name = input.value.trim();
+      input.remove();
+      if (commit && name.length > 0 && name !== currentName) {
+        send(commands.renameVariable(rung, branch, index, name));
+      }
+    };
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        close(true);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        close(false);
+      }
+    });
+    input.addEventListener("blur", () => close(true));
   }
   function wire() {
     const palette = byId("palette");
@@ -548,13 +651,15 @@
       node.className = "palette-item";
       node.title = item.title;
       node.textContent = item.label;
-      node.addEventListener("click", () => addElement(item.type));
+      node.addEventListener("click", () => {
+        for (const command of paletteCommands(program, item.type)) {
+          send(command);
+        }
+      });
       palette.appendChild(node);
     }
     byId("btn-save").addEventListener("click", () => {
-      const textarea = byId("ld-textarea");
-      const text = textarea.style.display !== "none" ? textarea.value : serializeProgram(program);
-      vscode.postMessage({ type: "save", text });
+      vscode.postMessage({ type: "save" });
     });
     byId("btn-run").addEventListener("click", () => {
       vscode.postMessage({ type: "run" });
@@ -568,10 +673,33 @@
     });
     byId("ld-textarea").addEventListener("input", (event) => {
       try {
-        program = parseProgram(event.target.value);
-        byId("ld-canvas").innerHTML = renderSvg(layout(program), program, powerFlow);
+        const next = parseProgram(event.target.value);
+        byId("ld-canvas").innerHTML = renderSvg(layout(next), next, powerFlow);
+        program = next;
         updateStatus();
       } catch {
+      }
+    });
+    byId("ld-textarea").addEventListener("change", (event) => {
+      try {
+        sendReplace(parseProgram(event.target.value));
+      } catch {
+      }
+    });
+    window.addEventListener("keydown", (event) => {
+      const target = event.target;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
+        return;
+      }
+      const meta = event.metaKey || event.ctrlKey;
+      if (!meta || event.key.toLowerCase() !== "z") {
+        return;
+      }
+      event.preventDefault();
+      if (event.shiftKey) {
+        vscode.postMessage({ type: "redo" });
+      } else {
+        vscode.postMessage({ type: "undo" });
       }
     });
     window.addEventListener("message", (event) => {

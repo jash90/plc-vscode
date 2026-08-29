@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 mod dap;
 
-const USAGE: &str = "usage:\n  plc run <file.st> [scans]\n  plc build <file.st> [--target cpdev] [-o <out.xcp>]\n  plc convert <from-id> <to-id> <file>   (ids: plc languages)\n  plc ld <file.ld> [--watch]             (compile+run LD, or emit power-flow JSON)\n  plc debug                              (Debug Adapter Protocol over stdio)";
+const USAGE: &str = "usage:\n  plc run <file.st> [scans]\n  plc build <file.st> [--target cpdev] [-o <out.xcp>]\n  plc convert <from-id> <to-id> <file>   (ids: plc languages)\n  plc ld <file.ld> [--watch|--serve]     (compile+run LD, power-flow JSON, or the serve protocol)\n  plc debug                              (Debug Adapter Protocol over stdio)";
 
 fn main() {
     if let Err(error) = run() {
@@ -56,6 +56,14 @@ fn run() -> Result<(), String> {
                 .next()
                 .map(PathBuf::from)
                 .ok_or_else(|| USAGE.to_owned())?;
+            let serve = args.any(|flag| flag == "--serve");
+            if serve {
+                // The program arrives via the `load` op, not the file
+                // argument (kept for CLI shape compatibility).
+                let stdin = std::io::BufReader::new(std::io::stdin());
+                return plc_cli::run_ld_serve(stdin, std::io::stdout())
+                    .map_err(|error| format!("serve loop failed: {error}"));
+            }
             let watch = args.next().map(|flag| flag == "--watch").unwrap_or(false);
             run_ld_file(path, watch)
         }

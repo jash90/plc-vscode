@@ -172,3 +172,49 @@ body {
   stroke-dasharray: 4 2;
   opacity: 0.6;
 }
+
+/* Simulation panel (PLC-114) */
+#sim-panel {
+  border-top: 1px solid var(--vscode-panel-border, #333);
+  padding: 6px 8px;
+  flex-shrink: 0;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.sim-header {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  margin-bottom: 4px;
+}
+
+.sim-inputs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+
+.sim-input {
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.sim-watch {
+  border-collapse: collapse;
+  font-size: 11px;
+  font-family: var(--vscode-font-family, monospace);
+}
+
+.sim-watch th,
+.sim-watch td {
+  padding: 1px 10px 1px 0;
+  text-align: left;
+}
+
+.sim-watch th {
+  color: var(--vscode-descriptionForeground, #888);
+  font-weight: normal;
+}
+
+.sim-watch tr.forced td {
+  color: var(--vscode-charts-yellow, #cca700);
+}

@@ -28,6 +28,14 @@ function parseHostMessage(value) {
             return { type: 'powerFlow', json: String(record.json) };
         case 'error':
             return { type: 'error', message: String(record.message) };
+        case 'simState':
+            return {
+                type: 'simState',
+                scan: Number(record.scan),
+                timeMs: Number(record.timeMs),
+                watch: Array.isArray(record.watch) ? record.watch : [],
+                forced: Array.isArray(record.forced) ? record.forced : [],
+            };
         default:
             throw new Error(`unknown host message: ${JSON.stringify(value)}`);
     }
@@ -50,6 +58,16 @@ function parseWebviewMessage(value) {
             return { type: 'undo' };
         case 'redo':
             return { type: 'redo' };
+        case 'simStart':
+            return { type: 'simStart' };
+        case 'simStop':
+            return { type: 'simStop' };
+        case 'simStep':
+            return { type: 'simStep' };
+        case 'simReset':
+            return { type: 'simReset' };
+        case 'simInput':
+            return { type: 'simInput', name: String(record.name), value: record.value === true };
         default:
             throw new Error(`unknown webview message: ${JSON.stringify(value)}`);
     }

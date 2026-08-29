@@ -15,7 +15,8 @@ export type HostToWebview =
   | { type: 'load'; text: string }
   | { type: 'state'; program: LdProgram }
   | { type: 'powerFlow'; json: string }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  | { type: 'simState'; scan: number; timeMs: number; watch: string[]; forced: string[] };
 
 /** Messages the webview sends to the extension host. */
 export type WebviewToHost =
@@ -26,7 +27,12 @@ export type WebviewToHost =
   | { type: 'modelChanged'; program: LdProgram }
   | { type: 'edit'; command: LdCommand }
   | { type: 'undo' }
-  | { type: 'redo' };
+  | { type: 'redo' }
+  | { type: 'simStart' }
+  | { type: 'simStop' }
+  | { type: 'simStep' }
+  | { type: 'simReset' }
+  | { type: 'simInput'; name: string; value: boolean };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
@@ -47,6 +53,14 @@ export function parseHostMessage(value: unknown): HostToWebview {
       return { type: 'powerFlow', json: String(record.json) };
     case 'error':
       return { type: 'error', message: String(record.message) };
+    case 'simState':
+      return {
+        type: 'simState',
+        scan: Number(record.scan),
+        timeMs: Number(record.timeMs),
+        watch: Array.isArray(record.watch) ? (record.watch as string[]) : [],
+        forced: Array.isArray(record.forced) ? (record.forced as string[]) : [],
+      };
     default:
       throw new Error(`unknown host message: ${JSON.stringify(value)}`);
   }
@@ -70,6 +84,16 @@ export function parseWebviewMessage(value: unknown): WebviewToHost {
       return { type: 'undo' };
     case 'redo':
       return { type: 'redo' };
+    case 'simStart':
+      return { type: 'simStart' };
+    case 'simStop':
+      return { type: 'simStop' };
+    case 'simStep':
+      return { type: 'simStep' };
+    case 'simReset':
+      return { type: 'simReset' };
+    case 'simInput':
+      return { type: 'simInput', name: String(record.name), value: record.value === true };
     default:
       throw new Error(`unknown webview message: ${JSON.stringify(value)}`);
   }

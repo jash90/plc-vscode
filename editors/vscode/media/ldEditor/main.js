@@ -18,6 +18,14 @@
         return { type: "powerFlow", json: String(record.json) };
       case "error":
         return { type: "error", message: String(record.message) };
+      case "simState":
+        return {
+          type: "simState",
+          scan: Number(record.scan),
+          timeMs: Number(record.timeMs),
+          watch: Array.isArray(record.watch) ? record.watch : [],
+          forced: Array.isArray(record.forced) ? record.forced : []
+        };
       default:
         throw new Error(`unknown host message: ${JSON.stringify(value)}`);
     }
@@ -103,6 +111,26 @@
       }
     }
     return next;
+  }
+  function allVariables(program2) {
+    const vars = /* @__PURE__ */ new Set();
+    for (const rung of program2.rungs) {
+      for (const branch of rung.branches) {
+        for (const contact of branch.elements) {
+          vars.add(contact.name);
+        }
+      }
+      for (const output of rung.outputs) {
+        if (output.kind === "coil") {
+          vars.add(output.name);
+        } else {
+          for (const arg of [...output.inputs, ...output.outputs]) {
+            vars.add(arg.value);
+          }
+        }
+      }
+    }
+    return [...vars];
   }
   function serializeProgram(program2) {
     return `${JSON.stringify(program2, null, 2)}
@@ -684,6 +712,7 @@
   var program = { name: "NewProgram", schema_version: 2, rungs: [] };
   var powerFlow;
   var selection;
+  var simState;
   function byId(id) {
     const element = document.getElementById(id);
     if (!element) {
@@ -1006,6 +1035,18 @@
     byId("btn-run").addEventListener("click", () => {
       vscode.postMessage({ type: "run" });
     });
+    byId("btn-sim-run").addEventListener("click", () => {
+      vscode.postMessage({ type: "simStart" });
+    });
+    byId("btn-sim-pause").addEventListener("click", () => {
+      vscode.postMessage({ type: "simStop" });
+    });
+    byId("btn-sim-step").addEventListener("click", () => {
+      vscode.postMessage({ type: "simStep" });
+    });
+    byId("btn-sim-reset").addEventListener("click", () => {
+      vscode.postMessage({ type: "simReset" });
+    });
     byId("btn-toggle-json").addEventListener("click", () => {
       const textarea = byId("ld-textarea");
       textarea.style.display = textarea.style.display === "none" ? "block" : "none";
@@ -1116,6 +1157,16 @@
           revalidateSelection();
           render();
           break;
+        case "simState":
+          simState = {
+            scan: message.scan,
+            timeMs: message.timeMs,
+            watch: message.watch,
+            forced: message.forced
+          };
+          renderSimPanel();
+          updateStatus();
+          break;
         case "powerFlow":
           try {
             powerFlow = JSON.parse(message.json);
@@ -1164,5 +1215,83 @@
       window.setTimeout(() => list.remove(), 150);
     });
     refresh();
+  }
+  function escapeHtml(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function watchBooleans() {
+    const map = /* @__PURE__ */ new Map();
+    if (!simState) {
+      return map;
+    }
+    for (const line of simState.watch) {
+      const separator = line.indexOf("=");
+      if (separator === -1) {
+        continue;
+      }
+      const name = line.slice(0, separator).trim();
+      const value = line.slice(separator + 1).trim().toUpperCase();
+      if (value === "TRUE" || value === "FALSE") {
+        map.set(name, value === "TRUE");
+      }
+    }
+    return map;
+  }
+  function renderSimPanel() {
+    const panel = document.getElementById("sim-panel");
+    if (!panel || !simState) {
+      return;
+    }
+    const forcedSet = new Set(simState.forced.map((name) => name.toLowerCase()));
+    const watchValues = watchBooleans();
+    const inputSignature = JSON.stringify(allVariables(program));
+    if (panel.getAttribute("data-inputs") !== inputSignature) {
+      panel.setAttribute("data-inputs", inputSignature);
+      const inputs = allVariables(program).slice(0, 12);
+      panel.innerHTML = `
+      <div class="sim-header"></div>
+      <div class="sim-inputs">
+        ${inputs.map(
+        (name) => `<label class="sim-input"><input type="checkbox" data-var="${escapeHtml(name)}" /> ${escapeHtml(name)}</label>`
+      ).join("")}
+      </div>
+      <table class="sim-watch">
+        <thead><tr><th>variable</th><th>value</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>`;
+      panel.querySelectorAll('input[type="checkbox"]').forEach((box) => {
+        box.addEventListener("change", () => {
+          vscode.postMessage({
+            type: "simInput",
+            name: box.getAttribute("data-var") ?? "",
+            value: box.checked
+          });
+        });
+      });
+    }
+    const header = panel.querySelector(".sim-header");
+    if (header) {
+      header.textContent = `scan ${simState.scan} \xB7 t=${simState.timeMs}ms`;
+    }
+    panel.querySelectorAll('input[type="checkbox"]').forEach((box) => {
+      const name = box.getAttribute("data-var") ?? "";
+      const value = watchValues.get(name);
+      if (value !== void 0) {
+        box.checked = value;
+      }
+    });
+    const tbody = panel.querySelector(".sim-watch tbody");
+    if (tbody) {
+      const rows = simState.watch.map((line) => {
+        const separator = line.indexOf("=");
+        const name = separator === -1 ? line : line.slice(0, separator).trim();
+        const value = separator === -1 ? "" : line.slice(separator + 1).trim();
+        const forced = forcedSet.has(name.toLowerCase());
+        const forcedMark = forced ? "\u26A0" : "";
+        const rowClass = forced ? ' class="forced"' : "";
+        return `<tr${rowClass}><td>${escapeHtml(name)}</td><td>${escapeHtml(value)}</td><td>${forcedMark}</td></tr>`;
+      }).join("");
+      tbody.innerHTML = rows;
+    }
   }
 })();

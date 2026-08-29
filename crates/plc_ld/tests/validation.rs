@@ -334,3 +334,27 @@ fn unknown_fb_type_suppresses_ld0005() {
     ));
     assert_eq!(codes(&program), vec![(0, "LD0003")]);
 }
+
+#[test]
+fn literal_output_pin_value_is_ld0006() {
+    // Output-pin values become assignment targets; a literal renders an ST
+    // statement the runtime silently skips.
+    let mut program = LdProgram::new("P");
+    program.rungs.push(rung(
+        &["A"],
+        vec![OutputElement::Block {
+            id: None,
+            fb_type: "TON".to_owned(),
+            instance: "T1".to_owned(),
+            inputs: vec![BlockArg {
+                name: "IN".to_owned(),
+                value: "A".to_owned(),
+            }],
+            outputs: vec![BlockArg {
+                name: "Q".to_owned(),
+                value: "5".to_owned(), // literal, not a variable
+            }],
+        }],
+    ));
+    assert_eq!(codes(&program), vec![(0, "LD0006")]);
+}

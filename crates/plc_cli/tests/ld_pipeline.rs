@@ -54,19 +54,24 @@ fn timer_output_reaches_variable_through_runtime() {
     runtime.set_scan_interval_ms(100);
     runtime.set_input("Start", plc_runtime::Value::Bool(true));
 
-    // Before the preset elapses the output is FALSE.
+    // Scan semantics: the clock ticks before logic, so scan n runs at
+    // t = n·100ms; TON fires at et >= pt. Exact sequence: F, F, T.
     runtime.run_scans(1);
     assert!(
         !runtime.watch().iter().any(|l| l.contains("Done = TRUE")),
-        "Done must not be set before PT elapses: {:?}",
+        "scan 1 (t=0): Done must be FALSE: {:?}",
         runtime.watch()
     );
-
-    // 200ms preset at 100ms scans → true by the third scan.
-    runtime.run_scans(2);
+    runtime.run_scans(1);
+    assert!(
+        !runtime.watch().iter().any(|l| l.contains("Done = TRUE")),
+        "scan 2 (t=100ms < PT): Done must still be FALSE: {:?}",
+        runtime.watch()
+    );
+    runtime.run_scans(1);
     assert!(
         runtime.watch().iter().any(|l| l.contains("Done = TRUE")),
-        "Done must be TRUE after PT elapses: {:?}",
+        "scan 3 (t=200ms >= PT): Done must be TRUE: {:?}",
         runtime.watch()
     );
 }

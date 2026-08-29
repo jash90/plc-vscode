@@ -170,6 +170,55 @@
       };
     }
   };
+  function paletteCommands(program2, paletteType) {
+    const elementCommand = (rung) => {
+      switch (paletteType) {
+        case "no-contact":
+        case "nc-contact": {
+          const branches = program2.rungs[rung]?.branches.length ?? 0;
+          return commands.addContact(rung, Math.max(branches - 1, 0), "NewVar", paletteType === "nc-contact");
+        }
+        case "coil":
+        case "set-coil":
+        case "reset-coil":
+          return commands.addCoil(
+            rung,
+            "OutVar",
+            paletteType === "coil" ? "normal" : paletteType === "set-coil" ? "set" : "reset"
+          );
+        case "ton":
+          return commands.addBlock(rung, {
+            kind: "block",
+            fb_type: "TON",
+            instance: "TON_inst",
+            inputs: [
+              { name: "IN", value: "NewVar" },
+              { name: "PT", value: "T#1s" }
+            ],
+            outputs: [{ name: "Q", value: "Done" }]
+          });
+        case "ctu":
+          return commands.addBlock(rung, {
+            kind: "block",
+            fb_type: "CTU",
+            instance: "CTU_inst",
+            inputs: [
+              { name: "CU", value: "NewVar" },
+              { name: "PV", value: "10" }
+            ],
+            outputs: [{ name: "Q", value: "Done" }]
+          });
+        default:
+          return void 0;
+      }
+    };
+    if (program2.rungs.length === 0) {
+      const element2 = elementCommand(0);
+      return element2 ? [commands.addRung(), element2] : [];
+    }
+    const element = elementCommand(program2.rungs.length - 1);
+    return element ? [element] : [];
+  }
 
   // src/ldWebview/layout.ts
   var CELL = {
@@ -507,51 +556,6 @@
     { type: "ton", label: "TON", title: "Timer On Delay" },
     { type: "ctu", label: "CTU", title: "Count Up" }
   ];
-  function paletteCommand(type) {
-    const rung = program.rungs.length === 0 ? 0 : program.rungs.length - 1;
-    if (program.rungs.length === 0) {
-      return commands.addRung();
-    }
-    switch (type) {
-      case "no-contact":
-      case "nc-contact": {
-        const branch = Math.max(program.rungs[rung].branches.length - 1, 0);
-        return commands.addContact(rung, branch, "NewVar", type === "nc-contact");
-      }
-      case "coil":
-      case "set-coil":
-      case "reset-coil":
-        return commands.addCoil(
-          rung,
-          "OutVar",
-          type === "coil" ? "normal" : type === "set-coil" ? "set" : "reset"
-        );
-      case "ton":
-        return commands.addBlock(rung, {
-          kind: "block",
-          fb_type: "TON",
-          instance: "TON_inst",
-          inputs: [
-            { name: "IN", value: "NewVar" },
-            { name: "PT", value: "T#1s" }
-          ],
-          outputs: [{ name: "Q", value: "Done" }]
-        });
-      case "ctu":
-        return commands.addBlock(rung, {
-          kind: "block",
-          fb_type: "CTU",
-          instance: "CTU_inst",
-          inputs: [
-            { name: "CU", value: "NewVar" },
-            { name: "PV", value: "10" }
-          ],
-          outputs: [{ name: "Q", value: "Done" }]
-        });
-      default:
-        return void 0;
-    }
-  }
   function send(command) {
     vscode.postMessage({ type: "edit", command });
   }
@@ -617,22 +621,28 @@
     container.appendChild(input);
     input.focus();
     input.select();
-    const commit = () => {
+    let settled = false;
+    const close = (commit) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       const name = input.value.trim();
       input.remove();
-      if (name.length > 0 && name !== currentName) {
+      if (commit && name.length > 0 && name !== currentName) {
         send(commands.renameVariable(rung, branch, index, name));
       }
     };
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        commit();
+        close(true);
       } else if (event.key === "Escape") {
-        input.remove();
+        event.preventDefault();
+        close(false);
       }
     });
-    input.addEventListener("blur", commit);
+    input.addEventListener("blur", () => close(true));
   }
   function wire() {
     const palette = byId("palette");
@@ -642,23 +652,14 @@
       node.title = item.title;
       node.textContent = item.label;
       node.addEventListener("click", () => {
-        const command = paletteCommand(item.type);
-        if (command) {
+        for (const command of paletteCommands(program, item.type)) {
           send(command);
-          if (command.type === "addRung") {
-            const followUp = paletteCommand(item.type);
-            if (followUp) {
-              send(followUp);
-            }
-          }
         }
       });
       palette.appendChild(node);
     }
     byId("btn-save").addEventListener("click", () => {
-      const textarea = byId("ld-textarea");
-      const text = textarea.style.display !== "none" ? textarea.value : serializeProgram(program);
-      vscode.postMessage({ type: "save", text });
+      vscode.postMessage({ type: "save" });
     });
     byId("btn-run").addEventListener("click", () => {
       vscode.postMessage({ type: "run" });
@@ -686,8 +687,12 @@
       }
     });
     window.addEventListener("keydown", (event) => {
+      const target = event.target;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) {
+        return;
+      }
       const meta = event.metaKey || event.ctrlKey;
-      if (!meta || event.key !== "z") {
+      if (!meta || event.key.toLowerCase() !== "z") {
         return;
       }
       event.preventDefault();

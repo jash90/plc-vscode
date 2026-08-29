@@ -87,6 +87,63 @@ export const commands = {
   },
 };
 
+/**
+ * The command sequence a palette click performs, computed against the given
+ * program state (pure — the webview computes the whole sequence before
+ * sending, so a not-yet-updated local program cannot corrupt addressing).
+ * An empty program yields [addRung, element]; otherwise [element].
+ */
+export function paletteCommands(program: LdProgram, paletteType: string): LdCommand[] {
+  const elementCommand = (rung: number): LdCommand | undefined => {
+    switch (paletteType) {
+      case 'no-contact':
+      case 'nc-contact': {
+        const branches = program.rungs[rung]?.branches.length ?? 0;
+        return commands.addContact(rung, Math.max(branches - 1, 0), 'NewVar', paletteType === 'nc-contact');
+      }
+      case 'coil':
+      case 'set-coil':
+      case 'reset-coil':
+        return commands.addCoil(
+          rung,
+          'OutVar',
+          paletteType === 'coil' ? 'normal' : paletteType === 'set-coil' ? 'set' : 'reset',
+        );
+      case 'ton':
+        return commands.addBlock(rung, {
+          kind: 'block',
+          fb_type: 'TON',
+          instance: 'TON_inst',
+          inputs: [
+            { name: 'IN', value: 'NewVar' },
+            { name: 'PT', value: 'T#1s' },
+          ],
+          outputs: [{ name: 'Q', value: 'Done' }],
+        });
+      case 'ctu':
+        return commands.addBlock(rung, {
+          kind: 'block',
+          fb_type: 'CTU',
+          instance: 'CTU_inst',
+          inputs: [
+            { name: 'CU', value: 'NewVar' },
+            { name: 'PV', value: '10' },
+          ],
+          outputs: [{ name: 'Q', value: 'Done' }],
+        });
+      default:
+        return undefined;
+    }
+  };
+
+  if (program.rungs.length === 0) {
+    const element = elementCommand(0);
+    return element ? [commands.addRung(), element] : [];
+  }
+  const element = elementCommand(program.rungs.length - 1);
+  return element ? [element] : [];
+}
+
 /** Apply a command to a program; never mutates the input. */
 export function applyCommand(
   program: LdProgram,

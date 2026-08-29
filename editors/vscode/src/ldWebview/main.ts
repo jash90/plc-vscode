@@ -8,7 +8,7 @@
 
 import { parseHostMessage, WebviewToHost } from './protocol';
 import { LdProgram, normalizeIds, parseProgram, serializeProgram } from './model';
-import { LdCommand, commands } from './commands';
+import { LdCommand, commands, paletteCommands } from './commands';
 import { layout } from './layout';
 import { PowerFlow, renderSvg } from './render';
 
@@ -39,54 +39,6 @@ const ELEMENT_PALETTE = [
   { type: 'ton', label: 'TON', title: 'Timer On Delay' },
   { type: 'ctu', label: 'CTU', title: 'Count Up' },
 ];
-
-/** Palette actions map onto domain commands (one undo step each). */
-function paletteCommand(type: string): LdCommand | undefined {
-  const rung = program.rungs.length === 0 ? 0 : program.rungs.length - 1;
-  if (program.rungs.length === 0) {
-    // Commands address existing rungs; create one first (two undo steps).
-    return commands.addRung();
-  }
-  switch (type) {
-    case 'no-contact':
-    case 'nc-contact': {
-      const branch = Math.max(program.rungs[rung].branches.length - 1, 0);
-      return commands.addContact(rung, branch, 'NewVar', type === 'nc-contact');
-    }
-    case 'coil':
-    case 'set-coil':
-    case 'reset-coil':
-      return commands.addCoil(
-        rung,
-        'OutVar',
-        type === 'coil' ? 'normal' : type === 'set-coil' ? 'set' : 'reset',
-      );
-    case 'ton':
-      return commands.addBlock(rung, {
-        kind: 'block',
-        fb_type: 'TON',
-        instance: 'TON_inst',
-        inputs: [
-          { name: 'IN', value: 'NewVar' },
-          { name: 'PT', value: 'T#1s' },
-        ],
-        outputs: [{ name: 'Q', value: 'Done' }],
-      });
-    case 'ctu':
-      return commands.addBlock(rung, {
-        kind: 'block',
-        fb_type: 'CTU',
-        instance: 'CTU_inst',
-        inputs: [
-          { name: 'CU', value: 'NewVar' },
-          { name: 'PV', value: '10' },
-        ],
-        outputs: [{ name: 'Q', value: 'Done' }],
-      });
-    default:
-      return undefined;
-  }
-}
 
 function send(command: LdCommand): void {
   vscode.postMessage({ type: 'edit', command });
@@ -168,22 +120,30 @@ function beginRename(rung: number, branch: number, index: number, node: SVGEleme
   input.focus();
   input.select();
 
-  const commit = (): void => {
+  // One-shot guard: removing a focused input fires blur, which would
+  // otherwise commit twice; Escape cancels without committing.
+  let settled = false;
+  const close = (commit: boolean): void => {
+    if (settled) {
+      return;
+    }
+    settled = true;
     const name = input.value.trim();
     input.remove();
-    if (name.length > 0 && name !== currentName) {
+    if (commit && name.length > 0 && name !== currentName) {
       send(commands.renameVariable(rung, branch, index, name));
     }
   };
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
-      commit();
+      close(true);
     } else if (event.key === 'Escape') {
-      input.remove();
+      event.preventDefault();
+      close(false);
     }
   });
-  input.addEventListener('blur', commit);
+  input.addEventListener('blur', () => close(true));
 }
 
 function wire(): void {
@@ -194,28 +154,21 @@ function wire(): void {
     node.title = item.title;
     node.textContent = item.label;
     node.addEventListener('click', () => {
-      const command = paletteCommand(item.type);
-      if (command) {
+      // The whole sequence is computed up front against the current program
+      // (pure paletteCommands) — a not-yet-synced local model cannot
+      // corrupt the addressing of the follow-up command.
+      for (const command of paletteCommands(program, item.type)) {
         send(command);
-        // When the rung was just created, follow up with the actual element.
-        if (command.type === 'addRung') {
-          const followUp = paletteCommand(item.type);
-          if (followUp) {
-            send(followUp);
-          }
-        }
       }
     });
     palette.appendChild(node);
   }
 
   byId('btn-save').addEventListener('click', () => {
-    const textarea = byId<HTMLTextAreaElement>('ld-textarea');
-    const text =
-      textarea.style.display !== 'none'
-        ? textarea.value
-        : serializeProgram(program);
-    vscode.postMessage({ type: 'save', text });
+    // Clicking the button blurs the JSON textarea first, committing its
+    // content via the change event; the host then routes through VS Code's
+    // save flow, which serializes the document's canonical model.
+    vscode.postMessage({ type: 'save' });
   });
 
   byId('btn-run').addEventListener('click', () => {
@@ -252,10 +205,15 @@ function wire(): void {
   });
 
   // Undo/redo: VS Code handles them when focus is outside the webview;
-  // forward them when it is inside.
+  // forward them when it is inside — but never hijack text editing (the
+  // rename input and JSON textarea keep their native undo).
   window.addEventListener('keydown', (event) => {
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+      return;
+    }
     const meta = event.metaKey || event.ctrlKey;
-    if (!meta || event.key !== 'z') {
+    if (!meta || event.key.toLowerCase() !== 'z') {
       return;
     }
     event.preventDefault();

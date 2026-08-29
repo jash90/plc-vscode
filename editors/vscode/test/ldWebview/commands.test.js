@@ -194,6 +194,33 @@ check('replaceProgram swaps the model and undoes', () => {
   assert.strictEqual(program.name, 'Q', 'redo reapplies the replacement');
 });
 
+
+// Appended (review): palette sequences are computed purely against a program.
+check('palette on empty program yields addRung then the element', () => {
+  const { paletteCommands } = require('../../dist/ldWebview/commands.js');
+  const program = emptyProgram();
+  const sequence = paletteCommands(program, 'no-contact');
+  assert.deepStrictEqual(
+    sequence.map((c) => c.type),
+    ['addRung', 'addContact'],
+    'empty program: rung first, then the contact addressed at rung 0',
+  );
+  assert.strictEqual(sequence[1].rung, 0);
+  assert.strictEqual(sequence[1].name, 'NewVar');
+});
+
+check('palette on existing program addresses the last rung once', () => {
+  const { paletteCommands } = require('../../dist/ldWebview/commands.js');
+  const program = parseProgram(
+    '{"name":"P","rungs":[{"branches":[{"elements":[{"name":"A"}]}],"outputs":[]}]}',
+  );
+  const sequence = paletteCommands(program, 'ton');
+  assert.strictEqual(sequence.length, 1);
+  assert.strictEqual(sequence[0].type, 'addBlock');
+  assert.strictEqual(sequence[0].rung, 0);
+  assert.strictEqual(sequence[0].output.fb_type, 'TON');
+});
+
 if (failures > 0) {
   process.exit(1);
 }

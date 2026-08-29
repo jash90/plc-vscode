@@ -12,6 +12,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CommandHistory = exports.commands = void 0;
+exports.paletteCommands = paletteCommands;
 exports.applyCommand = applyCommand;
 function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -77,6 +78,57 @@ exports.commands = {
         };
     },
 };
+/**
+ * The command sequence a palette click performs, computed against the given
+ * program state (pure — the webview computes the whole sequence before
+ * sending, so a not-yet-updated local program cannot corrupt addressing).
+ * An empty program yields [addRung, element]; otherwise [element].
+ */
+function paletteCommands(program, paletteType) {
+    const elementCommand = (rung) => {
+        switch (paletteType) {
+            case 'no-contact':
+            case 'nc-contact': {
+                const branches = program.rungs[rung]?.branches.length ?? 0;
+                return exports.commands.addContact(rung, Math.max(branches - 1, 0), 'NewVar', paletteType === 'nc-contact');
+            }
+            case 'coil':
+            case 'set-coil':
+            case 'reset-coil':
+                return exports.commands.addCoil(rung, 'OutVar', paletteType === 'coil' ? 'normal' : paletteType === 'set-coil' ? 'set' : 'reset');
+            case 'ton':
+                return exports.commands.addBlock(rung, {
+                    kind: 'block',
+                    fb_type: 'TON',
+                    instance: 'TON_inst',
+                    inputs: [
+                        { name: 'IN', value: 'NewVar' },
+                        { name: 'PT', value: 'T#1s' },
+                    ],
+                    outputs: [{ name: 'Q', value: 'Done' }],
+                });
+            case 'ctu':
+                return exports.commands.addBlock(rung, {
+                    kind: 'block',
+                    fb_type: 'CTU',
+                    instance: 'CTU_inst',
+                    inputs: [
+                        { name: 'CU', value: 'NewVar' },
+                        { name: 'PV', value: '10' },
+                    ],
+                    outputs: [{ name: 'Q', value: 'Done' }],
+                });
+            default:
+                return undefined;
+        }
+    };
+    if (program.rungs.length === 0) {
+        const element = elementCommand(0);
+        return element ? [exports.commands.addRung(), element] : [];
+    }
+    const element = elementCommand(program.rungs.length - 1);
+    return element ? [element] : [];
+}
 /** Apply a command to a program; never mutates the input. */
 function applyCommand(program, command, history) {
     const next = clone(program);

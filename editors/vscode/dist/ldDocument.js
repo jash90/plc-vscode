@@ -5,8 +5,13 @@
  * `onDidChangeCustomDocument` with undo/redo closures (dirty dot, Cmd+Z,
  * hot-exit backups), revert re-reads the file, save-as writes elsewhere.
  *
- * One instance per URI, shared by every webview panel editing that file, so
- * split views join the same undo stack.
+ * Eventing follows the pawDraw contract with two emitters: `onDidChange`
+ * fires ONLY for user edits (what VS Code tracks as undoable changes);
+ * `onDidChangeContent` fires for every content mutation including
+ * undo/redo, and is what syncs the webview panels. Undo/redo closures
+ * therefore never push phantom entries onto VS Code's undo stack.
+ *
+ * One instance per URI, shared by every webview panel editing that file.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -48,10 +53,15 @@ const commands_1 = require("./ldWebview/commands");
 const model_1 = require("./ldWebview/model");
 class LdDocument {
     uri;
+    /** User edits only — becomes VS Code's undoable change stream. */
     _onDidChange = new vscode.EventEmitter();
     onDidChange = this._onDidChange.event;
-    _onDidRevert = new vscode.EventEmitter();
-    onDidRevert = this._onDidRevert.event;
+    /** Every content change (edits + undo/redo) — syncs webview panels. */
+    _onDidChangeContent = new vscode.EventEmitter();
+    onDidChangeContent = this._onDidChangeContent.event;
+    /** Fired from dispose() so the provider can drop its cache entry. */
+    _onDisposed = new vscode.EventEmitter();
+    onDisposed = this._onDisposed.event;
     history = new commands_1.CommandHistory();
     program;
     /** Serialized on disk as of the last save/revert. */
@@ -61,7 +71,20 @@ class LdDocument {
         this.savedText = text;
         this.program = this.parse(text);
     }
-    static async open(uri) {
+    /**
+     * Open from disk. When `backupId` is present (hot-exit restore), the
+     * backed-up content wins over the file on disk.
+     */
+    static async open(uri, backupId) {
+        if (backupId) {
+            try {
+                const backupBytes = await vscode.workspace.fs.readFile(vscode.Uri.file(backupId));
+                return new LdDocument(uri, Buffer.from(backupBytes).toString('utf8'));
+            }
+            catch {
+                // Fall through to the file on disk.
+            }
+        }
         const bytes = await vscode.workspace.fs.readFile(uri);
         return new LdDocument(uri, Buffer.from(bytes).toString('utf8'));
     }
@@ -80,9 +103,6 @@ class LdDocument {
     get current() {
         return this.program;
     }
-    get isDirty() {
-        return this.serialize(this.program) !== this.savedText;
-    }
     serialize(program) {
         (0, model_1.normalizeIds)(program);
         return (0, model_1.serializeProgram)(program);
@@ -95,42 +115,49 @@ class LdDocument {
     /** Apply a domain command as one undoable change. */
     applyEdit(command) {
         this.program = (0, commands_1.applyCommand)(this.program, command, this.history);
-        this.fireDidChange(command.label);
+        this.fireEdit(command.label);
         return this.program;
     }
     /** Replace the whole model (JSON textarea path) as one undoable change. */
     replaceProgram(program) {
         this.program = (0, commands_1.applyCommand)(this.program, commands_1.commands.replaceProgram(program), this.history);
-        this.fireDidChange('Edit JSON');
+        this.fireEdit('Edit JSON');
         return this.program;
     }
     /** Undo the last change (webview button or VS Code timeline). */
     undo() {
+        const before = this.history.undoDepth;
         this.program = this.history.undo(this.program);
-        this.fireDidChange('Undo');
-        return this.program;
+        if (this.history.undoDepth !== before) {
+            this.fireContent();
+        }
     }
     redo() {
+        const before = this.history.redoDepth;
         this.program = this.history.redo(this.program);
-        this.fireDidChange('Redo');
-        return this.program;
+        if (this.history.redoDepth !== before) {
+            this.fireContent();
+        }
     }
-    fireDidChange(label) {
+    /** A user edit: VS Code change event (with undo closures) + panel sync. */
+    fireEdit(label) {
         this._onDidChange.fire({
             document: this,
             label,
-            undo: () => {
-                this.undo();
-            },
-            redo: () => {
-                this.redo();
-            },
+            undo: () => this.undo(),
+            redo: () => this.redo(),
         });
+        this.fireContent();
+    }
+    fireContent() {
+        this._onDidChangeContent.fire(this.program);
     }
     /** vscode.CustomDocument */
     dispose() {
+        this._onDisposed.fire(this);
         this._onDidChange.dispose();
-        this._onDidRevert.dispose();
+        this._onDidChangeContent.dispose();
+        this._onDisposed.dispose();
     }
     /** Hot-exit backup: current content, not last-saved. */
     async backup(context) {
@@ -144,14 +171,17 @@ class LdDocument {
     }
     async revert() {
         const bytes = await vscode.workspace.fs.readFile(this.uri);
-        await this.revertToText(Buffer.from(bytes).toString('utf8'));
-        this._onDidRevert.fire();
+        this.savedText = Buffer.from(bytes).toString('utf8');
+        this.program = this.parse(this.savedText);
+        this.history.clear();
+        this.fireContent();
     }
     /** Reset the document to exactly the given (saved) text; clears history. */
     async revertToText(text) {
         this.savedText = text;
         this.program = this.parse(text);
         this.history.clear();
+        this.fireContent();
     }
     /** Persist the current program and remember it as the saved baseline. */
     async save() {

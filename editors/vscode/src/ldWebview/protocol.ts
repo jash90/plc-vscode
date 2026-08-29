@@ -20,7 +20,8 @@ export type HostToWebview =
 /** Messages the webview sends to the extension host. */
 export type WebviewToHost =
   | { type: 'ready' }
-  | { type: 'save'; text: string }
+  /** Triggers VS Code's save flow (dirty clears, undo history kept). */
+  | { type: 'save' }
   | { type: 'run' }
   | { type: 'modelChanged'; program: LdProgram }
   | { type: 'edit'; command: LdCommand }
@@ -58,7 +59,7 @@ export function parseWebviewMessage(value: unknown): WebviewToHost {
     case 'ready':
       return { type: 'ready' };
     case 'save':
-      return { type: 'save', text: String(record.text) };
+      return { type: 'save' };
     case 'run':
       return { type: 'run' };
     case 'modelChanged':

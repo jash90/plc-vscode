@@ -59,15 +59,23 @@ class LdEditorProvider {
     constructor(context) {
         this.context = context;
     }
-    async openCustomDocument(uri, _openContext, _token) {
+    async openCustomDocument(uri, openContext, _token) {
         const key = uri.toString();
         const existing = documents.get(key);
         if (existing) {
             return existing;
         }
-        const document = await ldDocument_1.LdDocument.open(uri);
+        // backupId (hot-exit restore) wins over the file on disk.
+        const document = await ldDocument_1.LdDocument.open(uri, openContext.backupId);
         documents.set(key, document);
         document.onDidChange((event) => this._onDidChange.fire(event));
+        // Every content change (edits AND undo/redo) syncs all panels of the file.
+        document.onDidChangeContent(() => this.postStateToAll(document));
+        // Drop the cache entry when VS Code disposes the document.
+        document.onDisposed((disposed) => {
+            documents.delete(disposed.uri.toString());
+            this.panels.delete(disposed.uri.toString());
+        });
         return document;
     }
     async saveCustomDocument(document, _cancellation) {
@@ -75,9 +83,7 @@ class LdEditorProvider {
     }
     async revertCustomDocument(document, _cancellation) {
         await document.revert();
-        for (const panel of this.panelsOf(document)) {
-            this.postState(panel, document);
-        }
+        this.postStateToAll(document);
     }
     async backupCustomDocument(document, context, _cancellation) {
         return document.backup(context);
@@ -86,6 +92,11 @@ class LdEditorProvider {
         await document.saveAs(destination);
         documents.delete(document.uri.toString());
         documents.set(destination.toString(), document);
+        const panels = this.panels.get(document.uri.toString());
+        if (panels) {
+            this.panels.set(destination.toString(), panels);
+            this.panels.delete(document.uri.toString());
+        }
     }
     /** Webview panels resolved for a document (for state pushes). */
     panels = new Map();
@@ -94,6 +105,12 @@ class LdEditorProvider {
     }
     postState(panel, document) {
         void panel.webview.postMessage({ type: 'state', program: document.current });
+    }
+    /** Sync the document state to every panel editing it (split views). */
+    postStateToAll(document) {
+        for (const panel of this.panelsOf(document)) {
+            this.postState(panel, document);
+        }
     }
     async resolveCustomEditor(document, webviewPanel, _token) {
         webviewPanel.webview.options = { enableScripts: true };
@@ -118,41 +135,40 @@ class LdEditorProvider {
                 post({ type: 'error', message: `protocol: ${error.message}` });
                 return;
             }
-            switch (message.type) {
-                case 'ready':
-                    post({ type: 'load', text: JSON.stringify(document.current) });
-                    break;
-                case 'edit':
-                    document.applyEdit(message.command);
-                    this.postState(webviewPanel, document);
-                    break;
-                case 'undo':
-                case 'redo': {
-                    if (message.type === 'undo') {
+            try {
+                switch (message.type) {
+                    case 'ready':
+                        post({ type: 'load', text: JSON.stringify(document.current) });
+                        break;
+                    case 'edit':
+                        document.applyEdit(message.command);
+                        break;
+                    case 'undo':
                         document.undo();
-                    }
-                    else {
+                        break;
+                    case 'redo':
                         document.redo();
+                        break;
+                    case 'modelChanged':
+                        document.replaceProgram(message.program);
+                        break;
+                    case 'save': {
+                        // Route through VS Code's save: dirty state clears, undo history
+                        // is kept, and the deterministic serialization is written. The
+                        // webview has already synced its model via edit/modelChanged.
+                        await vscode.commands.executeCommand('workbench.action.files.save');
+                        await this.updatePowerFlow(post, document.uri);
+                        break;
                     }
-                    this.postState(webviewPanel, document);
-                    break;
+                    case 'run':
+                        await this.runLdFile(document.uri);
+                        break;
+                    default:
+                        break;
                 }
-                case 'modelChanged':
-                    document.replaceProgram(message.program);
-                    this.postState(webviewPanel, document);
-                    break;
-                case 'save': {
-                    const buffer = Buffer.from(message.text, 'utf8');
-                    await vscode.workspace.fs.writeFile(document.uri, buffer);
-                    await document.revertToText(buffer.toString('utf8'));
-                    await this.updatePowerFlow(post, document.uri);
-                    break;
-                }
-                case 'run':
-                    await this.runLdFile(document.uri);
-                    break;
-                default:
-                    break;
+            }
+            catch (error) {
+                post({ type: 'error', message: error.message });
             }
         });
     }

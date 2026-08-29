@@ -39,7 +39,7 @@ function parseWebviewMessage(value) {
         case 'ready':
             return { type: 'ready' };
         case 'save':
-            return { type: 'save', text: String(record.text) };
+            return { type: 'save' };
         case 'run':
             return { type: 'run' };
         case 'modelChanged':

@@ -4,8 +4,13 @@
  * `onDidChangeCustomDocument` with undo/redo closures (dirty dot, Cmd+Z,
  * hot-exit backups), revert re-reads the file, save-as writes elsewhere.
  *
- * One instance per URI, shared by every webview panel editing that file, so
- * split views join the same undo stack.
+ * Eventing follows the pawDraw contract with two emitters: `onDidChange`
+ * fires ONLY for user edits (what VS Code tracks as undoable changes);
+ * `onDidChangeContent` fires for every content mutation including
+ * undo/redo, and is what syncs the webview panels. Undo/redo closures
+ * therefore never push phantom entries onto VS Code's undo stack.
+ *
+ * One instance per URI, shared by every webview panel editing that file.
  */
 
 import * as vscode from 'vscode';
@@ -15,12 +20,18 @@ import { LdProgram, normalizeIds, parseProgram, serializeProgram } from './ldWeb
 export class LdDocument implements vscode.CustomDocument {
   readonly uri: vscode.Uri;
 
-  private readonly _onDidChange = new vscode.EventEmitter<vscode.CustomDocumentEditEvent<LdDocument>>();
-  readonly onDidChange: vscode.Event<vscode.CustomDocumentEditEvent<LdDocument>> =
-    this._onDidChange.event;
+  /** User edits only — becomes VS Code's undoable change stream. */
+  private readonly _onDidChange =
+    new vscode.EventEmitter<vscode.CustomDocumentEditEvent<LdDocument>>();
+  readonly onDidChange = this._onDidChange.event;
 
-  private readonly _onDidRevert = new vscode.EventEmitter<void>();
-  readonly onDidRevert: vscode.Event<void> = this._onDidRevert.event;
+  /** Every content change (edits + undo/redo) — syncs webview panels. */
+  private readonly _onDidChangeContent = new vscode.EventEmitter<LdProgram>();
+  readonly onDidChangeContent = this._onDidChangeContent.event;
+
+  /** Fired from dispose() so the provider can drop its cache entry. */
+  private readonly _onDisposed = new vscode.EventEmitter<LdDocument>();
+  readonly onDisposed = this._onDisposed.event;
 
   private readonly history = new CommandHistory();
   private program: LdProgram;
@@ -33,7 +44,19 @@ export class LdDocument implements vscode.CustomDocument {
     this.program = this.parse(text);
   }
 
-  static async open(uri: vscode.Uri): Promise<LdDocument> {
+  /**
+   * Open from disk. When `backupId` is present (hot-exit restore), the
+   * backed-up content wins over the file on disk.
+   */
+  static async open(uri: vscode.Uri, backupId?: string): Promise<LdDocument> {
+    if (backupId) {
+      try {
+        const backupBytes = await vscode.workspace.fs.readFile(vscode.Uri.file(backupId));
+        return new LdDocument(uri, Buffer.from(backupBytes).toString('utf8'));
+      } catch {
+        // Fall through to the file on disk.
+      }
+    }
     const bytes = await vscode.workspace.fs.readFile(uri);
     return new LdDocument(uri, Buffer.from(bytes).toString('utf8'));
   }
@@ -54,10 +77,6 @@ export class LdDocument implements vscode.CustomDocument {
     return this.program;
   }
 
-  get isDirty(): boolean {
-    return this.serialize(this.program) !== this.savedText;
-  }
-
   private serialize(program: LdProgram): string {
     normalizeIds(program);
     return serializeProgram(program);
@@ -72,49 +91,56 @@ export class LdDocument implements vscode.CustomDocument {
   /** Apply a domain command as one undoable change. */
   applyEdit(command: LdCommand): LdProgram {
     this.program = applyCommand(this.program, command, this.history);
-    this.fireDidChange(command.label);
+    this.fireEdit(command.label);
     return this.program;
   }
 
   /** Replace the whole model (JSON textarea path) as one undoable change. */
   replaceProgram(program: LdProgram): LdProgram {
     this.program = applyCommand(this.program, commands.replaceProgram(program), this.history);
-    this.fireDidChange('Edit JSON');
+    this.fireEdit('Edit JSON');
     return this.program;
   }
 
   /** Undo the last change (webview button or VS Code timeline). */
-  undo(): LdProgram {
+  undo(): void {
+    const before = this.history.undoDepth;
     this.program = this.history.undo(this.program);
-    this.fireDidChange('Undo');
-    return this.program;
+    if (this.history.undoDepth !== before) {
+      this.fireContent();
+    }
   }
 
-  redo(): LdProgram {
+  redo(): void {
+    const before = this.history.redoDepth;
     this.program = this.history.redo(this.program);
-    this.fireDidChange('Redo');
-    return this.program;
+    if (this.history.redoDepth !== before) {
+      this.fireContent();
+    }
   }
 
-  private fireDidChange(label: string): void {
+  /** A user edit: VS Code change event (with undo closures) + panel sync. */
+  private fireEdit(label: string): void {
     this._onDidChange.fire({
       document: this,
       label,
-      undo: () => {
-        this.undo();
-      },
-      redo: () => {
-        this.redo();
-      },
+      undo: () => this.undo(),
+      redo: () => this.redo(),
     });
+    this.fireContent();
   }
 
+  private fireContent(): void {
+    this._onDidChangeContent.fire(this.program);
+  }
 
   /** vscode.CustomDocument */
 
   dispose(): void {
+    this._onDisposed.fire(this);
     this._onDidChange.dispose();
-    this._onDidRevert.dispose();
+    this._onDidChangeContent.dispose();
+    this._onDisposed.dispose();
   }
 
   /** Hot-exit backup: current content, not last-saved. */
@@ -135,8 +161,10 @@ export class LdDocument implements vscode.CustomDocument {
 
   async revert(): Promise<void> {
     const bytes = await vscode.workspace.fs.readFile(this.uri);
-    await this.revertToText(Buffer.from(bytes).toString('utf8'));
-    this._onDidRevert.fire();
+    this.savedText = Buffer.from(bytes).toString('utf8');
+    this.program = this.parse(this.savedText);
+    this.history.clear();
+    this.fireContent();
   }
 
   /** Reset the document to exactly the given (saved) text; clears history. */
@@ -144,6 +172,7 @@ export class LdDocument implements vscode.CustomDocument {
     this.savedText = text;
     this.program = this.parse(text);
     this.history.clear();
+    this.fireContent();
   }
 
   /** Persist the current program and remember it as the saved baseline. */

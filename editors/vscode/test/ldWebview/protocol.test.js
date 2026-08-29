@@ -29,8 +29,7 @@ check('host powerFlow message round-trips', () => {
 });
 
 check('webview save message round-trips', () => {
-  const message = { type: 'save', text: '{}' };
-  assert.deepStrictEqual(parseWebviewMessage(message), message);
+  assert.deepStrictEqual(parseWebviewMessage({ type: 'save' }), { type: 'save' });
 });
 
 check('webview run message round-trips', () => {

@@ -18,6 +18,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CELL = void 0;
 exports.layout = layout;
+exports.hitTest = hitTest;
 exports.CELL = {
     contactW: 72,
     contactH: 28,
@@ -214,5 +215,111 @@ function layout(program, cell = exports.CELL) {
         elements,
         wires,
     };
+}
+/**
+ * Map a canvas point to an insertion location for a drop or a keyboard
+ * cursor. Pure geometry over the computed layout:
+ *
+ * - on an element body → move/inspect target (`element`)
+ * - between two contacts of a branch (the wire row) → `series` insertion
+ * - below a rung's contact band but within its vertical slack → `parallel`
+ * - on an output slot → `output`
+ * - past the last rung → `newRung`
+ */
+function hitTest(geometry, x, y) {
+    // 1. Element bodies first (they sit on the wire rows but are narrower).
+    for (const element of geometry.elements) {
+        if (x >= element.x &&
+            x <= element.x + element.width &&
+            y >= element.y &&
+            y <= element.y + element.height) {
+            return {
+                kind: 'element',
+                id: element.id ?? `${element.rung}:${element.branch}:${element.index}`,
+                rung: element.rung,
+                branch: element.branch,
+                index: element.index,
+            };
+        }
+    }
+    // 2. Below everything → a fresh rung.
+    if (y > geometry.height) {
+        return { kind: 'newRung' };
+    }
+    // 3. Determine the rung band from element positions.
+    const rungs = [...new Set(geometry.elements.map((e) => e.rung))].sort((a, b) => a - b);
+    if (rungs.length === 0) {
+        return { kind: 'newRung' };
+    }
+    let rung = rungs[rungs.length - 1];
+    for (const candidate of rungs) {
+        const band = geometry.elements.filter((e) => e.rung === candidate);
+        const top = Math.min(...band.map((e) => e.y));
+        const bottom = Math.max(...band.map((e) => e.y + e.height));
+        if (y >= top - 14 && y <= bottom + 24) {
+            rung = candidate;
+            break;
+        }
+    }
+    const band = geometry.elements.filter((e) => e.rung === rung);
+    const contacts = band.filter((e) => e.kind === 'contact');
+    const outputs = band.filter((e) => e.kind !== 'contact');
+    const bandTop = Math.min(...band.map((e) => e.y));
+    const bandBottom = Math.max(...band.map((e) => e.y + e.height));
+    // 4. Output column → output slot.
+    if (outputs.length > 0) {
+        const outputLeft = Math.min(...outputs.map((e) => e.x));
+        const outputRight = Math.max(...outputs.map((e) => e.x + e.width));
+        if (x >= outputLeft - 8 && x <= outputRight + 8 && y >= bandTop - 8 && y <= bandBottom + 8) {
+            let index = outputs.length;
+            for (let i = 0; i < outputs.length; i += 1) {
+                if (y < outputs[i].y + outputs[i].height / 2) {
+                    index = i;
+                    break;
+                }
+            }
+            return { kind: 'output', rung, index };
+        }
+    }
+    // 5. Below the branch rows but within the band slack → parallel branch,
+    //    unless the drop is in the output column (a new output slot).
+    const branchRows = [...new Set(contacts.map((e) => e.branch))].sort((a, b) => a - b);
+    const rowsBottom = contacts.length
+        ? Math.max(...contacts.map((e) => e.y + e.height))
+        : bandTop;
+    if (y > rowsBottom && y <= bandBottom + 24) {
+        const inOutputColumn = outputs.length > 0
+            ? x >= Math.min(...outputs.map((e) => e.x)) - 8
+            : false;
+        if (inOutputColumn) {
+            return { kind: 'output', rung, index: outputs.length };
+        }
+        return { kind: 'parallel', rung };
+    }
+    // 6. Between contacts of the closest branch row → series insertion.
+    if (contacts.length > 0 && branchRows.length > 0) {
+        let branch = branchRows[0];
+        for (const candidate of branchRows) {
+            const row = contacts.filter((e) => e.branch === candidate);
+            const top = Math.min(...row.map((e) => e.y));
+            const bottom = Math.max(...row.map((e) => e.y + e.height));
+            if (y >= top - 6 && y <= bottom + 6) {
+                branch = candidate;
+                break;
+            }
+        }
+        const row = contacts
+            .filter((e) => e.branch === branch)
+            .sort((a, b) => a.index - b.index);
+        let index = row.length;
+        for (let i = 0; i < row.length; i += 1) {
+            if (x < row[i].x + row[i].width / 2) {
+                index = i;
+                break;
+            }
+        }
+        return { kind: 'series', rung, branch, index };
+    }
+    return { kind: 'parallel', rung };
 }
 //# sourceMappingURL=layout.js.map

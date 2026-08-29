@@ -221,6 +221,52 @@ check('palette on existing program addresses the last rung once', () => {
   assert.strictEqual(sequence[0].output.fb_type, 'TON');
 });
 
+
+// Appended (PLC-112): drop-target commands.
+check('insertContact splices at the drop index and undoes', () => {
+  const history = new CommandHistory();
+  let program = parseProgram(
+    '{"name":"P","rungs":[{"branches":[{"elements":[{"id":"e0","name":"A"},{"id":"e1","name":"B"}]}],"outputs":[]}]}',
+  );
+  program = applyCommand(program, commands.insertContact(0, 0, 1, 'X', false), history);
+  assert.deepStrictEqual(
+    program.rungs[0].branches[0].elements.map((e) => e.name),
+    ['A', 'X', 'B'],
+  );
+  program = history.undo(program);
+  assert.deepStrictEqual(
+    program.rungs[0].branches[0].elements.map((e) => e.name),
+    ['A', 'B'],
+  );
+});
+
+check('moveElement reorders within a branch', () => {
+  const history = new CommandHistory();
+  let program = parseProgram(
+    '{"name":"P","rungs":[{"branches":[{"elements":[{"id":"e0","name":"A"},{"id":"e1","name":"B"},{"id":"e2","name":"C"}]}],"outputs":[]}]}',
+  );
+  program = applyCommand(program, commands.moveElement({ rung: 0, branch: 0, index: 2 }, { rung: 0, branch: 0, index: 0 }), history);
+  assert.deepStrictEqual(
+    program.rungs[0].branches[0].elements.map((e) => e.name),
+    ['C', 'A', 'B'],
+  );
+  program = history.undo(program);
+  assert.deepStrictEqual(
+    program.rungs[0].branches[0].elements.map((e) => e.name),
+    ['A', 'B', 'C'],
+  );
+});
+
+check('moveElement relocates across branches', () => {
+  const history = new CommandHistory();
+  let program = parseProgram(
+    '{"name":"P","rungs":[{"branches":[{"elements":[{"id":"e0","name":"A"},{"id":"e1","name":"B"}]},{"elements":[{"id":"e2","name":"C"}]}],"outputs":[]}]}',
+  );
+  program = applyCommand(program, commands.moveElement({ rung: 0, branch: 0, index: 1 }, { rung: 0, branch: 1, index: 0 }), history);
+  assert.deepStrictEqual(program.rungs[0].branches[0].elements.map((e) => e.name), ['A']);
+  assert.deepStrictEqual(program.rungs[0].branches[1].elements.map((e) => e.name), ['B', 'C']);
+});
+
 if (failures > 0) {
   process.exit(1);
 }

@@ -39,6 +39,32 @@ export const commands = {
   addContact(rung: number, branch: number, name: string, negated: boolean): LdCommand {
     return { type: 'addContact', label: `Add contact ${name}`, rung, branch, index: -1, name, negated };
   },
+  /** Insert a contact at a specific position in a branch (drop target). */
+  insertContact(
+    rung: number,
+    branch: number,
+    index: number,
+    name: string,
+    negated: boolean,
+  ): LdCommand {
+    return { type: 'insertContact', label: `Insert contact ${name}`, rung, branch, index, name, negated };
+  },
+  /** Move an element to a series position (reorder/branch change). */
+  moveElement(
+    from: { rung: number; branch: number; index: number },
+    to: { rung: number; branch: number; index: number },
+  ): LdCommand {
+    return {
+      type: 'moveElement',
+      label: 'Move element',
+      rung: from.rung,
+      branch: from.branch,
+      index: from.index,
+      toRung: to.rung,
+      toBranch: to.branch,
+      toIndex: to.index,
+    };
+  },
   insertParallelBranch(rung: number, contactName: string): LdCommand {
     return {
       type: 'insertParallelBranch',
@@ -236,6 +262,48 @@ function mutate(program: LdProgram, command: LdCommand): void {
         name: command.name as string,
         negated: Boolean(command.negated),
       });
+      return;
+    }
+    case 'insertContact': {
+      if (!rung) {
+        return;
+      }
+      while (rung.branches.length <= command.branch) {
+        rung.branches.push({ elements: [] });
+      }
+      rung.branches[command.branch].elements.splice(
+        Math.max(command.index, 0),
+        0,
+        { name: command.name as string, negated: Boolean(command.negated) },
+      );
+      return;
+    }
+    case 'moveElement': {
+      const fromRung = program.rungs[command.rung];
+      const toRung = program.rungs[command.toRung as number];
+      if (!fromRung || !toRung) {
+        return;
+      }
+      if (command.branch === -1) {
+        // Move an output to another output slot.
+        const [output] = fromRung.outputs.splice(command.index, 1);
+        if (output) {
+          toRung.outputs.splice(Math.max(command.toIndex as number, 0), 0, output);
+        }
+        return;
+      }
+      const [contact] = fromRung.branches[command.branch]?.elements.splice(command.index, 1) ?? [];
+      if (!contact) {
+        return;
+      }
+      while (toRung.branches.length <= (command.toBranch as number)) {
+        toRung.branches.push({ elements: [] });
+      }
+      toRung.branches[command.toBranch as number].elements.splice(
+        Math.max(command.toIndex as number, 0),
+        0,
+        contact,
+      );
       return;
     }
     case 'insertParallelBranch': {

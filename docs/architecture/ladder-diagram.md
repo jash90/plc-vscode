@@ -46,18 +46,29 @@ existing runtime, and live power-flow visualization.
 
 ### Model (`model.rs`)
 
-The LD model is a serde-serializable tree:
+The LD model is a serde-serializable tree. Wire format **v2** (PLC-107) adds
+`schema_version`, optional rung `comment`s, and optional stable element `id`s —
+all additive, so v1 files parse unchanged:
 
 | Type | Description |
 |---|---|
-| `LdProgram` | Top-level: `{ name, rungs: Vec<Rung> }` |
-| `Rung` | One horizontal line: `{ branches: Vec<SeriesBranch>, outputs: Vec<OutputElement> }` |
+| `LdProgram` | Top-level: `{ name, schema_version, rungs: Vec<Rung> }` |
+| `Rung` | One horizontal line: `{ id?, comment?, branches, outputs }` |
 | `SeriesBranch` | AND chain: `{ elements: Vec<ContactElement> }` |
-| `ContactElement` | `{ name, negated }` — NO (`| |`) or NC (`|/|`) |
-| `OutputElement` | Coil or Block (tagged enum) |
+| `ContactElement` | `{ id?, name, negated }` — NO (`\| \|`) or NC (`\|/\|`) |
+| `OutputElement` | Coil or Block (tagged enum), both with `id?` |
 | `CoilVariant` | Normal `( )`, Set `(S)`, Reset `(R)` |
 | `BlockArg` | Named pin: `{ name, value }` |
 | `PowerFlowResult` | Per-rung energized state for visualization |
+
+#### Element ids (`ids.rs`)
+
+`normalize_ids(&mut LdProgram)` assigns `r{n}` to rungs and `e{n}` to
+contacts/outputs in document order, preserving valid existing ids, resolving
+duplicate claims (first occurrence wins), and seeding fresh counters past the
+highest numeric suffix in use. Editors normalize on load (v1 upgrade) and
+before save. Ids are ignored by lowering — they exist for diagnostics, undo,
+and interchange. See `tests/ld/motor_control_v2.ld` for a canonical v2 file.
 
 ### Lowering (`lower.rs`)
 
@@ -79,8 +90,10 @@ The IN/CU pin of a timer/counter block receives the **rung logic expression**
 ### Power-flow (`power_flow.rs`)
 
 `evaluate_power_flow(&LdProgram, &VarState) → PowerFlowResult` evaluates which
-elements are energized given variable states. Used by the CLI (`plc ld --watch`)
-and the VS Code webview for live green/gray coloring.
+elements are energized given variable states. `RungPowerFlow.contact_energized`
+reports cumulative energy after each contact (`[branch][contact]`), enabling
+per-contact wire coloring rather than whole-branch tinting. Used by the CLI
+(`plc ld --watch`) and the VS Code webview for live green/gray coloring.
 
 ## HIR Extension
 

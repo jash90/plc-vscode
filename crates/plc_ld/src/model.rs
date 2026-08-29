@@ -10,6 +10,17 @@
 
 use serde::{Deserialize, Serialize};
 
+/// The wire format version written by this crate (PLC-107, model v2).
+///
+/// v2 is an additive superset of v1: `schema_version` itself, optional
+/// `comment` on rungs, and optional `id` on rungs/contacts/outputs. Files
+/// written before v2 lack these fields and therefore parse as v2.
+pub const CURRENT_SCHEMA_VERSION: u32 = 2;
+
+fn default_schema_version() -> u32 {
+    CURRENT_SCHEMA_VERSION
+}
+
 // ---------------------------------------------------------------------------
 // Top-level program
 // ---------------------------------------------------------------------------
@@ -18,12 +29,22 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LdProgram {
     pub name: String,
+    /// Wire format version. Absent in v1 files; defaults to the current
+    /// version because every v2 change is additive.
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
     pub rungs: Vec<Rung>,
 }
 
 /// A single rung — one horizontal line from left rail to right rail.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Rung {
+    /// Stable identity for diagnostics, undo, and interchange.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    /// Free-text rung comment. Never affects semantics.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
     /// A rung is a parallel composition of series branches (OR of branches).
     pub branches: Vec<SeriesBranch>,
     /// The output element(s) driven by the rung logic.
@@ -43,6 +64,9 @@ pub struct SeriesBranch {
 /// A contact element in a series branch.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContactElement {
+    /// Stable identity for diagnostics, undo, and interchange.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     pub name: String,
     /// Normally-open (false) or normally-closed (true).
     pub negated: bool,
@@ -58,10 +82,19 @@ pub struct ContactElement {
 pub enum OutputElement {
     /// Normal coil `( )` — assigns the rung result to the variable.
     #[serde(rename = "coil")]
-    Coil { name: String, variant: CoilVariant },
+    Coil {
+        /// Stable identity for diagnostics, undo, and interchange.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+        name: String,
+        variant: CoilVariant,
+    },
     /// Function-block invocation (TON, TOF, TP, CTU, CTD, R_TRIG, F_TRIG, …).
     #[serde(rename = "block")]
     Block {
+        /// Stable identity for diagnostics, undo, and interchange.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
         fb_type: String,
         instance: String,
         /// Named input arguments (e.g. `IN`, `PT`).
@@ -105,6 +138,10 @@ pub struct PowerFlowResult {
 /// Power-flow state for a single rung.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RungPowerFlow {
+    /// Cumulative energy after each contact, per branch: `contact_energized`
+    /// [branch][contact] is true when power reaches the wire immediately
+    /// right of that contact.
+    pub contact_energized: Vec<Vec<bool>>,
     /// Whether each parallel branch (by index) is energized.
     pub branch_energized: Vec<bool>,
     /// Whether each output element (by index) is energized.
@@ -117,6 +154,7 @@ impl LdProgram {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
+            schema_version: CURRENT_SCHEMA_VERSION,
             rungs: Vec::new(),
         }
     }
@@ -160,21 +198,27 @@ mod tests {
     #[test]
     fn simple_program_serializes_round_trip() {
         let program = LdProgram {
+            schema_version: CURRENT_SCHEMA_VERSION,
             name: "Motor".to_owned(),
             rungs: vec![Rung {
+                id: None,
+                comment: None,
                 branches: vec![SeriesBranch {
                     elements: vec![
                         ContactElement {
+                            id: None,
                             name: "Start".to_owned(),
                             negated: false,
                         },
                         ContactElement {
+                            id: None,
                             name: "Stop".to_owned(),
                             negated: true,
                         },
                     ],
                 }],
                 outputs: vec![OutputElement::Coil {
+                    id: None,
                     name: "Motor".to_owned(),
                     variant: CoilVariant::Normal,
                 }],
@@ -189,15 +233,20 @@ mod tests {
     #[test]
     fn block_rung_serializes_round_trip() {
         let program = LdProgram {
+            schema_version: CURRENT_SCHEMA_VERSION,
             name: "Timer".to_owned(),
             rungs: vec![Rung {
+                id: None,
+                comment: None,
                 branches: vec![SeriesBranch {
                     elements: vec![ContactElement {
+                        id: None,
                         name: "Start".to_owned(),
                         negated: false,
                     }],
                 }],
                 outputs: vec![OutputElement::Block {
+                    id: None,
                     fb_type: "TON".to_owned(),
                     instance: "Delay".to_owned(),
                     inputs: vec![
@@ -226,34 +275,44 @@ mod tests {
     #[test]
     fn collects_all_variable_names() {
         let program = LdProgram {
+            schema_version: CURRENT_SCHEMA_VERSION,
             name: "Test".to_owned(),
             rungs: vec![
                 Rung {
+                    id: None,
+                    comment: None,
                     branches: vec![SeriesBranch {
                         elements: vec![
                             ContactElement {
+                                id: None,
                                 name: "A".to_owned(),
                                 negated: false,
                             },
                             ContactElement {
+                                id: None,
                                 name: "B".to_owned(),
                                 negated: true,
                             },
                         ],
                     }],
                     outputs: vec![OutputElement::Coil {
+                        id: None,
                         name: "C".to_owned(),
                         variant: CoilVariant::Normal,
                     }],
                 },
                 Rung {
+                    id: None,
+                    comment: None,
                     branches: vec![SeriesBranch {
                         elements: vec![ContactElement {
+                            id: None,
                             name: "C".to_owned(),
                             negated: false,
                         }],
                     }],
                     outputs: vec![OutputElement::Block {
+                        id: None,
                         fb_type: "TON".to_owned(),
                         instance: "Delay".to_owned(),
                         inputs: vec![BlockArg {

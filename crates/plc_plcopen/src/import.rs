@@ -327,10 +327,7 @@ pub fn from_plcopen_with_notes(xml: &str) -> Result<(LdProgram, Vec<String>), Pl
                 .upstream
                 .first()
                 .cloned();
-            match found {
-                Some(next) => current = next,
-                None => return None,
-            }
+            current = found?;
         }
     };
 

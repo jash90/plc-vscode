@@ -45,6 +45,7 @@ function asSimChild(child) {
         // how the extension spawns the CLI.
         stdin: child.stdin,
         stdout: child.stdout,
+        events: child,
         kill: () => child.kill(),
     };
 }
@@ -58,6 +59,17 @@ class SimClient {
         this.child = child;
         this.onEvent = onEvent;
         this.child.stdout.on('data', (chunk) => this.receive(chunk));
+        // Child death (crash, external kill, failed spawn): stop pacing and
+        // mark disposed so sends never hit a dead pipe. Without this, the
+        // tick interval keeps writing to a closed stdin → EPIPE crashes.
+        this.child.events.on('close', () => {
+            this.disposed = true;
+            this.stop();
+        });
+        this.child.events.on('error', () => {
+            this.disposed = true;
+            this.stop();
+        });
     }
     /** Handshake: hello → ready (with the FB catalog). */
     start() {
@@ -80,9 +92,10 @@ class SimClient {
     tick() {
         this.send({ op: 'tick' });
     }
-    /** Continuous run: arm the host-side tick pacer. */
+    /** Continuous run: align the server clock, then arm the tick pacer. */
     run(intervalMs) {
         this.stop();
+        this.send({ op: 'setInterval', ms: intervalMs });
         this.timer = setInterval(() => this.tick(), intervalMs);
     }
     /** Pause: disarm the pacer (the server keeps its state). */
@@ -118,12 +131,16 @@ class SimClient {
             if (line.length === 0) {
                 continue;
             }
+            let event;
             try {
-                this.onEvent(parseServeEvent(line));
+                event = parseServeEvent(line);
             }
             catch {
-                // Unknown/junk lines never take the session down.
+                // Unknown/junk lines never take the session down; consumer errors
+                // must propagate instead of being swallowed per line.
+                continue;
             }
+            this.onEvent(event);
         }
     }
 }

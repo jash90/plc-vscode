@@ -25,14 +25,29 @@ function fakeChild() {
   child.stdin = { written: [], write(line) { this.written.push(line); } };
   child.killed = false;
   child.kill = () => { child.killed = true; child.emit('close', 0); };
+  // The SimClient seam: the child itself is the lifecycle emitter.
+  child.events = child;
   return child;
 }
 
-function bootstrap(child, client) {
-  // The handshake every session starts with.
-  child.stdout.emit('data', Buffer.from('{"event":"ready","protocolVersion":1,"fbCatalog":[]}\n'));
-  void client;
-}
+check('child death disposes the client and stops ticking', () => {
+  const child = fakeChild();
+  const client = new SimClient(child, () => {});
+  client.start();
+  child.emit('close', 0);
+  const written = child.stdin.written.length;
+  client.tick(); // after death — must be a no-op
+  assert.strictEqual(child.stdin.written.length, written, 'sends stop after close');
+});
+
+check('double dispose is safe', () => {
+  const child = fakeChild();
+  const client = new SimClient(child, () => {});
+  client.start();
+  client.dispose();
+  client.dispose();
+  assert.strictEqual(child.killed, true);
+});
 
 check('frames partial lines correctly', () => {
   const child = fakeChild();

@@ -178,17 +178,19 @@ class LdEditorProvider {
                         const sim = await this.ensureSim(document);
                         switch (message.type) {
                             case 'simStart':
-                                // Live model, no save required: reload carries the current
-                                // program, then continuous ticks (host-paced).
-                                sim.client.reload(JSON.stringify(document.current));
+                                // Reload only when the model changed — pause → resume must
+                                // not reset scan/timers/inputs.
+                                await this.reloadIfChanged(sim, document);
                                 sim.client.run(100);
                                 break;
                             case 'simStop':
                                 sim.client.stop();
                                 break;
                             case 'simStep':
+                                // One scan from the CURRENT state — no reload (a reload
+                                // resets scan and wipes timers/inputs on the server).
                                 sim.client.stop();
-                                sim.client.reload(JSON.stringify(document.current));
+                                await this.reloadIfChanged(sim, document);
                                 sim.client.tick();
                                 break;
                             case 'simReset':
@@ -215,6 +217,14 @@ class LdEditorProvider {
     /** Compile LD → ST, run, and send power-flow JSON back to the webview. */
     /** Live simulations by document URI (lazy-started, disposed with panels). */
     simulations = new Map();
+    /** Reload only when the serialized model differs from the last load. */
+    async reloadIfChanged(sim, document) {
+        const json = JSON.stringify(document.current);
+        if (sim.loadedJson !== json) {
+            sim.client.reload(json);
+            sim.loadedJson = json;
+        }
+    }
     /**
      * Lazily spawn the `plc ld --serve` child for a document and forward its
      * events to the webview as protocol messages.
@@ -227,6 +237,17 @@ class LdEditorProvider {
         }
         const invocation = (0, ldCli_1.resolveRunInvocation)(this.context, 'ld', ['--serve']);
         const child = (0, node_child_process_1.spawn)(invocation.command, invocation.args, invocation.cwd ? { cwd: invocation.cwd } : undefined);
+        // A failed spawn (missing binary, no cargo on PATH) surfaces as an
+        // async 'error' event — without a listener it crashes the host.
+        child.on('error', (error) => {
+            this.simulations.delete(key);
+            for (const panel of this.panels.get(key) ?? []) {
+                void panel.webview.postMessage({
+                    type: 'error',
+                    message: `simulation failed to start: ${error.message}`,
+                });
+            }
+        });
         const client = new simClient_1.SimClient((0, simClient_1.asSimChild)(child), (event) => {
             this.forwardServeEvent(key, event);
         });
@@ -244,30 +265,41 @@ class LdEditorProvider {
     /** Translate serve events into webview protocol messages for all panels. */
     forwardServeEvent(key, event) {
         const panels = this.panels.get(key) ?? new Set();
+        const post = (message) => {
+            for (const panel of panels) {
+                void panel.webview.postMessage(message);
+            }
+        };
         switch (event.event) {
             case 'state':
-                for (const panel of panels) {
-                    void panel.webview.postMessage({
-                        type: 'simState',
-                        scan: event.scan,
-                        timeMs: event.timeMs,
-                        watch: event.watch,
-                        forced: event.forced,
-                    });
-                }
+                post({
+                    type: 'simState',
+                    scan: event.scan,
+                    timeMs: event.timeMs,
+                    watch: event.watch,
+                    forced: event.forced,
+                });
                 break;
             case 'powerFlow':
-                for (const panel of panels) {
-                    void panel.webview.postMessage({
-                        type: 'powerFlow',
-                        json: JSON.stringify({ rungs: event.rungs }),
-                    });
+                post({ type: 'powerFlow', json: JSON.stringify({ rungs: event.rungs }) });
+                break;
+            case 'diagnostics': {
+                // Summarize LD codes so a failing model is never a dead end.
+                const items = Array.isArray(event.items) ? event.items : [];
+                const summary = items
+                    .map((item) => {
+                    const code = item.code;
+                    const message = item.message;
+                    return `${code}: ${message}`;
+                })
+                    .join('; ');
+                if (summary.length > 0) {
+                    post({ type: 'error', message: summary });
                 }
                 break;
+            }
             case 'error':
-                for (const panel of panels) {
-                    void panel.webview.postMessage({ type: 'error', message: String(event.message) });
-                }
+                post({ type: 'error', message: String(event.message) });
                 break;
             default:
                 break;

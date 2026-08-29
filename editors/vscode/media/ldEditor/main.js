@@ -1216,40 +1216,82 @@
     });
     refresh();
   }
+  function escapeHtml(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function watchBooleans() {
+    const map = /* @__PURE__ */ new Map();
+    if (!simState) {
+      return map;
+    }
+    for (const line of simState.watch) {
+      const separator = line.indexOf("=");
+      if (separator === -1) {
+        continue;
+      }
+      const name = line.slice(0, separator).trim();
+      const value = line.slice(separator + 1).trim().toUpperCase();
+      if (value === "TRUE" || value === "FALSE") {
+        map.set(name, value === "TRUE");
+      }
+    }
+    return map;
+  }
   function renderSimPanel() {
     const panel = document.getElementById("sim-panel");
     if (!panel || !simState) {
       return;
     }
     const forcedSet = new Set(simState.forced.map((name) => name.toLowerCase()));
-    const inputs = allVariables(program).slice(0, 12);
-    const watchRows = simState.watch.map((line) => {
-      const separator = line.indexOf("=");
-      const name = separator === -1 ? line : line.slice(0, separator).trim();
-      const value = separator === -1 ? "" : line.slice(separator + 1).trim();
-      const forced = forcedSet.has(name.toLowerCase());
-      const forcedMark = forced ? "\u26A0" : "";
-      return `<tr class="${forced ? "forced" : ""}"><td>${name}</td><td>${value}</td><td>${forcedMark}</td></tr>`;
-    }).join("");
-    panel.innerHTML = `
-    <div class="sim-header">scan ${simState.scan} \xB7 t=${simState.timeMs}ms</div>
-    <div class="sim-inputs">
-      ${inputs.map(
-      (name) => `<label class="sim-input"><input type="checkbox" data-var="${name}" /> ${name}</label>`
-    ).join("")}
-    </div>
-    <table class="sim-watch">
-      <thead><tr><th>variable</th><th>value</th><th></th></tr></thead>
-      <tbody>${watchRows}</tbody>
-    </table>`;
-    panel.querySelectorAll('input[type="checkbox"]').forEach((box) => {
-      box.addEventListener("change", () => {
-        vscode.postMessage({
-          type: "simInput",
-          name: box.getAttribute("data-var") ?? "",
-          value: box.checked
+    const watchValues = watchBooleans();
+    const inputSignature = JSON.stringify(allVariables(program));
+    if (panel.getAttribute("data-inputs") !== inputSignature) {
+      panel.setAttribute("data-inputs", inputSignature);
+      const inputs = allVariables(program).slice(0, 12);
+      panel.innerHTML = `
+      <div class="sim-header"></div>
+      <div class="sim-inputs">
+        ${inputs.map(
+        (name) => `<label class="sim-input"><input type="checkbox" data-var="${escapeHtml(name)}" /> ${escapeHtml(name)}</label>`
+      ).join("")}
+      </div>
+      <table class="sim-watch">
+        <thead><tr><th>variable</th><th>value</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>`;
+      panel.querySelectorAll('input[type="checkbox"]').forEach((box) => {
+        box.addEventListener("change", () => {
+          vscode.postMessage({
+            type: "simInput",
+            name: box.getAttribute("data-var") ?? "",
+            value: box.checked
+          });
         });
       });
+    }
+    const header = panel.querySelector(".sim-header");
+    if (header) {
+      header.textContent = `scan ${simState.scan} \xB7 t=${simState.timeMs}ms`;
+    }
+    panel.querySelectorAll('input[type="checkbox"]').forEach((box) => {
+      const name = box.getAttribute("data-var") ?? "";
+      const value = watchValues.get(name);
+      if (value !== void 0) {
+        box.checked = value;
+      }
     });
+    const tbody = panel.querySelector(".sim-watch tbody");
+    if (tbody) {
+      const rows = simState.watch.map((line) => {
+        const separator = line.indexOf("=");
+        const name = separator === -1 ? line : line.slice(0, separator).trim();
+        const value = separator === -1 ? "" : line.slice(separator + 1).trim();
+        const forced = forcedSet.has(name.toLowerCase());
+        const forcedMark = forced ? "\u26A0" : "";
+        const rowClass = forced ? ' class="forced"' : "";
+        return `<tr${rowClass}><td>${escapeHtml(name)}</td><td>${escapeHtml(value)}</td><td>${forcedMark}</td></tr>`;
+      }).join("");
+      tbody.innerHTML = rows;
+    }
   }
 })();

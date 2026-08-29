@@ -20,9 +20,7 @@ use plc_hir::{
     BinaryOp, HirCallArg, HirExpr, HirModule, HirPouKind, HirProgram, HirStmt, HirType, HirVar,
 };
 
-use crate::model::{
-    CoilVariant, ContactElement, LdProgram, OutputElement, Rung, SeriesBranch,
-};
+use crate::model::{CoilVariant, ContactElement, LdProgram, OutputElement, Rung, SeriesBranch};
 
 /// Lower an [`LdProgram`] into a [`HirModule`] with a single PROGRAM POU.
 ///
@@ -45,9 +43,7 @@ pub fn lower_ld_program(program: &LdProgram) -> HirModule {
     for rung in &program.rungs {
         for output in &rung.outputs {
             if let OutputElement::Block {
-                instance,
-                fb_type,
-                ..
+                instance, fb_type, ..
             } = output
             {
                 vars.push(HirVar {
@@ -73,11 +69,7 @@ pub fn lower_ld_program(program: &LdProgram) -> HirModule {
 /// the output). Parallel branches are OR'd; series contacts within a branch are
 /// AND'd; normally-closed contacts are NOT'd.
 fn lower_rung_logic(rung: &Rung) -> HirExpr {
-    let branches: Vec<HirExpr> = rung
-        .branches
-        .iter()
-        .map(|branch| lower_series_branch(branch))
-        .collect();
+    let branches: Vec<HirExpr> = rung.branches.iter().map(lower_series_branch).collect();
 
     if branches.is_empty() {
         return HirExpr::Bool(false);
@@ -95,11 +87,7 @@ fn lower_rung_logic(rung: &Rung) -> HirExpr {
 
 /// AND together all contacts in a series branch.
 fn lower_series_branch(branch: &SeriesBranch) -> HirExpr {
-    let contacts: Vec<HirExpr> = branch
-        .elements
-        .iter()
-        .map(lower_contact)
-        .collect();
+    let contacts: Vec<HirExpr> = branch.elements.iter().map(lower_contact).collect();
 
     if contacts.is_empty() {
         return HirExpr::Bool(true);
@@ -197,13 +185,13 @@ fn collect_variables(program: &LdProgram) -> Vec<HirVar> {
             }
         }
         for output in &rung.outputs {
-            if let OutputElement::Coil { name, .. } = output {
-                if seen.insert(name.clone()) {
-                    vars.push(HirVar {
-                        name: name.clone(),
-                        ty: HirType::Bool,
-                    });
-                }
+            if let OutputElement::Coil { name, .. } = output
+                && seen.insert(name.clone())
+            {
+                vars.push(HirVar {
+                    name: name.clone(),
+                    ty: HirType::Bool,
+                });
             }
             if let OutputElement::Block { outputs, .. } = output {
                 for arg in outputs {
@@ -411,9 +399,7 @@ mod tests {
 
         let module = lower_ld_program(&program);
         match &module.programs[0].statements[0] {
-            HirStmt::FbCall {
-                instance, args, ..
-            } => {
+            HirStmt::FbCall { instance, args, .. } => {
                 assert_eq!(instance, "Delay");
                 assert_eq!(args.len(), 2);
                 assert_eq!(args[0].name.as_deref(), Some("IN"));
@@ -447,8 +433,11 @@ mod tests {
         };
 
         let module = lower_ld_program(&program);
-        let var_names: Vec<&str> =
-            module.programs[0].vars.iter().map(|v| v.name.as_str()).collect();
+        let var_names: Vec<&str> = module.programs[0]
+            .vars
+            .iter()
+            .map(|v| v.name.as_str())
+            .collect();
         assert!(var_names.contains(&"A"));
         assert!(var_names.contains(&"B"));
         assert!(var_names.contains(&"C"));

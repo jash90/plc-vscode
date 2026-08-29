@@ -10,8 +10,8 @@
 
 use std::collections::HashMap;
 
-use crate::model::{CoilVariant, ContactElement, LdProgram, OutputElement, Rung, RungPowerFlow};
 use crate::PowerFlowResult;
+use crate::model::{CoilVariant, ContactElement, LdProgram, OutputElement, Rung, RungPowerFlow};
 
 /// Variable state: variable name (lowercased) → boolean value.
 pub type VarState = HashMap<String, bool>;
@@ -52,12 +52,10 @@ fn evaluate_rung(rung: &Rung, state: &VarState) -> RungPowerFlow {
 
 /// Evaluate a series of contacts (AND).
 fn evaluate_series<'a>(
-    contacts: impl Iterator<Item = &'a ContactElement>,
+    mut contacts: impl Iterator<Item = &'a ContactElement>,
     state: &VarState,
 ) -> bool {
-    contacts
-        .map(|c| evaluate_contact(c, state))
-        .fold(true, |acc, energized| acc && energized)
+    contacts.all(|c| evaluate_contact(c, state))
 }
 
 /// A contact is energized if the variable state matches the contact type:
@@ -67,21 +65,13 @@ fn evaluate_contact(contact: &ContactElement, state: &VarState) -> bool {
         .get(&contact.name.to_ascii_lowercase())
         .copied()
         .unwrap_or(false);
-    if contact.negated {
-        !value
-    } else {
-        value
-    }
+    if contact.negated { !value } else { value }
 }
 
 /// Evaluate an output element: a normal coil is energized when the rung is
 /// energized; SET/RESET coils and blocks are always "active" in the sense that
 /// they are driven by the rung.
-fn evaluate_output(
-    output: &OutputElement,
-    rung_result: bool,
-    _state: &VarState,
-) -> bool {
+fn evaluate_output(output: &OutputElement, rung_result: bool, _state: &VarState) -> bool {
     match output {
         OutputElement::Coil { variant, .. } => match variant {
             CoilVariant::Normal => rung_result,
@@ -177,7 +167,10 @@ mod tests {
         state.insert("stop".to_owned(), false);
 
         let result = evaluate_rung(&rung, &state);
-        assert!(result.branch_energized[0], "NC passes when variable is FALSE");
+        assert!(
+            result.branch_energized[0],
+            "NC passes when variable is FALSE"
+        );
     }
 
     #[test]
@@ -187,7 +180,10 @@ mod tests {
         state.insert("stop".to_owned(), true);
 
         let result = evaluate_rung(&rung, &state);
-        assert!(!result.branch_energized[0], "NC blocks when variable is TRUE");
+        assert!(
+            !result.branch_energized[0],
+            "NC blocks when variable is TRUE"
+        );
     }
 
     #[test]

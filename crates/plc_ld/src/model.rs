@@ -58,10 +58,7 @@ pub struct ContactElement {
 pub enum OutputElement {
     /// Normal coil `( )` — assigns the rung result to the variable.
     #[serde(rename = "coil")]
-    Coil {
-        name: String,
-        variant: CoilVariant,
-    },
+    Coil { name: String, variant: CoilVariant },
     /// Function-block invocation (TON, TOF, TP, CTU, CTD, R_TRIG, F_TRIG, …).
     #[serde(rename = "block")]
     Block {
@@ -139,7 +136,9 @@ impl LdProgram {
                     OutputElement::Coil { name, .. } => {
                         vars.insert(name.clone());
                     }
-                    OutputElement::Block { inputs, outputs, .. } => {
+                    OutputElement::Block {
+                        inputs, outputs, ..
+                    } => {
                         for arg in inputs {
                             vars.insert(arg.value.clone());
                         }

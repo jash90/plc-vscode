@@ -2,7 +2,9 @@
 //! assignment bodies with a full operator set (`+`/`-`/`*`/`/`/`MOD`,
 //! `AND`/`OR`/`XOR`, comparisons, `NOT`, and function calls).
 
-use plc_hir::{BinaryOp, HirCallArg, HirExpr, HirPouKind, HirType, UnaryOp, lower_expression, lower_source};
+use plc_hir::{
+    BinaryOp, HirCallArg, HirExpr, HirPouKind, HirType, UnaryOp, lower_expression, lower_source,
+};
 
 const FIXTURE: &str = include_str!("fixtures/prg_test_st.st");
 
@@ -73,8 +75,14 @@ fn function_calls_lower_to_call_expr() {
         HirExpr::Call {
             name: "SHL".to_owned(),
             args: vec![
-                HirCallArg { name: None, value: var("wA") },
-                HirCallArg { name: None, value: HirExpr::Int(4) },
+                HirCallArg {
+                    name: None,
+                    value: var("wA")
+                },
+                HirCallArg {
+                    name: None,
+                    value: HirExpr::Int(4)
+                },
             ],
         }
     );

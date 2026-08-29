@@ -126,6 +126,28 @@ cargo run --package plc_lsp_server --bin plc-lsp-server --
 
 Run `npm install` in `editors/vscode` and ensure the Node.js version is an active LTS release.
 
+### Recovering the stashed WASM playground work
+
+Before the PLC-106 housekeeping task, the working tree held uncommitted work on an
+in-browser PLC playground (`plc_wasm` crate plus `website/` playground pages) and a
+locally emptied `LICENSE`. That work was parked with:
+
+```bash
+git stash push -u -m "wip: plc_wasm + website playground (pre-PLC-106)"
+```
+
+To resume it later, inspect and restore with:
+
+```bash
+git stash list
+git stash show --stat 'stash@{0}'
+git stash apply 'stash@{0}'   # or `pop` once you are sure
+```
+
+The stash also carried a root `Cargo.toml` edit adding `crates/plc_wasm` to the
+workspace members — re-check `Cargo.toml` merge state after applying, since the LD
+tasks may have evolved the member list in the meantime.
+
 ### LLVM version mismatch
 
 Symptoms can include `llvm-sys` build failures, missing `llvm-config`, or inkwell version errors.

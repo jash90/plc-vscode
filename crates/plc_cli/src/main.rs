@@ -56,10 +56,7 @@ fn run() -> Result<(), String> {
                 .next()
                 .map(PathBuf::from)
                 .ok_or_else(|| USAGE.to_owned())?;
-            let watch = args
-                .next()
-                .map(|flag| flag == "--watch")
-                .unwrap_or(false);
+            let watch = args.next().map(|flag| flag == "--watch").unwrap_or(false);
             run_ld_file(path, watch)
         }
         // Debug Adapter Protocol server over stdio; the program path arrives in

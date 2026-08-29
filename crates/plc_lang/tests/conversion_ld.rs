@@ -79,10 +79,7 @@ fn converts_ld_to_st_with_and_not() {
     // The assignment: C := A AND NOT B;
     assert!(st.contains("AND"), "ST was:\n{st}");
     assert!(st.contains("NOT"), "ST was:\n{st}");
-    assert!(
-        st.contains("C :="),
-        "ST should assign to C, was:\n{st}"
-    );
+    assert!(st.contains("C :="), "ST should assign to C, was:\n{st}");
 }
 
 #[test]

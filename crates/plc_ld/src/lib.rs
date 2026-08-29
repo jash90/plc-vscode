@@ -21,6 +21,19 @@ pub use model::*;
 pub use power_flow::{evaluate_power_flow, var_state_from_watch};
 
 /// Parse an [`LdProgram`] from a JSON string.
+///
+/// Files declaring a `schema_version` newer than [`CURRENT_SCHEMA_VERSION`]
+/// are rejected loudly rather than silently misinterpreted.
 pub fn parse_ld_json(text: &str) -> Result<LdProgram, serde_json::Error> {
-    serde_json::from_str(text)
+    use serde::de::Error as _;
+
+    let program: LdProgram = serde_json::from_str(text)?;
+    if program.schema_version > model::CURRENT_SCHEMA_VERSION {
+        return Err(serde_json::Error::custom(format!(
+            "unsupported .ld schema_version {} (this build understands up to {})",
+            program.schema_version,
+            model::CURRENT_SCHEMA_VERSION
+        )));
+    }
+    Ok(program)
 }

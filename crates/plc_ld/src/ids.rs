@@ -43,20 +43,26 @@ pub fn normalize_ids(program: &mut LdProgram) {
 /// Id allocation state for one prefix (`r` or `e`).
 struct Ids {
     prefix: &'static str,
-    next: u32,
+    /// u64 so hostile ids like `e4294967295` cannot overflow the counter
+    /// (a wrapped counter could sit below a kept suffix and force-valid ids
+    /// to regenerate, breaking the preserve-existing contract).
+    next: u64,
     used: HashSet<String>,
 }
 
 impl Ids {
     /// Seed the counter past the highest numeric `<prefix><n>` id in the
     /// program. `used` starts empty: keep-decisions are made during the walk,
-    /// in document order, via insert-result.
+    /// in document order, via insert-result. Suffixes beyond `u64::MAX - 1`
+    /// are ignored for seeding (allocating past them is unreachable in
+    /// practice and saturates instead of wrapping).
     fn new(prefix: &'static str, program: &LdProgram) -> Self {
-        let mut next = 0;
+        let mut next = 0u64;
         let mut consider = |id: &Option<String>| {
             if let Some(id) = id
                 && let Some(suffix) = id.strip_prefix(prefix)
-                && let Ok(n) = suffix.parse::<u32>()
+                && let Ok(n) = suffix.parse::<u64>()
+                && n < u64::MAX
                 && n >= next
             {
                 next = n + 1;
@@ -97,7 +103,7 @@ impl Ids {
     fn allocate(&mut self) -> String {
         loop {
             let candidate = format!("{}{}", self.prefix, self.next);
-            self.next += 1;
+            self.next = self.next.saturating_add(1);
             if self.used.insert(candidate.clone()) {
                 return candidate;
             }

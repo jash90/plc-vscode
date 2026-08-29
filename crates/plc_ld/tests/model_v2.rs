@@ -210,3 +210,67 @@ fn contact_energized_reports_cumulative_and_state() {
     let result = evaluate_power_flow(&program, &state);
     assert_eq!(result.rungs[0].contact_energized, vec![vec![true, false]]);
 }
+
+// ---------------------------------------------------------------------------
+// Review hardening (PLC-107 code review)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn future_schema_version_is_rejected() {
+    let future = r#"{"name":"P","schema_version":999,"rungs":[]}"#;
+    let err = parse_ld_json(future).expect_err("future version must be rejected");
+    assert!(
+        err.to_string().contains("schema_version"),
+        "error should name the field: {err}"
+    );
+}
+
+#[test]
+fn v1_shaped_program_serializes_without_new_keys() {
+    // A program with no ids/comments must serialize without the v2 keys, so
+    // id-less JSON stays byte-stable through a parse→serialize round trip.
+    let mut stripped = parse_ld_json(MOTOR_LD).unwrap();
+    for rung in &mut stripped.rungs {
+        rung.id = None;
+        rung.comment = None;
+    }
+    let json = serde_json::to_string(&stripped).unwrap();
+    assert!(!json.contains("\"id\""), "no id keys expected: {json}");
+    assert!(
+        !json.contains("\"comment\""),
+        "no comment keys expected: {json}"
+    );
+}
+
+#[test]
+fn hostile_max_suffix_does_not_break_preservation() {
+    // Regression (code review): a u32::MAX suffix must not overflow the id
+    // counter into clobbering preserved ids.
+    let mut program = LdProgram::new("P");
+    program
+        .rungs
+        .push(no_id_rung(&[("A", false), ("B", false)]));
+    program.rungs[0].branches[0].elements[0].id = Some("e0".to_owned());
+    program.rungs[0].branches[0].elements[1].id = Some("e4294967295".to_owned());
+
+    normalize_ids(&mut program);
+
+    // Both pre-existing ids survive untouched.
+    assert_eq!(
+        program.rungs[0].branches[0].elements[0].id.as_deref(),
+        Some("e0")
+    );
+    assert_eq!(
+        program.rungs[0].branches[0].elements[1].id.as_deref(),
+        Some("e4294967295")
+    );
+    // A subsequent id-less element gets a fresh, non-colliding id.
+    program.rungs.push(no_id_rung(&[("C", false)]));
+    normalize_ids(&mut program);
+    let fresh = program.rungs[1].branches[0].elements[0]
+        .id
+        .as_deref()
+        .unwrap();
+    assert_ne!(fresh, "e0");
+    assert_ne!(fresh, "e4294967295");
+}

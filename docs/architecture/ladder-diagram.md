@@ -153,3 +153,4 @@ conversion through the SourceHasErrors path):
 | `LD0004` | warning | Rung without outputs |
 | `LD0005` | warning | Pin unknown for the FB type (see `fb_pins`) |
 | `LD0006` | error | Empty variable/instance/pin value |
+| `LD0007` | error | FB instance name collides with a variable name (duplicate VARs in ST) |

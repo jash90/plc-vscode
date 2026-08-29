@@ -165,4 +165,12 @@ fn invalid_ld_convert_reports_ld_codes() {
         "warnings must not fail conversion: {:?}",
         result.diagnostics
     );
+
+    // With the filter removed, warnings surface in ConversionResult.diagnostics
+    // (visible to the CLI and the LSP Problems panel) without failing.
+    assert!(
+        result.diagnostics.iter().any(|d| d.code == "LD0004"),
+        "warning should ride along in diagnostics: {:?}",
+        result.diagnostics
+    );
 }

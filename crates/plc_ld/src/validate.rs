@@ -11,7 +11,8 @@
 //! | `LD0003` | error | Unknown function-block type (not in [`STANDARD_FB_TYPES`]) |
 //! | `LD0004` | warning | Rung has no outputs |
 //! | `LD0005` | warning | Unknown pin name for a known FB type |
-//! | `LD0006` | error | Empty variable/instance name |
+//! | `LD0006` | error | Empty variable/instance/pin value |
+//! | `LD0007` | error | FB instance name collides with a variable name |
 
 use std::collections::HashSet;
 
@@ -39,14 +40,23 @@ pub struct LdDiagnostic {
     pub message: String,
 }
 
-/// Function-block types the runtime can instantiate (case-sensitive: the
-/// runtime dispatches on the exact name).
+/// Function-block types the runtime can instantiate. Compared
+/// case-insensitively — the runtime upcases type names before dispatch —
+/// but the canonical spellings below are what editors should write.
 pub const STANDARD_FB_TYPES: &[&str] =
     &["TON", "TOF", "TP", "CTU", "CTD", "CTUD", "R_TRIG", "F_TRIG"];
 
+/// True when `fb_type` names a standard FB (case-insensitive, like the
+/// runtime's dispatch).
+pub fn is_standard_fb(fb_type: &str) -> bool {
+    STANDARD_FB_TYPES
+        .iter()
+        .any(|known| known.eq_ignore_ascii_case(fb_type))
+}
+
 /// Input and output pin names for a standard FB type, or `None` if unknown.
 pub fn fb_pins(fb_type: &str) -> Option<(&'static [&'static str], &'static [&'static str])> {
-    match fb_type {
+    match fb_type.trim().to_ascii_uppercase().as_str() {
         "TON" | "TOF" | "TP" => Some((&["IN", "PT"], &["Q", "ET"])),
         "CTU" => Some((&["CU", "RESET", "PV"], &["Q", "CV"])),
         "CTD" => Some((&["CD", "LOAD", "PV"], &["Q", "CV"])),
@@ -59,13 +69,24 @@ pub fn fb_pins(fb_type: &str) -> Option<(&'static [&'static str], &'static [&'st
 /// Validate the structural integrity of an [`LdProgram`].
 ///
 /// Order is deterministic: rules run per rung (empty → outputs → elements),
-/// then the cross-rung instance-uniqueness pass.
+/// with the cross-rung instance-uniqueness and instance-vs-variable passes.
 pub fn validate(program: &LdProgram) -> Vec<LdDiagnostic> {
     let mut diagnostics = Vec::new();
     let mut instances: HashSet<String> = HashSet::new();
+    let variables: HashSet<String> = program
+        .all_variables()
+        .into_iter()
+        .map(|name| name.to_ascii_lowercase())
+        .collect();
 
     for (rung_index, rung) in program.rungs.iter().enumerate() {
-        validate_rung(rung, rung_index, &mut diagnostics, &mut instances);
+        validate_rung(
+            rung,
+            rung_index,
+            &mut diagnostics,
+            &mut instances,
+            &variables,
+        );
     }
 
     diagnostics
@@ -76,6 +97,7 @@ fn validate_rung(
     rung_index: usize,
     diagnostics: &mut Vec<LdDiagnostic>,
     instances: &mut HashSet<String>,
+    variables: &HashSet<String>,
 ) {
     if rung.branches.is_empty() {
         diagnostics.push(LdDiagnostic {
@@ -122,7 +144,7 @@ fn validate_rung(
     }
 
     for output in &rung.outputs {
-        validate_output(output, rung_index, diagnostics, instances);
+        validate_output(output, rung_index, diagnostics, instances, variables);
     }
 }
 
@@ -131,6 +153,7 @@ fn validate_output(
     rung_index: usize,
     diagnostics: &mut Vec<LdDiagnostic>,
     instances: &mut HashSet<String>,
+    variables: &HashSet<String>,
 ) {
     match output {
         OutputElement::Coil { id, name, .. } => {
@@ -159,7 +182,7 @@ fn validate_output(
                     rung: rung_index,
                     message: "empty instance name on block".to_owned(),
                 });
-            } else if !instances.insert(instance.clone()) {
+            } else if !instances.insert(instance.to_ascii_lowercase()) {
                 diagnostics.push(LdDiagnostic {
                     code: "LD0002",
                     severity: LdSeverity::Error,
@@ -167,9 +190,21 @@ fn validate_output(
                     rung: rung_index,
                     message: format!("duplicate function-block instance '{instance}'"),
                 });
+            } else if variables.contains(&instance.to_ascii_lowercase()) {
+                diagnostics.push(LdDiagnostic {
+                    code: "LD0007",
+                    severity: LdSeverity::Error,
+                    element_id: id.clone(),
+                    rung: rung_index,
+                    message: format!(
+                        "function-block instance '{instance}' collides with a \
+                         variable of the same name (would render duplicate VAR \
+                         declarations)"
+                    ),
+                });
             }
 
-            if !STANDARD_FB_TYPES.contains(&fb_type.as_str()) {
+            if !is_standard_fb(fb_type) {
                 diagnostics.push(LdDiagnostic {
                     code: "LD0003",
                     severity: LdSeverity::Error,
@@ -182,8 +217,7 @@ fn validate_output(
                 });
             } else if let Some((input_pins, output_pins)) = fb_pins(fb_type) {
                 for arg in inputs.iter().chain(outputs) {
-                    if !input_pins.contains(&arg.name.as_str())
-                        && !output_pins.contains(&arg.name.as_str())
+                    if !is_known_pin(&arg.name, input_pins) && !is_known_pin(&arg.name, output_pins)
                     {
                         diagnostics.push(LdDiagnostic {
                             code: "LD0005",
@@ -217,6 +251,18 @@ fn validate_output(
     }
 }
 
+/// Pin-name acceptance matching the runtime: case-insensitive, with the
+/// `R`→RESET and `LD`→LOAD aliases the interpreter honours.
+fn is_known_pin(name: &str, pins: &[&str]) -> bool {
+    let upper = name.trim().to_ascii_uppercase();
+    pins.iter().any(|pin| pin.eq_ignore_ascii_case(&upper))
+        || match upper.as_str() {
+            "R" => pins.contains(&"RESET"),
+            "LD" => pins.contains(&"LOAD"),
+            _ => false,
+        }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -227,5 +273,22 @@ mod tests {
             assert!(fb_pins(fb_type).is_some(), "{fb_type} lacks a pin table");
         }
         assert!(fb_pins("MAGIC").is_none());
+    }
+
+    #[test]
+    fn fb_type_matching_is_case_insensitive_like_the_runtime() {
+        assert!(is_standard_fb("ton"));
+        assert!(is_standard_fb("Ton"));
+        assert!(!is_standard_fb("MAGIC"));
+        // fb_pins itself must resolve through case.
+        assert!(fb_pins("ctu").is_some());
+    }
+
+    #[test]
+    fn pin_aliases_match_runtime_acceptance() {
+        let (ctu_inputs, _) = fb_pins("CTU").unwrap();
+        assert!(is_known_pin("R", ctu_inputs), "R aliases RESET");
+        assert!(is_known_pin("reset", ctu_inputs), "case-insensitive");
+        assert!(!is_known_pin("PT", ctu_inputs), "PT is not a CTU pin");
     }
 }

@@ -16,11 +16,11 @@ pub struct LdFrontend;
 /// Map an [`plc_ld::LdDiagnostic`] onto the API diagnostic shape.
 ///
 /// LD is JSON, so there is no meaningful line/character span; the message
-/// carries the rung index and element id instead.
+/// carries the (1-based, user-facing) rung number and element id instead.
 fn to_api_diagnostic(d: plc_ld::LdDiagnostic) -> plc_api::Diagnostic {
     let location = match &d.element_id {
-        Some(id) => format!("rung {}, element {id}: ", d.rung),
-        None => format!("rung {}: ", d.rung),
+        Some(id) => format!("rung {}, element {id}: ", d.rung + 1),
+        None => format!("rung {}: ", d.rung + 1),
     };
     plc_api::Diagnostic {
         severity: match d.severity {
@@ -56,13 +56,13 @@ impl LanguageFrontend for LdFrontend {
         match plc_ld::parse_ld_json(text) {
             Ok(program) => {
                 let module = plc_ld::lower_ld_program(&program);
-                // Attach validation diagnostics. Only errors flow into
-                // `LoweringResult` — the registry fails the conversion when
-                // diagnostics are non-empty (SourceHasErrors), and warnings
-                // must not block LD→ST round trips.
+                // Attach all validation diagnostics — errors and warnings
+                // alike. The registry fails conversion only on Error severity
+                // (plc_lang::lib convert), so warnings surface in
+                // ConversionResult.diagnostics and the LSP Problems panel
+                // without blocking LD→ST round trips.
                 let diagnostics = plc_ld::validate(&program)
                     .into_iter()
-                    .filter(|d| d.severity == plc_ld::LdSeverity::Error)
                     .map(to_api_diagnostic)
                     .collect();
                 LoweringResult {

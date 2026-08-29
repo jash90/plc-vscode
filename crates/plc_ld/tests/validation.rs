@@ -246,3 +246,91 @@ fn diagnostics_key_on_element_ids_when_present() {
     assert_eq!(diags[0].code, "LD0006");
     assert_eq!(diags[0].element_id.as_deref(), Some("e0"));
 }
+
+// ---------------------------------------------------------------------------
+// Review hardening (PLC-108 code review)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lowercase_fb_type_is_accepted_like_the_runtime() {
+    let mut program = LdProgram::new("P");
+    program.rungs.push(rung(
+        &["A"],
+        vec![OutputElement::Block {
+            id: None,
+            fb_type: "ton".to_owned(),
+            instance: "T1".to_owned(),
+            inputs: vec![BlockArg {
+                name: "in".to_owned(), // case-insensitive pin
+                value: "A".to_owned(),
+            }],
+            outputs: vec![],
+        }],
+    ));
+    assert!(
+        plc_ld::validate(&program).is_empty(),
+        "runtime treats types/pins case-insensitively: {:?}",
+        plc_ld::validate(&program)
+    );
+}
+
+#[test]
+fn empty_instance_is_ld0006_not_ld0002() {
+    let mut program = LdProgram::new("P");
+    program.rungs.push(rung(
+        &["A"],
+        vec![OutputElement::Block {
+            id: None,
+            fb_type: "TON".to_owned(),
+            instance: String::new(),
+            inputs: vec![],
+            outputs: vec![],
+        }],
+    ));
+    assert_eq!(codes(&program), vec![(0, "LD0006")]);
+}
+
+#[test]
+fn same_rung_duplicate_instance_is_ld0002() {
+    let mut program = LdProgram::new("P");
+    let mut rung = rung(&["A"], vec![ton("Timer")]);
+    rung.outputs.push(ton("Timer"));
+    program.rungs.push(rung);
+    assert_eq!(codes(&program), vec![(0, "LD0002")]);
+}
+
+#[test]
+fn instance_variable_collision_is_ld0007() {
+    // A contact named like the FB instance would render duplicate VAR
+    // declarations in ST (BOOL + the instance type).
+    let mut program = LdProgram::new("P");
+    program.rungs.push(rung(&["Timer"], vec![ton("Timer")]));
+    assert_eq!(codes(&program), vec![(0, "LD0007")]);
+}
+
+#[test]
+fn empty_coil_name_is_ld0006() {
+    let mut program = LdProgram::new("P");
+    program.rungs.push(rung(&["A"], vec![coil("")]));
+    assert_eq!(codes(&program), vec![(0, "LD0006")]);
+}
+
+#[test]
+fn unknown_fb_type_suppresses_ld0005() {
+    // No pin table exists for an unknown type; pin checking is skipped.
+    let mut program = LdProgram::new("P");
+    program.rungs.push(rung(
+        &["A"],
+        vec![OutputElement::Block {
+            id: None,
+            fb_type: "MAGIC".to_owned(),
+            instance: "T1".to_owned(),
+            inputs: vec![BlockArg {
+                name: "WHATEVER".to_owned(),
+                value: "A".to_owned(),
+            }],
+            outputs: vec![],
+        }],
+    ));
+    assert_eq!(codes(&program), vec![(0, "LD0003")]);
+}

@@ -22,6 +22,9 @@ body {
 
 #palette { display: flex; gap: 6px; }
 
+/* CSP forbids inline style attributes; the toolbar spacer is a class. */
+.spacer { flex: 1; }
+
 .palette-item {
   padding: 4px 10px;
   border: 1px solid var(--vscode-button-border, #555);

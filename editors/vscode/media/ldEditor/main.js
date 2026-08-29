@@ -84,7 +84,7 @@
   function seed(program2, prefix) {
     let next = 0;
     const consider = (id) => {
-      if (typeof id === "string" && id.startsWith(prefix)) {
+      if (typeof id === "string" && id.length > prefix.length && id.startsWith(prefix) && /^\+?\d+$/.test(id.slice(prefix.length))) {
         const suffix = Number(id.slice(prefix.length));
         if (Number.isInteger(suffix) && suffix >= next && suffix < Number.MAX_SAFE_INTEGER) {
           next = suffix + 1;
@@ -137,7 +137,7 @@
     const leftRailX = cell.outerPad;
     const maxContacts = Math.max(0, ...program2.rungs.map((r) => Math.max(0, ...r.branches.map((b) => b.elements.length)), 0));
     const contactX = (column) => leftRailX + cell.railPadX + column * (cell.contactW + cell.gapX);
-    const outputsX = contactX(maxContacts) + (maxContacts > 0 ? cell.gapX : cell.gapX);
+    const outputsX = contactX(maxContacts) + cell.gapX;
     const maxOutputW = Math.max(
       cell.coilW,
       ...program2.rungs.flatMap((r) => r.outputs.map((o) => outputSize(o, cell).width))
@@ -159,7 +159,6 @@
       const branchesTotalH = branchCount * rowH + (branchCount - 1) * cell.branchGapY;
       const bandHeight = Math.max(branchesTotalH, outputsTotalH);
       const bandTop = y;
-      const bandMid = bandTop + bandHeight / 2;
       const outputsTop = bandTop + Math.max(0, (bandHeight - outputsTotalH) / 2);
       const outputY = (index) => {
         let oy = outputsTop;
@@ -172,24 +171,69 @@
         const size = outputSize(rung.outputs[index], cell);
         return outputY(index) + size.height / 2;
       };
-      wires.push({ x1: leftRailX, y1: bandTop, x2: leftRailX, y2: bandTop + bandHeight, kind: "rail" });
-      wires.push({ x1: rightRailX, y1: bandTop, x2: rightRailX, y2: bandTop + bandHeight, kind: "rail" });
+      wires.push({
+        x1: leftRailX,
+        y1: bandTop,
+        x2: leftRailX,
+        y2: bandTop + bandHeight,
+        kind: "rail",
+        carrier: { type: "source" },
+        rung: rungIndex
+      });
+      wires.push({
+        x1: rightRailX,
+        y1: bandTop,
+        x2: rightRailX,
+        y2: bandTop + bandHeight,
+        kind: "rail",
+        carrier: { type: "return" },
+        rung: rungIndex
+      });
       const firstBranchMid = branchMid(0);
       const lastBranchMid = branchMid(branchCount - 1);
       const collectorX = leftRailX + cell.railPadX / 2;
       const teeX = outputsX - cell.gapX / 2;
-      wires.push({ x1: leftRailX, y1: firstBranchMid, x2: collectorX, y2: firstBranchMid, kind: "series" });
+      wires.push({
+        x1: leftRailX,
+        y1: firstBranchMid,
+        x2: collectorX,
+        y2: firstBranchMid,
+        kind: "series",
+        carrier: { type: "source" },
+        rung: rungIndex
+      });
       if (rung.branches.length > 1) {
         wires.push({
           x1: collectorX,
           y1: firstBranchMid,
           x2: collectorX,
           y2: lastBranchMid,
-          kind: "collector"
+          kind: "collector",
+          carrier: { type: "source" },
+          rung: rungIndex
         });
       }
       for (let b = 0; b < rung.branches.length; b += 1) {
-        wires.push({ x1: collectorX, y1: branchMid(b), x2: contactX(0), y2: branchMid(b), kind: "series" });
+        wires.push({
+          x1: collectorX,
+          y1: branchMid(b),
+          x2: contactX(0),
+          y2: branchMid(b),
+          kind: "series",
+          carrier: { type: "source" },
+          rung: rungIndex
+        });
+      }
+      if (rung.branches.length === 0 && rung.outputs.length > 0) {
+        wires.push({
+          x1: leftRailX,
+          y1: branchMid(0),
+          x2: teeX,
+          y2: branchMid(0),
+          kind: "series",
+          carrier: { type: "source" },
+          rung: rungIndex
+        });
       }
       for (let b = 0; b < rung.branches.length; b += 1) {
         const branch = rung.branches[b];
@@ -201,7 +245,9 @@
               y1: branchMid(b),
               x2: contactX(i),
               y2: branchMid(b),
-              kind: "series"
+              kind: "series",
+              carrier: { type: "contact", branch: b, after: i - 1 },
+              rung: rungIndex
             });
           }
           elements.push({
@@ -218,10 +264,26 @@
           });
         }
         const branchEndX = branch.elements.length > 0 ? contactX(branch.elements.length - 1) + cell.contactW : contactX(0);
-        wires.push({ x1: branchEndX, y1: branchMid(b), x2: teeX, y2: branchMid(b), kind: "series" });
+        wires.push({
+          x1: branchEndX,
+          y1: branchMid(b),
+          x2: teeX,
+          y2: branchMid(b),
+          kind: "series",
+          carrier: { type: "branch", branch: b },
+          rung: rungIndex
+        });
       }
       if (rung.branches.length > 1) {
-        wires.push({ x1: teeX, y1: firstBranchMid, x2: teeX, y2: lastBranchMid, kind: "tee" });
+        wires.push({
+          x1: teeX,
+          y1: firstBranchMid,
+          x2: teeX,
+          y2: lastBranchMid,
+          kind: "tee",
+          carrier: { type: "rung" },
+          rung: rungIndex
+        });
       }
       for (let o = 0; o < rung.outputs.length; o += 1) {
         const output = rung.outputs[o];
@@ -239,16 +301,36 @@
           label: output.kind === "block" ? output.fb_type : coilLabel(output),
           sublabel: output.kind === "block" ? output.instance : void 0
         });
-        wires.push({ x1: teeX, y1: firstBranchMid, x2: outputsX, y2: outputMid(o), kind: "tee" });
+        if (Math.abs(outputMid(o) - firstBranchMid) > 0.5) {
+          wires.push({
+            x1: teeX,
+            y1: firstBranchMid,
+            x2: teeX,
+            y2: outputMid(o),
+            kind: "tee",
+            carrier: { type: "rung" },
+            rung: rungIndex
+          });
+        }
+        wires.push({
+          x1: teeX,
+          y1: outputMid(o),
+          x2: outputsX,
+          y2: outputMid(o),
+          kind: "tee",
+          carrier: { type: "rung" },
+          rung: rungIndex
+        });
         wires.push({
           x1: outputsX + size.width,
           y1: outputMid(o),
           x2: rightRailX,
           y2: outputMid(o),
-          kind: "series"
+          kind: "series",
+          carrier: { type: "output", index: o },
+          rung: rungIndex
         });
       }
-      void bandMid;
       y += bandHeight + cell.rungGapY;
     }
     const height = Math.max(y - cell.rungGapY + cell.outerPad, cell.outerPad * 2);
@@ -288,9 +370,9 @@
       `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="ld-diagram">`
     );
     for (const wire2 of geometry.wires) {
-      const energized = wireEnergized(wire2, geometry, flow);
+      const energized = wireEnergized(wire2, flow);
       parts.push(
-        `<line x1="${wire2.x1}" y1="${wire2.y1}" x2="${wire2.x2}" y2="${wire2.y2}" class="wire wire-${wire2.kind}${energized ? " energized" : ""}" />`
+        `<line x1="${wire2.x1}" y1="${wire2.y1}" x2="${wire2.x2}" y2="${wire2.y2}" class="wire wire-${wire2.kind} wire-${wire2.carrier.type}${energized ? " energized" : ""}" />`
       );
     }
     for (const element of geometry.elements) {
@@ -317,23 +399,30 @@
     parts.push("</svg>");
     return parts.join("\n");
   }
-  function wireEnergized(wire2, geometry, flow) {
-    if (wire2.kind === "rail") {
-      const midY = (wire2.y1 + wire2.y2) / 2;
-      const band = geometry.elements.filter(
-        (e) => e.y <= midY && e.y + e.height >= wire2.y1
-      );
-      return band.some((element) => isElementEnergized(element, flow));
+  function wireEnergized(wire2, flow) {
+    if (!flow?.rungs) {
+      return false;
     }
-    if (wire2.kind === "series") {
-      const left = geometry.elements.filter((e) => e.kind === "contact").filter((e) => Math.abs(e.y + e.height / 2 - wire2.y1) < 0.5 && e.x + e.width <= wire2.x1 + 1).sort((a, b) => b.x - a.x)[0];
-      return left ? isElementEnergized(left, flow) : false;
+    const rungFlow = flow.rungs[wire2.rung];
+    if (!rungFlow) {
+      return false;
     }
-    const branches = geometry.elements.filter((e) => e.kind === "contact" && e.index === 0).filter((e) => e.y + e.height / 2 >= Math.min(wire2.y1, wire2.y2) - 0.5).filter((e) => e.y + e.height / 2 <= Math.max(wire2.y1, wire2.y2) + 0.5);
-    return branches.some((element) => isElementEnergized(element, flow));
-  }
-  function isElementEnergized(element, flow) {
-    return element.kind === "contact" ? contactEnergized(flow, element) : outputEnergized(flow, element);
+    switch (wire2.carrier.type) {
+      case "source":
+        return true;
+      case "contact":
+        return rungFlow.contact_energized?.[wire2.carrier.branch]?.[wire2.carrier.after] === true;
+      case "branch":
+        return rungFlow.branch_energized?.[wire2.carrier.branch] === true;
+      case "rung":
+        return rungFlow.rung_result === true;
+      case "output":
+        return rungFlow.output_energized?.[wire2.carrier.index] === true;
+      case "return":
+        return (rungFlow.output_energized ?? []).some(Boolean);
+      default:
+        return false;
+    }
   }
 
   // src/ldWebview/main.ts

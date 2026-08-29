@@ -77,8 +77,12 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<vscode.Cust
       void webviewPanel.webview.postMessage(message);
     };
 
+    // Cache the file text up front; deliver `load` when the webview signals
+    // `ready`. Posting immediately after setting html races content load —
+    // a dropped load would leave the default empty program, and one Save
+    // click would overwrite the user's file with it.
     const content = await vscode.workspace.fs.readFile(document.uri);
-    post({ type: 'load', text: Buffer.from(content).toString('utf8') });
+    const text = Buffer.from(content).toString('utf8');
 
     webviewPanel.webview.onDidReceiveMessage(async (data: unknown) => {
       let message;
@@ -89,6 +93,9 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<vscode.Cust
         return;
       }
       switch (message.type) {
+        case 'ready':
+          post({ type: 'load', text });
+          break;
         case 'save': {
           const buffer = Buffer.from(message.text, 'utf8');
           await vscode.workspace.fs.writeFile(document.uri, buffer);
@@ -172,7 +179,7 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<vscode.Cust
 <body>
 <div id="toolbar">
   <div id="palette"></div>
-  <div style="flex:1"></div>
+  <div class="spacer"></div>
   <button id="btn-save">Save</button>
   <button id="btn-run">Run</button>
   <button id="btn-toggle-json">JSON</button>

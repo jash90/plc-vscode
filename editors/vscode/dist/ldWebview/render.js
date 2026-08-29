@@ -39,11 +39,12 @@ function renderSvg(geometry, program, flow) {
     const width = Math.ceil(geometry.width);
     const height = Math.ceil(geometry.height);
     parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="ld-diagram">`);
-    // Wires.
+    // Wires. Classes carry the kind (geometry) and the carrier (what the wire
+    // conducts) so coloring is testable and stylable.
     for (const wire of geometry.wires) {
-        const energized = wireEnergized(wire, geometry, flow);
+        const energized = wireEnergized(wire, flow);
         parts.push(`<line x1="${wire.x1}" y1="${wire.y1}" x2="${wire.x2}" y2="${wire.y2}"` +
-            ` class="wire wire-${wire.kind}${energized ? ' energized' : ''}" />`);
+            ` class="wire wire-${wire.kind} wire-${wire.carrier.type}${energized ? ' energized' : ''}" />`);
     }
     // Elements.
     for (const element of geometry.elements) {
@@ -77,32 +78,36 @@ function renderSvg(geometry, program, flow) {
     parts.push('</svg>');
     return parts.join('\n');
 }
-function wireEnergized(wire, geometry, flow) {
-    if (wire.kind === 'rail') {
-        // Rails are live when any element on the rung band is energized.
-        const midY = (wire.y1 + wire.y2) / 2;
-        const band = geometry.elements.filter((e) => e.y <= midY && e.y + e.height >= wire.y1);
-        return band.some((element) => isElementEnergized(element, flow));
+/**
+ * Wire coloring by carrier — physical conduction rules, no geometry
+ * heuristics: the supply side (left rail, collector, feeds) is live whenever
+ * flow exists; segments between contacts follow cumulative contact energy;
+ * branch ends follow `branch_energized`; output feeds follow `rung_result`;
+ * the return side follows `output_energized`.
+ */
+function wireEnergized(wire, flow) {
+    if (!flow?.rungs) {
+        return false;
     }
-    if (wire.kind === 'series') {
-        // A series wire is live when the element immediately left of it passes
-        // power: find the closest contact ending at the wire's start.
-        const left = geometry.elements
-            .filter((e) => e.kind === 'contact')
-            .filter((e) => Math.abs(e.y + e.height / 2 - wire.y1) < 0.5 && e.x + e.width <= wire.x1 + 1)
-            .sort((a, b) => b.x - a.x)[0];
-        return left ? isElementEnergized(left, flow) : false;
+    const rungFlow = flow.rungs[wire.rung];
+    if (!rungFlow) {
+        return false;
     }
-    // collector/tee wires follow the branches they join.
-    const branches = geometry.elements
-        .filter((e) => e.kind === 'contact' && e.index === 0)
-        .filter((e) => e.y + e.height / 2 >= Math.min(wire.y1, wire.y2) - 0.5)
-        .filter((e) => e.y + e.height / 2 <= Math.max(wire.y1, wire.y2) + 0.5);
-    return branches.some((element) => isElementEnergized(element, flow));
-}
-function isElementEnergized(element, flow) {
-    return element.kind === 'contact'
-        ? contactEnergized(flow, element)
-        : outputEnergized(flow, element);
+    switch (wire.carrier.type) {
+        case 'source':
+            return true;
+        case 'contact':
+            return rungFlow.contact_energized?.[wire.carrier.branch]?.[wire.carrier.after] === true;
+        case 'branch':
+            return rungFlow.branch_energized?.[wire.carrier.branch] === true;
+        case 'rung':
+            return rungFlow.rung_result === true;
+        case 'output':
+            return rungFlow.output_energized?.[wire.carrier.index] === true;
+        case 'return':
+            return (rungFlow.output_energized ?? []).some(Boolean);
+        default:
+            return false;
+    }
 }
 //# sourceMappingURL=render.js.map

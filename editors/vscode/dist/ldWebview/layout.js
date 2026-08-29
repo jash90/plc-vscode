@@ -49,7 +49,7 @@ function layout(program, cell = exports.CELL) {
     // Pass 1: per-rung band extents → the global right rail x.
     const maxContacts = Math.max(0, ...program.rungs.map((r) => Math.max(0, ...r.branches.map((b) => b.elements.length)), 0));
     const contactX = (column) => leftRailX + cell.railPadX + column * (cell.contactW + cell.gapX);
-    const outputsX = contactX(maxContacts) + (maxContacts > 0 ? cell.gapX : cell.gapX);
+    const outputsX = contactX(maxContacts) + cell.gapX;
     const maxOutputW = Math.max(cell.coilW, ...program.rungs.flatMap((r) => r.outputs.map((o) => outputSize(o, cell).width)));
     const rightRailX = outputsX + maxOutputW + cell.railPadX;
     const elements = [];
@@ -65,7 +65,6 @@ function layout(program, cell = exports.CELL) {
         const branchesTotalH = branchCount * rowH + (branchCount - 1) * cell.branchGapY;
         const bandHeight = Math.max(branchesTotalH, outputsTotalH);
         const bandTop = y;
-        const bandMid = bandTop + bandHeight / 2;
         const outputsTop = bandTop + Math.max(0, (bandHeight - outputsTotalH) / 2);
         const outputY = (index) => {
             let oy = outputsTop;
@@ -79,25 +78,47 @@ function layout(program, cell = exports.CELL) {
             return outputY(index) + size.height / 2;
         };
         // Rails (per-band segments of the global rails).
-        wires.push({ x1: leftRailX, y1: bandTop, x2: leftRailX, y2: bandTop + bandHeight, kind: 'rail' });
-        wires.push({ x1: rightRailX, y1: bandTop, x2: rightRailX, y2: bandTop + bandHeight, kind: 'rail' });
+        wires.push({
+            x1: leftRailX, y1: bandTop, x2: leftRailX, y2: bandTop + bandHeight,
+            kind: 'rail', carrier: { type: 'source' },
+            rung: rungIndex,
+        });
+        wires.push({
+            x1: rightRailX, y1: bandTop, x2: rightRailX, y2: bandTop + bandHeight,
+            kind: 'rail', carrier: { type: 'return' },
+            rung: rungIndex,
+        });
         const firstBranchMid = branchMid(0);
         const lastBranchMid = branchMid(branchCount - 1);
         const collectorX = leftRailX + cell.railPadX / 2;
         const teeX = outputsX - cell.gapX / 2;
         // Left rail → collector → branch starts.
-        wires.push({ x1: leftRailX, y1: firstBranchMid, x2: collectorX, y2: firstBranchMid, kind: 'series' });
+        wires.push({
+            x1: leftRailX, y1: firstBranchMid, x2: collectorX, y2: firstBranchMid,
+            kind: 'series', carrier: { type: 'source' },
+            rung: rungIndex,
+        });
         if (rung.branches.length > 1) {
             wires.push({
-                x1: collectorX,
-                y1: firstBranchMid,
-                x2: collectorX,
-                y2: lastBranchMid,
-                kind: 'collector',
+                x1: collectorX, y1: firstBranchMid, x2: collectorX, y2: lastBranchMid,
+                kind: 'collector', carrier: { type: 'source' },
+                rung: rungIndex,
             });
         }
         for (let b = 0; b < rung.branches.length; b += 1) {
-            wires.push({ x1: collectorX, y1: branchMid(b), x2: contactX(0), y2: branchMid(b), kind: 'series' });
+            wires.push({
+                x1: collectorX, y1: branchMid(b), x2: contactX(0), y2: branchMid(b),
+                kind: 'series', carrier: { type: 'source' },
+                rung: rungIndex,
+            });
+        }
+        // Rung with outputs but no branches: a straight source→output feed.
+        if (rung.branches.length === 0 && rung.outputs.length > 0) {
+            wires.push({
+                x1: leftRailX, y1: branchMid(0), x2: teeX, y2: branchMid(0),
+                kind: 'series', carrier: { type: 'source' },
+                rung: rungIndex,
+            });
         }
         // Contacts, column-aligned across branches, with series wires between.
         for (let b = 0; b < rung.branches.length; b += 1) {
@@ -111,6 +132,8 @@ function layout(program, cell = exports.CELL) {
                         x2: contactX(i),
                         y2: branchMid(b),
                         kind: 'series',
+                        carrier: { type: 'contact', branch: b, after: i - 1 },
+                        rung: rungIndex,
                     });
                 }
                 elements.push({
@@ -130,13 +153,21 @@ function layout(program, cell = exports.CELL) {
             const branchEndX = branch.elements.length > 0
                 ? contactX(branch.elements.length - 1) + cell.contactW
                 : contactX(0);
-            wires.push({ x1: branchEndX, y1: branchMid(b), x2: teeX, y2: branchMid(b), kind: 'series' });
+            wires.push({
+                x1: branchEndX, y1: branchMid(b), x2: teeX, y2: branchMid(b),
+                kind: 'series', carrier: { type: 'branch', branch: b },
+                rung: rungIndex,
+            });
         }
         // Right tee: branch ends join into the output column.
         if (rung.branches.length > 1) {
-            wires.push({ x1: teeX, y1: firstBranchMid, x2: teeX, y2: lastBranchMid, kind: 'tee' });
+            wires.push({
+                x1: teeX, y1: firstBranchMid, x2: teeX, y2: lastBranchMid,
+                kind: 'tee', carrier: { type: 'rung' },
+                rung: rungIndex,
+            });
         }
-        // Outputs (vertically centered in the band).
+        // Outputs (vertically centered in the band), fed orthogonally from the tee.
         for (let o = 0; o < rung.outputs.length; o += 1) {
             const output = rung.outputs[o];
             const size = outputSize(output, cell);
@@ -153,17 +184,25 @@ function layout(program, cell = exports.CELL) {
                 label: output.kind === 'block' ? output.fb_type : coilLabel(output),
                 sublabel: output.kind === 'block' ? output.instance : undefined,
             });
-            wires.push({ x1: teeX, y1: firstBranchMid, x2: outputsX, y2: outputMid(o), kind: 'tee' });
+            // Elbow: vertical at the tee column, then horizontal into the output.
+            if (Math.abs(outputMid(o) - firstBranchMid) > 0.5) {
+                wires.push({
+                    x1: teeX, y1: firstBranchMid, x2: teeX, y2: outputMid(o),
+                    kind: 'tee', carrier: { type: 'rung' },
+                    rung: rungIndex,
+                });
+            }
             wires.push({
-                x1: outputsX + size.width,
-                y1: outputMid(o),
-                x2: rightRailX,
-                y2: outputMid(o),
-                kind: 'series',
+                x1: teeX, y1: outputMid(o), x2: outputsX, y2: outputMid(o),
+                kind: 'tee', carrier: { type: 'rung' },
+                rung: rungIndex,
+            });
+            wires.push({
+                x1: outputsX + size.width, y1: outputMid(o), x2: rightRailX, y2: outputMid(o),
+                kind: 'series', carrier: { type: 'output', index: o },
+                rung: rungIndex,
             });
         }
-        // Rung comment sits in the band's slack space, if any.
-        void bandMid;
         y += bandHeight + cell.rungGapY;
     }
     const height = Math.max(y - cell.rungGapY + cell.outerPad, cell.outerPad * 2);

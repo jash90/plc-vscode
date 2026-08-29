@@ -77,7 +77,8 @@ check('energized classes match power flow exactly', () => {
     );
   }
 
-  // Kill the flow: nothing energized.
+  // Kill the flow: elements dead; only the supply side (source carrier)
+  // stays energized — the left rail is the power source by definition.
   const dead = JSON.parse(JSON.stringify(FLOW));
   dead.rungs[0] = {
     contact_energized: [[false, false]],
@@ -86,7 +87,13 @@ check('energized classes match power flow exactly', () => {
     rung_result: false,
   };
   const deadSvg = renderSvg(layout(program), program, dead);
-  assert.ok(!hasEnergizedClass(deadSvg), 'nothing energized when flow is dead');
+  for (const id of ['e0', 'e1', 'e2']) {
+    assert.ok(!hasEnergizedClass(elementTag(deadSvg, id)), `${id} dead`);
+  }
+  const deadWires = deadSvg.match(/class="wire wire-\S+ wire-(contact|branch|rung|output|return)[^"]* energized"/g) || [];
+  assert.strictEqual(deadWires.length, 0, 'no conducting wires energized when dead');
+  const supply = deadSvg.match(/class="wire wire-\S+ wire-source energized"/g) || [];
+  assert.ok(supply.length > 0, 'supply side stays live');
 });
 
 check('partial flow: dead contact not marked energized', () => {
@@ -107,6 +114,55 @@ check('output is svg with rails', () => {
   const svg = renderSvg(layout(program), program);
   assert.ok(svg.startsWith('<svg'));
   assert.ok(svg.includes('</svg>'));
+});
+
+
+// Appended check (review): carrier-based wire coloring in a 2-branch rung.
+check('wire coloring follows carriers in a 2-branch rung', () => {
+  const program = parseProgram(`{
+    "name": "P",
+    "rungs": [{
+      "branches": [
+        { "elements": [{ "name": "A", "negated": false }] },
+        { "elements": [{ "name": "B", "negated": false }] }
+      ],
+      "outputs": [{ "kind": "coil", "name": "Out", "variant": "normal" }]
+    }]
+  }`);
+  // A conducts, B dead → rung true, coil on.
+  const flow = {
+    rungs: [{
+      contact_energized: [[true], [false]],
+      branch_energized: [true, false],
+      output_energized: [true],
+      rung_result: true,
+    }],
+  };
+  const svg = renderSvg(layout(program), program, flow);
+  const wires = (svg.match(/class="wire [^"]*"/g) || []);
+  const energizedCarriers = wires
+    .filter((w) => w.includes(' energized'))
+    .map((w) => w.match(/wire-(contact|branch|rung|output|return|source)/g));
+  // Branch-0 trailing wire (branch carrier) is live, branch-1 is not: both
+  // carry carrier 'branch' but only one is energized — count energized
+  // wire-branch occurrences by checking against the dead twin.
+  const live = svg.match(/class="wire wire-series wire-branch energized"/g) || [];
+  const dead = svg.match(/class="wire wire-series wire-branch"[^e]/g) || [];
+  assert.strictEqual(live.length, 1, `exactly one live branch wire: ${live.length}`);
+  assert.strictEqual(dead.length, 1, `exactly one dead branch wire: ${dead.length}`);
+  assert.ok(
+    (svg.match(/class="wire wire-tee wire-rung energized"/g) || []).length >= 1,
+    'tee feed energized on rung_result',
+  );
+  assert.ok(
+    (svg.match(/class="wire wire-series wire-output energized"/g) || []).length === 1,
+    'output wire energized',
+  );
+  assert.ok(
+    (svg.match(/class="wire wire-rail wire-return energized"/g) || []).length === 1,
+    'return rail energized when the output is on',
+  );
+  void energizedCarriers;
 });
 
 if (failures > 0) {

@@ -133,7 +133,15 @@ export function normalizeIds(program: LdProgram): void {
 function seed(program: LdProgram, prefix: string): number {
   let next = 0;
   const consider = (id: string | undefined): void => {
-    if (typeof id === 'string' && id.startsWith(prefix)) {
+    // Mirror Rust's `strip_prefix` + `parse::<u64>`: the suffix must be a
+    // plain (optionally `+`-signed) decimal digit run — no whitespace, hex,
+    // exponent, or empty suffix (JS `Number` would accept all of those).
+    if (
+      typeof id === 'string' &&
+      id.length > prefix.length &&
+      id.startsWith(prefix) &&
+      /^\+?\d+$/.test(id.slice(prefix.length))
+    ) {
       const suffix = Number(id.slice(prefix.length));
       if (Number.isInteger(suffix) && suffix >= next && suffix < Number.MAX_SAFE_INTEGER) {
         next = suffix + 1;

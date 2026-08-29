@@ -40,6 +40,7 @@ const node_child_process_1 = require("node:child_process");
 const vscode = __importStar(require("vscode"));
 const node_1 = require("vscode-languageclient/node");
 const bundled_1 = require("./bundled");
+const ldCli_1 = require("./ldCli");
 const ldEditor_1 = require("./ldEditor");
 let client;
 let outputChannel;
@@ -49,40 +50,6 @@ function workspaceRoot(context) {
 /** Installed (Marketplace) extensions run in Production mode. */
 function isProduction(context) {
     return context.extensionMode === vscode.ExtensionMode.Production;
-}
-/**
- * Build the command/args to invoke a `plc` subcommand (`run`, `debug`, …),
- * shared by the run command and the debug adapter so both resolve the dev
- * (cargo) vs production (bundled binary) launch the same way.
- */
-function resolveRunInvocation(context, subcommand, extraArgs) {
-    if (isProduction(context)) {
-        // Installed extension: run the bundled CLI binary directly.
-        return {
-            command: context.asAbsolutePath((0, bundled_1.bundledBinaryRelativePath)(bundled_1.CLI_BINARY)),
-            args: [subcommand, ...extraArgs],
-        };
-    }
-    // Development: drive the workspace CLI via cargo. `cliArgs` ends with the
-    // `run` subcommand by default; swap that trailing subcommand for the
-    // requested one so `run` and `debug` share the same cargo prefix.
-    const config = vscode.workspace.getConfiguration('plcVscode');
-    const command = config.get('cliCommand', 'cargo');
-    const cliArgs = config.get('cliArgs', [
-        'run',
-        '--quiet',
-        '--package',
-        'plc_cli',
-        '--',
-        'run',
-    ]);
-    const cargoPrefix = cliArgs.slice(0, -1);
-    const repositoryRoot = config.get('repositoryRoot', '') || workspaceRoot(context);
-    return {
-        command,
-        args: [...cargoPrefix, subcommand, ...extraArgs],
-        cwd: repositoryRoot,
-    };
 }
 function serverOptions(context) {
     // Installed extension: run the bundled, platform-specific server binary so
@@ -134,7 +101,7 @@ async function activate(context) {
         await compileCurrentFileToCpdev(context, resource);
     }), vscode.commands.registerCommand('plc-vscode.runLdFile', async (resource) => {
         if (resource && resource.scheme === 'file') {
-            const ldInvocation = resolveRunInvocation(context, 'ld', [resource.fsPath]);
+            const ldInvocation = (0, ldCli_1.resolveRunInvocation)(context, 'ld', [resource.fsPath]);
             const spawnOpts = ldInvocation.cwd ? { cwd: ldInvocation.cwd } : {};
             outputChannel?.clear();
             outputChannel?.appendLine(`$ ${ldInvocation.command} ${ldInvocation.args.join(' ')}`);
@@ -200,7 +167,7 @@ async function runCurrentStructuredTextFile(context, resource) {
         await vscode.window.showWarningMessage('Open a Structured Text file before running PLC VS Code.');
         return;
     }
-    const invocation = resolveRunInvocation(context, 'run', [target]);
+    const invocation = (0, ldCli_1.resolveRunInvocation)(context, 'run', [target]);
     const command = invocation.command;
     const args = invocation.args;
     const spawnOptions = invocation.cwd ? { cwd: invocation.cwd } : {};
@@ -236,7 +203,7 @@ async function compileCurrentFileToCpdev(context, resource) {
     // `plc build` defaults to `--target cpdev` and writes `<file>.xcp` plus its
     // `.dcp` sidecar next to the source. It is pure Rust, so it works on every
     // platform regardless of whether the VM (`cpdev` feature) is bundled.
-    const invocation = resolveRunInvocation(context, 'build', [target]);
+    const invocation = (0, ldCli_1.resolveRunInvocation)(context, 'build', [target]);
     const command = invocation.command;
     const args = invocation.args;
     const spawnOptions = invocation.cwd ? { cwd: invocation.cwd } : {};
@@ -308,7 +275,7 @@ class PlcDebugAdapterFactory {
         this.context = context;
     }
     createDebugAdapterDescriptor() {
-        const invocation = resolveRunInvocation(this.context, 'debug', []);
+        const invocation = (0, ldCli_1.resolveRunInvocation)(this.context, 'debug', []);
         const options = invocation.cwd
             ? { cwd: invocation.cwd }
             : undefined;

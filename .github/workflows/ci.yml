@@ -119,5 +119,11 @@ jobs:
         run: npm ci || npm install
       - name: Type-check
         run: npx tsc --noEmit
+      - name: Type-check webview
+        run: npx tsc -p tsconfig.webview.json --noEmit
       - name: Test
         run: npm test
+      - name: Committed build outputs are fresh
+        # npm test regenerates dist/ + media/; the tree must be identical
+        # afterwards, otherwise a stale committed bundle slipped in.
+        run: git diff --exit-code -- media/ldEditor dist

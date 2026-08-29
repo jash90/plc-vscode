@@ -1,11 +1,14 @@
 "use strict";
 /**
- * Ladder Diagram (LD) custom editor provider for VS Code.
+ * Ladder Diagram (LD) custom editor provider — thin host.
  *
- * Reads/writes `.ld` JSON files and renders an interactive Canvas-based ladder
- * diagram editor in a webview.  After each edit the editor compiles the LD model
- * via the CLI (`plc ld --watch`) to get a power-flow result and colors elements
- * green (energized) or gray (de-energized).
+ * The webview (media/ldEditor/main.js, bundled from src/ldWebview/) owns the
+ * interactive UI; this host shuttles typed protocol messages, runs the CLI
+ * (`plc ld --watch` for power-flow, `plc ld` for execution) through the
+ * shared `resolveRunInvocation`, and writes files.
+ *
+ * The webview HTML enforces a Content-Security-Policy: no remote sources,
+ * styles from the extension's cspSource, scripts only with a per-load nonce.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -45,25 +48,15 @@ exports.LdEditorProvider = void 0;
 const vscode = __importStar(require("vscode"));
 const node_child_process_1 = require("node:child_process");
 const path = __importStar(require("node:path"));
-/** Palette of LD elements the user can drag onto the canvas. */
-const ELEMENT_PALETTE = [
-    { type: 'no-contact', label: '| |', title: 'Normally-Open Contact' },
-    { type: 'nc-contact', label: '|/|', title: 'Normally-Closed Contact' },
-    { type: 'coil', label: '( )', title: 'Coil (Normal)' },
-    { type: 'set-coil', label: '(S)', title: 'SET Coil' },
-    { type: 'reset-coil', label: '(R)', title: 'RESET Coil' },
-    { type: 'ton', label: 'TON', title: 'Timer On Delay' },
-    { type: 'ctu', label: 'CTU', title: 'Count Up' },
-];
+const protocol_1 = require("./ldWebview/protocol");
+const ldCli_1 = require("./ldCli");
 class LdEditorProvider {
     context;
-    /** Fired when the document changes (required by the interface). */
     _onDidChange = new vscode.EventEmitter();
     onDidChangeCustomDocument = this._onDidChange.event;
     constructor(context) {
         this.context = context;
     }
-    /** Called when a `.ld` file is opened. */
     async openCustomDocument(uri, _openContext, _token) {
         return {
             uri,
@@ -71,499 +64,153 @@ class LdEditorProvider {
             dispose: () => { },
         };
     }
-    /** Called to back up a document during hot-exit. */
-    async saveCustomDocument(document, cancellation) {
+    async saveCustomDocument(_document, _cancellation) {
         // Delegated to the standard document save in resolveCustomEditor.
     }
-    /** Called to revert a document. */
-    async revertCustomDocument(document, cancellation) {
+    async revertCustomDocument(_document, _cancellation) {
         // No-op: the webview is the source of truth.
     }
-    /** Called to save the document to a different location. */
-    async backupCustomDocument(document, context, cancellation) {
+    async backupCustomDocument(_document, _context, _cancellation) {
         return { id: '', delete: () => { } };
     }
-    /** Called to save the document. */
-    async saveCustomDocumentAs(document, destination, cancellation) {
+    async saveCustomDocumentAs(_document, _destination, _cancellation) {
         // No-op: handled via WorkspaceEdit in resolveCustomEditor.
     }
-    /** Called to create the webview for a custom document. */
     async resolveCustomEditor(document, webviewPanel, _token) {
-        webviewPanel.webview.options = {
-            enableScripts: true,
-        };
+        webviewPanel.webview.options = { enableScripts: true };
         webviewPanel.webview.html = this.getHtml(webviewPanel.webview);
-        // Send initial content to the webview.
+        const post = (message) => {
+            void webviewPanel.webview.postMessage(message);
+        };
+        // Cache the file text up front; deliver `load` when the webview signals
+        // `ready`. Posting immediately after setting html races content load —
+        // a dropped load would leave the default empty program, and one Save
+        // click would overwrite the user's file with it.
         const content = await vscode.workspace.fs.readFile(document.uri);
-        webviewPanel.webview.postMessage({
-            type: 'load',
-            text: Buffer.from(content).toString('utf8'),
-        });
-        // Listen for save requests from the webview.
-        webviewPanel.webview.onDidReceiveMessage(async (message) => {
-            if (message.type === 'save') {
-                const content = Buffer.from(message.text, 'utf8');
-                await vscode.workspace.fs.writeFile(document.uri, content);
-                // After saving, compile and evaluate power-flow.
-                await this.updatePowerFlow(webviewPanel.webview, document.uri);
+        const text = Buffer.from(content).toString('utf8');
+        webviewPanel.webview.onDidReceiveMessage(async (data) => {
+            let message;
+            try {
+                message = (0, protocol_1.parseWebviewMessage)(data);
             }
-            else if (message.type === 'run') {
-                await this.runLdFile(document.uri);
+            catch (error) {
+                post({ type: 'error', message: `protocol: ${error.message}` });
+                return;
+            }
+            switch (message.type) {
+                case 'ready':
+                    post({ type: 'load', text });
+                    break;
+                case 'save': {
+                    const buffer = Buffer.from(message.text, 'utf8');
+                    await vscode.workspace.fs.writeFile(document.uri, buffer);
+                    await this.updatePowerFlow(post, document.uri);
+                    break;
+                }
+                case 'run':
+                    await this.runLdFile(document.uri);
+                    break;
+                default:
+                    break;
             }
         });
     }
     /** Compile LD → ST, run, and send power-flow JSON back to the webview. */
-    async updatePowerFlow(webview, uri) {
+    async updatePowerFlow(post, uri) {
         try {
-            const invocation = this.resolveLdInvocation(uri.fsPath, '--watch');
-            const result = await new Promise((resolve, reject) => {
-                const child = (0, node_child_process_1.spawn)(invocation.command, invocation.args, invocation.options);
-                let stdout = '';
-                let stderr = '';
-                child.stdout.on('data', (chunk) => (stdout += chunk.toString()));
-                child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
-                child.on('close', (code) => {
-                    if (code === 0)
-                        resolve(stdout);
-                    else
-                        reject(new Error(stderr || `Exit code ${code}`));
-                });
-                child.on('error', reject);
-            });
-            // Parse the power-flow JSON from stdout.
-            webview.postMessage({ type: 'powerFlow', json: result });
+            const invocation = (0, ldCli_1.resolveRunInvocation)(this.context, 'ld', [uri.fsPath, '--watch']);
+            const result = await capture(invocation);
+            post({ type: 'powerFlow', json: result });
         }
         catch (error) {
             vscode.window.showWarningMessage(`LD power-flow evaluation failed: ${error.message}`);
         }
     }
-    /** Run the LD file via the CLI. */
+    /** Run the LD file via the CLI, streaming output to the LD channel. */
     async runLdFile(uri) {
         try {
-            const invocation = this.resolveLdInvocation(uri.fsPath);
+            const invocation = (0, ldCli_1.resolveRunInvocation)(this.context, 'ld', [uri.fsPath]);
             const output = vscode.window.createOutputChannel('PLC LD');
             output.show(true);
             output.appendLine(`$ ${invocation.command} ${invocation.args.join(' ')}`);
-            const child = (0, node_child_process_1.spawn)(invocation.command, invocation.args, invocation.options);
+            const child = (0, node_child_process_1.spawn)(invocation.command, invocation.args, invocation.cwd ? { cwd: invocation.cwd } : undefined);
             child.stdout.on('data', (chunk) => output.append(chunk.toString()));
             child.stderr.on('data', (chunk) => output.append(chunk.toString()));
             child.on('close', (code) => {
-                if (code === 0) {
-                    output.appendLine('LD execution completed.');
-                }
-                else {
-                    output.appendLine(`LD execution failed with exit code ${code}.`);
-                }
+                output.appendLine(code === 0 ? 'LD execution completed.' : `LD execution failed with exit code ${code}.`);
             });
         }
         catch (error) {
             vscode.window.showErrorMessage(`LD run failed: ${error.message}`);
         }
     }
-    /** Resolve the CLI invocation for the `ld` subcommand. */
-    resolveLdInvocation(filePath, ...extraArgs) {
-        if (this.context.extensionMode === vscode.ExtensionMode.Production) {
-            return {
-                command: this.context.asAbsolutePath('./dist/plc'),
-                args: ['ld', filePath, ...extraArgs],
-            };
-        }
-        const config = vscode.workspace.getConfiguration('plcVscode');
-        const command = config.get('cliCommand', 'cargo');
-        const cliArgs = config.get('cliArgs', [
-            'run',
-            '--quiet',
-            '--package',
-            'plc_cli',
-            '--',
-            'run',
-        ]);
-        const repositoryRoot = config.get('repositoryRoot', '') ||
-            path.resolve(this.context.extensionPath, '..', '..');
-        // Replace the trailing 'run' subcommand with 'ld'.
-        const cargoPrefix = cliArgs.slice(0, -1);
-        return {
-            command,
-            args: [...cargoPrefix, 'ld', filePath, ...extraArgs],
-            options: { cwd: repositoryRoot },
-        };
-    }
-    /** The HTML/JS content for the webview. */
+    /** The webview shell: CSP-hardened, external bundle + stylesheet. */
     getHtml(webview) {
         const nonce = getNonce();
+        const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'ldEditor', 'main.js'));
+        const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'ldEditor', 'main.css'));
+        const csp = [
+            "default-src 'none'",
+            `style-src ${webview.cspSource}`,
+            `script-src 'nonce-${nonce}'`,
+            `img-src ${webview.cspSource} data:`,
+        ].join('; ');
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="${csp}">
 <title>Ladder Diagram Editor</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: var(--vscode-font-family, monospace);
-    background: var(--vscode-editor-background, #1e1e1e);
-    color: var(--vscode-editor-foreground, #d4d4d4);
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-  }
-  #toolbar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px;
-    border-bottom: 1px solid var(--vscode-panel-border, #333);
-    flex-shrink: 0;
-  }
-  #palette {
-    display: flex;
-    gap: 6px;
-  }
-  .palette-item {
-    padding: 4px 10px;
-    border: 1px solid var(--vscode-button-border, #555);
-    border-radius: 3px;
-    cursor: pointer;
-    font-size: 13px;
-    background: var(--vscode-button-secondaryBackground, #3a3d41);
-    color: var(--vscode-button-secondaryForeground, #fff);
-  }
-  .palette-item:hover {
-    background: var(--vscode-button-hoverBackground, #454545);
-  }
-  #toolbar button {
-    padding: 4px 12px;
-    cursor: pointer;
-    border: 1px solid var(--vscode-button-border, #0e639c);
-    border-radius: 2px;
-    background: var(--vscode-button-background, #0e639c);
-    color: var(--vscode-button-foreground, #fff);
-    font-size: 12px;
-  }
-  #canvas-container {
-    flex: 1;
-    overflow: auto;
-    padding: 16px;
-  }
-  #ld-textarea {
-    width: 100%;
-    min-height: 120px;
-    margin-top: 8px;
-    font-family: monospace;
-    font-size: 12px;
-    background: var(--vscode-input-background, #3c3c3c);
-    color: var(--vscode-input-foreground, #d4d4d4);
-    border: 1px solid var(--vscode-input-border, #555);
-    padding: 8px;
-    display: none;
-  }
-  .rung {
-    display: flex;
-    align-items: center;
-    min-height: 40px;
-    margin-bottom: 4px;
-    border-bottom: 1px dashed #333;
-    padding: 0 8px;
-  }
-  .left-rail, .right-rail {
-    width: 3px;
-    min-height: 30px;
-    background: #888;
-    flex-shrink: 0;
-  }
-  .element {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 50px;
-    height: 30px;
-    margin: 0 4px;
-    border: 1px solid var(--vscode-editorWidget-border, #666);
-    border-radius: 2px;
-    font-size: 12px;
-    cursor: pointer;
-  }
-  .element.energized {
-    border-color: #4caf50;
-    background: rgba(76, 175, 80, 0.15);
-    color: #66bb6a;
-  }
-  .element.not-energized {
-    opacity: 0.6;
-  }
-  .wire {
-    width: 20px;
-    height: 2px;
-    background: #555;
-    flex-shrink: 0;
-  }
-  .wire.energized {
-    background: #4caf50;
-  }
-  #status-bar {
-    padding: 4px 8px;
-    border-top: 1px solid var(--vscode-panel-border, #333);
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground, #888);
-    flex-shrink: 0;
-  }
-</style>
+<link rel="stylesheet" href="${styleUri}">
 </head>
 <body>
-  <div id="toolbar">
-    <div id="palette">
-      ${ELEMENT_PALETTE.map((e) => `<div class="palette-item" data-type="${e.type}" title="${e.title}">${e.label}</div>`).join('')}
-    </div>
-    <div style="flex:1"></div>
-    <button id="btn-save">Save</button>
-    <button id="btn-run">Run</button>
-    <button id="btn-toggle-json">JSON</button>
-  </div>
-  <div id="canvas-container">
-    <div id="ld-canvas"></div>
-    <textarea id="ld-textarea" spellcheck="false"></textarea>
-  </div>
-  <div id="status-bar">Ready.</div>
-
-<script nonce="${nonce}">
-  const vscode = acquireVsCodeApi();
-  let ldProgram = null;
-  let powerFlow = null;
-
-  // Receive messages from the extension.
-  window.addEventListener('message', (event) => {
-    const msg = event.data;
-    if (msg.type === 'load') {
-      try {
-        ldProgram = JSON.parse(msg.text);
-      } catch (e) {
-        ldProgram = { name: 'NewProgram', rungs: [] };
-      }
-      renderCanvas();
-      updateTextarea();
-    } else if (msg.type === 'powerFlow') {
-      try {
-        powerFlow = JSON.parse(msg.json);
-        renderCanvas();
-      } catch (e) {
-        document.getElementById('status-bar').textContent = 'Power-flow parse error: ' + e.message;
-      }
-    }
-  });
-
-  // Palette drag: add a new rung with the selected element type.
-  document.querySelectorAll('.palette-item').forEach((item) => {
-    item.addEventListener('click', () => {
-      addElement(item.dataset.type);
-    });
-  });
-
-  function addElement(type) {
-    if (!ldProgram) ldProgram = { name: 'NewProgram', rungs: [] };
-
-    let element;
-    switch (type) {
-      case 'no-contact':
-        element = { name: 'NewVar', negated: false };
-        break;
-      case 'nc-contact':
-        element = { name: 'NewVar', negated: true };
-        break;
-      case 'coil':
-      case 'set-coil':
-      case 'reset-coil':
-        const variant = type === 'coil' ? 'normal' : type === 'set-coil' ? 'set' : 'reset';
-        const coil = { kind: 'coil', name: 'OutVar', variant };
-        if (ldProgram.rungs.length === 0) {
-          ldProgram.rungs.push({ branches: [{ elements: [] }], outputs: [] });
-        }
-        ldProgram.rungs[ldProgram.rungs.length - 1].outputs.push(coil);
-        renderCanvas();
-        updateTextarea();
-        return;
-      case 'ton':
-      case 'ctu':
-        const fbType = type.toUpperCase();
-        const fb = {
-          kind: 'block',
-          fb_type: fbType,
-          instance: fbType + '_inst',
-          inputs: [
-            { name: type === 'ton' ? 'IN' : 'CU', value: 'NewVar' },
-            ...(type === 'ton'
-              ? [{ name: 'PT', value: 'T#1s' }]
-              : [{ name: 'PV', value: '10' }]),
-          ],
-          outputs: [{ name: 'Q', value: 'Done' }],
-        };
-        if (ldProgram.rungs.length === 0) {
-          ldProgram.rungs.push({ branches: [{ elements: [] }], outputs: [] });
-        }
-        ldProgram.rungs[ldProgram.rungs.length - 1].outputs.push(fb);
-        renderCanvas();
-        updateTextarea();
-        return;
-    }
-
-    // Add contact to the last rung's first branch.
-    if (ldProgram.rungs.length === 0) {
-      ldProgram.rungs.push({ branches: [{ elements: [] }], outputs: [] });
-    }
-    const rung = ldProgram.rungs[ldProgram.rungs.length - 1];
-    if (rung.branches.length === 0) {
-      rung.branches.push({ elements: [] });
-    }
-    rung.branches[0].elements.push(element);
-    renderCanvas();
-    updateTextarea();
-  }
-
-  function renderCanvas() {
-    const canvas = document.getElementById('ld-canvas');
-    canvas.innerHTML = '';
-
-    if (!ldProgram || !ldProgram.rungs) return;
-
-    ldProgram.rungs.forEach((rung, rungIdx) => {
-      const rungDiv = document.createElement('div');
-      rungDiv.className = 'rung';
-
-      const rail = document.createElement('div');
-      rail.className = 'left-rail';
-      rungDiv.appendChild(rail);
-
-      // Determine if this rung is energized.
-      const rungEnergized = powerFlow && powerFlow.rungs[rungIdx]
-        ? powerFlow.rungs[rungIdx].rung_result
-        : false;
-
-      // Render contacts in the first branch (series/AND).
-      if (rung.branches && rung.branches.length > 0) {
-        rung.branches.forEach((branch, branchIdx) => {
-          if (branch.elements) {
-            branch.elements.forEach((contact, contactIdx) => {
-              const wire = document.createElement('div');
-              wire.className = 'wire' + (rungEnergized ? ' energized' : '');
-              rungDiv.appendChild(wire);
-
-              const el = document.createElement('div');
-              const branchEnergized = powerFlow && powerFlow.rungs[rungIdx] &&
-                powerFlow.rungs[rungIdx].branch_energized &&
-                powerFlow.rungs[rungIdx].branch_energized[branchIdx];
-              el.className = 'element' + (branchEnergized ? ' energized' : ' not-energized');
-              const symbol = contact.negated ? '|/|' : '| |';
-              el.textContent = symbol + ' ' + contact.name;
-              el.title = 'Click to rename';
-              el.addEventListener('click', () => {
-                const name = prompt('Variable name:', contact.name);
-                if (name !== null) {
-                  contact.name = name;
-                  renderCanvas();
-                  updateTextarea();
-                }
-              });
-              rungDiv.appendChild(el);
-            });
-          }
-        });
-      }
-
-      // Wire to outputs.
-      const wireOut = document.createElement('div');
-      wireOut.style.flex = '1';
-      wireOut.style.maxWidth = '40px';
-      wireOut.style.height = '2px';
-      wireOut.style.background = rungEnergized ? '#4caf50' : '#555';
-      rungDiv.appendChild(wireOut);
-
-      // Render outputs.
-      if (rung.outputs) {
-        rung.outputs.forEach((output, outIdx) => {
-          const outEnergized = powerFlow && powerFlow.rungs[rungIdx] &&
-            powerFlow.rungs[rungIdx].output_energized &&
-            powerFlow.rungs[rungIdx].output_energized[outIdx];
-          const el = document.createElement('div');
-          el.className = 'element' + (outEnergized ? ' energized' : ' not-energized');
-          if (output.kind === 'coil') {
-            const symbol = output.variant === 'set' ? '(S)' : output.variant === 'reset' ? '(R)' : '( )';
-            el.textContent = symbol + ' ' + output.name;
-          } else if (output.kind === 'block') {
-            el.textContent = output.fb_type + ' [' + output.instance + ']';
-          }
-          el.title = 'Click to rename';
-          el.addEventListener('click', () => {
-            if (output.kind === 'coil') {
-              const name = prompt('Variable name:', output.name);
-              if (name !== null) {
-                output.name = name;
-                renderCanvas();
-                updateTextarea();
-              }
-            }
-          });
-          rungDiv.appendChild(el);
-        });
-      }
-
-      const rightRail = document.createElement('div');
-      rightRail.className = 'right-rail';
-      rungDiv.appendChild(rightRail);
-
-      canvas.appendChild(rungDiv);
-    });
-
-    // Update status bar.
-    if (powerFlow) {
-      const energized = powerFlow.rungs.filter(r => r.rung_result).length;
-      document.getElementById('status-bar').textContent =
-        powerFlow.rungs.length + ' rungs, ' + energized + ' energized.';
-    } else {
-      document.getElementById('status-bar').textContent =
-        (ldProgram.rungs ? ldProgram.rungs.length : 0) + ' rungs. Save to evaluate power-flow.';
-    }
-  }
-
-  function updateTextarea() {
-    document.getElementById('ld-textarea').value = JSON.stringify(ldProgram, null, 2);
-  }
-
-  document.getElementById('btn-save').addEventListener('click', () => {
-    const text = document.getElementById('ld-textarea').style.display !== 'none'
-      ? document.getElementById('ld-textarea').value
-      : JSON.stringify(ldProgram, null, 2);
-    vscode.postMessage({ type: 'save', text });
-  });
-
-  document.getElementById('btn-run').addEventListener('click', () => {
-    vscode.postMessage({ type: 'run' });
-  });
-
-  document.getElementById('btn-toggle-json').addEventListener('click', () => {
-    const ta = document.getElementById('ld-textarea');
-    ta.style.display = ta.style.display === 'none' ? 'block' : 'none';
-  });
-
-  // Sync textarea changes back to model.
-  document.getElementById('ld-textarea').addEventListener('input', (e) => {
-    try {
-      ldProgram = JSON.parse(e.target.value);
-      renderCanvas();
-    } catch (err) {
-      // Ignore parse errors while typing.
-    }
-  });
-</script>
+<div id="toolbar">
+  <div id="palette"></div>
+  <div class="spacer"></div>
+  <button id="btn-save">Save</button>
+  <button id="btn-run">Run</button>
+  <button id="btn-toggle-json">JSON</button>
+</div>
+<div id="canvas-container">
+  <div id="ld-canvas"></div>
+  <textarea id="ld-textarea" spellcheck="false"></textarea>
+</div>
+<div id="status-bar">Ready.</div>
+<script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
     }
 }
 exports.LdEditorProvider = LdEditorProvider;
 function getNonce() {
-    let text = '';
     const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
+    let text = '';
+    for (let i = 0; i < 32; i += 1) {
         text += possible.charAt(Math.floor(Math.random() * possible.length));
     }
     return text;
+}
+/** Run an invocation and resolve with stdout (reject on non-zero exit). */
+function capture(invocation) {
+    return new Promise((resolve, reject) => {
+        const child = (0, node_child_process_1.spawn)(invocation.command, invocation.args, invocation.cwd ? { cwd: invocation.cwd } : undefined);
+        let stdout = '';
+        let stderr = '';
+        child.stdout.on('data', (chunk) => {
+            stdout += chunk.toString();
+        });
+        child.stderr.on('data', (chunk) => {
+            stderr += chunk.toString();
+        });
+        child.on('close', (code) => {
+            if (code === 0) {
+                resolve(stdout);
+            }
+            else {
+                reject(new Error(stderr || `Exit code ${code}`));
+            }
+        });
+        child.on('error', reject);
+    });
 }
 //# sourceMappingURL=ldEditor.js.map

@@ -1,0 +1,127 @@
+/* LD editor webview styles. Loaded via cspSource (no inline styles). */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--vscode-font-family, monospace);
+  background: var(--vscode-editor-background, #1e1e1e);
+  color: var(--vscode-editor-foreground, #d4d4d4);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid var(--vscode-panel-border, #333);
+  flex-shrink: 0;
+}
+
+#palette { display: flex; gap: 6px; }
+
+/* CSP forbids inline style attributes; the toolbar spacer is a class. */
+.spacer { flex: 1; }
+
+.palette-item {
+  padding: 4px 10px;
+  border: 1px solid var(--vscode-button-border, #555);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 13px;
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #fff);
+}
+
+.palette-item:hover { background: var(--vscode-button-hoverBackground, #454545); }
+
+#toolbar button {
+  padding: 4px 12px;
+  cursor: pointer;
+  border: 1px solid var(--vscode-button-border, #0e639c);
+  border-radius: 2px;
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #fff);
+  font-size: 12px;
+}
+
+#canvas-container {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+}
+
+#ld-textarea {
+  width: 100%;
+  min-height: 140px;
+  margin-top: 8px;
+  font-family: monospace;
+  font-size: 12px;
+  background: var(--vscode-input-background, #3c3c3c);
+  color: var(--vscode-input-foreground, #d4d4d4);
+  border: 1px solid var(--vscode-input-border, #555);
+  padding: 8px;
+  display: none;
+}
+
+#status-bar {
+  padding: 4px 8px;
+  border-top: 1px solid var(--vscode-panel-border, #333);
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, #888);
+  flex-shrink: 0;
+}
+
+/* Diagram */
+
+.ld-diagram { display: block; }
+
+.ld-diagram .wire {
+  stroke: #555;
+  stroke-width: 2;
+}
+
+.ld-diagram .wire.energized { stroke: #4caf50; }
+
+.ld-diagram .wire-rail { stroke: #888; stroke-width: 3; }
+
+.ld-diagram .element rect {
+  fill: var(--vscode-editor-background, #1e1e1e);
+  stroke: var(--vscode-editorWidget-border, #666);
+  stroke-width: 1;
+}
+
+.ld-diagram .element.energized rect {
+  stroke: #4caf50;
+  fill: rgba(76, 175, 80, 0.12);
+}
+
+.ld-diagram .element.not-energized { opacity: 0.65; }
+
+.ld-diagram .element-label {
+  fill: var(--vscode-editor-foreground, #d4d4d4);
+  font-size: 11px;
+  font-family: var(--vscode-font-family, monospace);
+  user-select: none;
+}
+
+.ld-diagram .element.energized .element-label { fill: #66bb6a; }
+
+.ld-diagram .element-sublabel {
+  fill: var(--vscode-descriptionForeground, #888);
+  font-size: 10px;
+  font-family: var(--vscode-font-family, monospace);
+  user-select: none;
+}
+
+.ld-diagram .element { cursor: pointer; }
+
+.ld-diagram .element:hover rect { stroke: var(--vscode-focusBorder, #0e639c); }
+
+.ld-diagram .rung-comment {
+  fill: var(--vscode-descriptionForeground, #888);
+  font-size: 10px;
+  font-family: var(--vscode-font-family, monospace);
+}

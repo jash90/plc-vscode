@@ -36,6 +36,10 @@ pub fn lower_ld_program(program: &LdProgram) -> HirModule {
         for output in &rung.outputs {
             let stmt = lower_output(output, &rung_logic);
             statements.push(stmt);
+            // For FB blocks, append output assignments (Done := Delay.Q, …).
+            for out_stmt in lower_block_outputs(output) {
+                statements.push(out_stmt);
+            }
         }
     }
 
@@ -165,6 +169,28 @@ fn lower_output(output: &OutputElement, rung_logic: &HirExpr) -> HirStmt {
                 args,
             }
         }
+    }
+}
+
+/// Generate post-FB-call output assignments: `OutputVar := Instance.Pin;`.
+/// These are separate statements appended after the FbCall so the runtime
+/// wires the FB's output to the user-visible variable.
+fn lower_block_outputs(output: &OutputElement) -> Vec<HirStmt> {
+    if let OutputElement::Block {
+        instance, outputs, ..
+    } = output
+    {
+        outputs
+            .iter()
+            .map(|arg| {
+                HirStmt::Assign(plc_hir::HirAssign {
+                    target: arg.value.clone(),
+                    value: HirExpr::Var(format!("{instance}.{}", arg.name)),
+                })
+            })
+            .collect()
+    } else {
+        Vec::new()
     }
 }
 

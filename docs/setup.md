@@ -146,7 +146,12 @@ git stash apply 'stash@{0}'   # or `pop` once you are sure
 
 The stash also carried a root `Cargo.toml` edit adding `crates/plc_wasm` to the
 workspace members — re-check `Cargo.toml` merge state after applying, since the LD
-tasks may have evolved the member list in the meantime.
+tasks may have evolved the member list in the meantime. Expect conflicts beyond
+`Cargo.toml` as well: the stash includes edits to `crates/plc_hir/src/lib.rs`,
+`crates/plc_ld/src/lower.rs`, `crates/plc_hir/tests/prg_test_lowering.rs`,
+`crates/plc_ld/tests/full_ld_program.rs`, and `editors/vscode/dist/extension.js`,
+all of which were subsequently reformatted or rebuilt on this branch, so
+`git stash apply` onto the LD stack will likely conflict in those files.
 
 ### LLVM version mismatch
 

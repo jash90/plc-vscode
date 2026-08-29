@@ -369,14 +369,21 @@ export function hitTest(
     return { kind: 'newRung' };
   }
   let rung = rungs[rungs.length - 1];
+  let matched = false;
   for (const candidate of rungs) {
     const band = geometry.elements.filter((e) => e.rung === candidate);
     const top = Math.min(...band.map((e) => e.y));
     const bottom = Math.max(...band.map((e) => e.y + e.height));
     if (y >= top - 14 && y <= bottom + 24) {
       rung = candidate;
+      matched = true;
       break;
     }
+  }
+  // Above the whole diagram clamps to the first rung (the last-rung default
+  // would silently mis-attribute drops above rung 0).
+  if (!matched && y < Math.min(...geometry.elements.map((e) => e.y))) {
+    rung = rungs[0];
   }
 
   const band = geometry.elements.filter((e) => e.rung === rung);
@@ -384,6 +391,12 @@ export function hitTest(
   const outputs = band.filter((e) => e.kind !== 'contact');
   const bandTop = Math.min(...band.map((e) => e.y));
   const bandBottom = Math.max(...band.map((e) => e.y + e.height));
+
+  // Past the last rung's slack → a fresh rung (the canvas margin below the
+  // diagram is the drop zone for 'start a new rung').
+  if (rung === rungs[rungs.length - 1] && y > bandBottom + 24) {
+    return { kind: 'newRung' };
+  }
 
   // 4. Output column → output slot.
   if (outputs.length > 0) {

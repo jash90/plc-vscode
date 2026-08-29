@@ -292,14 +292,20 @@ function mutate(program: LdProgram, command: LdCommand): void {
         }
         return;
       }
-      const [contact] = fromRung.branches[command.branch]?.elements.splice(command.index, 1) ?? [];
+      const sourceBranch = fromRung.branches[command.branch];
+      const [contact] = sourceBranch?.elements.splice(command.index, 1) ?? [];
       if (!contact) {
         return;
+      }
+      // Prune the emptied source branch — an empty branch is an LD0001
+      // error state the editor must never create.
+      if (sourceBranch && sourceBranch.elements.length === 0) {
+        fromRung.branches.splice(command.branch, 1);
       }
       while (toRung.branches.length <= (command.toBranch as number)) {
         toRung.branches.push({ elements: [] });
       }
-      toRung.branches[command.toBranch as number].elements.splice(
+      toRung.branches[command.toBranch as number]?.elements.splice(
         Math.max(command.toIndex as number, 0),
         0,
         contact,
@@ -340,7 +346,11 @@ function mutate(program: LdProgram, command: LdCommand): void {
       if (command.branch === -1) {
         rung.outputs.splice(command.index, 1);
       } else {
-        rung.branches[command.branch]?.elements.splice(command.index, 1);
+        const branch = rung.branches[command.branch];
+        branch?.elements.splice(command.index, 1);
+        if (branch && branch.elements.length === 0) {
+          rung.branches.splice(command.branch, 1);
+        }
       }
       return;
     }

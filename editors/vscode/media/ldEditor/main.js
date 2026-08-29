@@ -491,20 +491,28 @@
       return { kind: "newRung" };
     }
     let rung = rungs[rungs.length - 1];
+    let matched = false;
     for (const candidate of rungs) {
       const band2 = geometry.elements.filter((e) => e.rung === candidate);
       const top = Math.min(...band2.map((e) => e.y));
       const bottom = Math.max(...band2.map((e) => e.y + e.height));
       if (y >= top - 14 && y <= bottom + 24) {
         rung = candidate;
+        matched = true;
         break;
       }
+    }
+    if (!matched && y < Math.min(...geometry.elements.map((e) => e.y))) {
+      rung = rungs[0];
     }
     const band = geometry.elements.filter((e) => e.rung === rung);
     const contacts = band.filter((e) => e.kind === "contact");
     const outputs = band.filter((e) => e.kind !== "contact");
     const bandTop = Math.min(...band.map((e) => e.y));
     const bandBottom = Math.max(...band.map((e) => e.y + e.height));
+    if (rung === rungs[rungs.length - 1] && y > bandBottom + 24) {
+      return { kind: "newRung" };
+    }
     if (outputs.length > 0) {
       const outputLeft = Math.min(...outputs.map((e) => e.x));
       const outputRight = Math.max(...outputs.map((e) => e.x + e.width));
@@ -729,6 +737,17 @@
     });
     return order;
   }
+  function revalidateSelection() {
+    if (!selection) {
+      return;
+    }
+    const exists = elementOrder().some(
+      (e) => e.rung === selection.rung && e.branch === selection.branch && e.index === selection.index
+    );
+    if (!exists) {
+      selection = void 0;
+    }
+  }
   function moveSelection(delta) {
     const order = elementOrder();
     if (order.length === 0) {
@@ -771,18 +790,47 @@
         const index = Number(node.getAttribute("data-index"));
         beginRename(rung, branch, index, node);
       });
-      const dragSource = node;
-      dragSource.draggable = true;
-      node.addEventListener("dragstart", (event) => {
-        selection = {
-          rung: Number(node.getAttribute("data-rung")),
-          branch: Number(node.getAttribute("data-branch")),
-          index: Number(node.getAttribute("data-index"))
-        };
-        event.dataTransfer?.setData("application/x-ld-element", JSON.stringify(selection));
-        event.dataTransfer?.setData("text/plain", "element");
+      node.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) {
+          return;
+        }
+        beginPointerDrag(node, event);
       });
     });
+  }
+  function beginPointerDrag(node, event) {
+    const source = {
+      rung: Number(node.getAttribute("data-rung")),
+      branch: Number(node.getAttribute("data-branch")),
+      index: Number(node.getAttribute("data-index"))
+    };
+    const startX = event.clientX;
+    const startY = event.clientY;
+    let armed = false;
+    const move = (moveEvent) => {
+      if (!armed && Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) > 4) {
+        armed = true;
+        node.classList.add("dragging");
+      }
+      if (armed) {
+        moveEvent.preventDefault();
+      }
+    };
+    const up = (upEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      node.classList.remove("dragging");
+      if (!armed) {
+        return;
+      }
+      const canvas = byId("ld-canvas");
+      const rect = canvas.getBoundingClientRect();
+      const geometry = layout(program);
+      const hit = hitTest(geometry, upEvent.clientX - rect.left, upEvent.clientY - rect.top);
+      applyDrop(hit, void 0, source);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   }
   function keyboardInsert(paletteType) {
     for (const command of paletteCommands(program, paletteType)) {
@@ -791,6 +839,10 @@
   }
   function applyDrop(hit, payloadType, elementSource) {
     if (elementSource) {
+      const samePosition = hit.kind === "series" && elementSource.rung === hit.rung && elementSource.branch === hit.branch && elementSource.index === hit.index || hit.kind === "output" && elementSource.branch === -1 && elementSource.rung === hit.rung && elementSource.index === hit.index;
+      if (samePosition) {
+        return;
+      }
       if (hit.kind === "series") {
         send(
           commands.moveElement(elementSource, {
@@ -814,25 +866,46 @@
     if (!payloadType) {
       return;
     }
-    if (hit.kind === "series") {
-      send(
-        commands.insertContact(
-          hit.rung,
-          hit.branch,
-          hit.index,
-          "NewVar",
-          payloadType === "nc-contact"
-        )
-      );
-    } else if (hit.kind === "parallel") {
-      send(commands.insertParallelBranch(hit.rung, "NewVar"));
-    } else if (hit.kind === "newRung") {
+    const isContact = payloadType === "no-contact" || payloadType === "nc-contact";
+    if (isContact) {
+      if (hit.kind === "series") {
+        send(
+          commands.insertContact(
+            hit.rung,
+            hit.branch,
+            hit.index,
+            "NewVar",
+            payloadType === "nc-contact"
+          )
+        );
+      } else if (hit.kind === "parallel") {
+        send(commands.insertParallelBranch(hit.rung, "NewVar"));
+      } else if (hit.kind === "newRung") {
+        for (const command of paletteCommands(program, payloadType)) {
+          send(command);
+        }
+      } else {
+        send(commands.insertContact(hit.rung, 0, 0, "NewVar", payloadType === "nc-contact"));
+      }
+      return;
+    }
+    if (hit.kind === "newRung") {
       for (const command of paletteCommands(program, payloadType)) {
         send(command);
       }
+      return;
     }
-    if (hit.kind === "output" || hit.kind === "element") {
-      for (const command of paletteCommands(program, payloadType)) {
+    const rung = hit.kind === "element" || hit.kind === "output" || hit.kind === "parallel" ? hit.rung : program.rungs.length - 1;
+    if (payloadType === "coil" || payloadType === "set-coil" || payloadType === "reset-coil") {
+      send(
+        commands.addCoil(
+          rung,
+          "OutVar",
+          payloadType === "coil" ? "normal" : payloadType === "set-coil" ? "set" : "reset"
+        )
+      );
+    } else {
+      for (const command of paletteCommands({ ...program, rungs: program.rungs.slice(0, rung + 1) }, payloadType)) {
         send(command);
       }
     }
@@ -920,7 +993,7 @@
       }
       const elementJson = data.getData("application/x-ld-element");
       const elementSource = elementJson ? JSON.parse(elementJson) : void 0;
-      const payloadType = data.getData("application/x-ld-palette") || (elementSource ? void 0 : void 0);
+      const payloadType = data.getData("application/x-ld-palette") || void 0;
       const canvas = byId("ld-canvas");
       const rect = canvas.getBoundingClientRect();
       const geometry = layout(program);
@@ -1035,10 +1108,12 @@
             program = { name: "NewProgram", schema_version: 2, rungs: [] };
           }
           powerFlow = void 0;
+          selection = void 0;
           render();
           break;
         case "state":
           program = message.program;
+          revalidateSelection();
           render();
           break;
         case "powerFlow":

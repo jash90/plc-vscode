@@ -87,6 +87,22 @@ function elementOrder(): { rung: number; branch: number; index: number }[] {
   return order;
 }
 
+/** Keep the selection only while it still points at a real element. */
+function revalidateSelection(): void {
+  if (!selection) {
+    return;
+  }
+  const exists = elementOrder().some(
+    (e) =>
+      e.rung === selection!.rung &&
+      e.branch === selection!.branch &&
+      e.index === selection!.index,
+  );
+  if (!exists) {
+    selection = undefined;
+  }
+}
+
 function moveSelection(delta: number): void {
   const order = elementOrder();
   if (order.length === 0) {
@@ -137,19 +153,55 @@ function bindElementClicks(): void {
       const index = Number(node.getAttribute('data-index'));
       beginRename(rung, branch, index, node as SVGElement);
     });
-    // Element drag: HTML5 DnD carrying the element address.
-    const dragSource = node as unknown as SVGElement & { draggable?: boolean };
-    dragSource.draggable = true;
-    node.addEventListener('dragstart', (event) => {
-      selection = {
-        rung: Number(node.getAttribute('data-rung')),
-        branch: Number(node.getAttribute('data-branch')),
-        index: Number(node.getAttribute('data-index')),
-      };
-      (event as DragEvent).dataTransfer?.setData('application/x-ld-element', JSON.stringify(selection));
-      (event as DragEvent).dataTransfer?.setData('text/plain', 'element');
+    // Element drag via pointer events — SVG elements cannot initiate
+    // HTML5 drag-and-drop in Chromium, so we drive it ourselves.
+    node.addEventListener('pointerdown', (event) => {
+      if ((event as PointerEvent).button !== 0) {
+        return;
+      }
+      beginPointerDrag(node as SVGElement, event as PointerEvent);
     });
   });
+}
+
+/**
+ * Pointer-based element dragging: pointerdown selects, a >4px move arms the
+ * drag (visual cue via CSS), pointerup drop-targets through hitTest.
+ */
+function beginPointerDrag(node: SVGElement, event: PointerEvent): void {
+  const source = {
+    rung: Number(node.getAttribute('data-rung')),
+    branch: Number(node.getAttribute('data-branch')),
+    index: Number(node.getAttribute('data-index')),
+  };
+  const startX = event.clientX;
+  const startY = event.clientY;
+  let armed = false;
+
+  const move = (moveEvent: PointerEvent): void => {
+    if (!armed && Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) > 4) {
+      armed = true;
+      node.classList.add('dragging');
+    }
+    if (armed) {
+      moveEvent.preventDefault();
+    }
+  };
+  const up = (upEvent: PointerEvent): void => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    node.classList.remove('dragging');
+    if (!armed) {
+      return; // plain click — selection already handled
+    }
+    const canvas = byId('ld-canvas');
+    const rect = canvas.getBoundingClientRect();
+    const geometry = layout(program);
+    const hit = hitTest(geometry, upEvent.clientX - rect.left, upEvent.clientY - rect.top);
+    applyDrop(hit, undefined, source);
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
 }
 
 /** Keyboard insert helpers addressed at the selection (or program end). */
@@ -166,7 +218,20 @@ function applyDrop(
   elementSource: { rung: number; branch: number; index: number } | undefined,
 ): void {
   if (elementSource) {
-    // Moving an existing element.
+    // Moving an existing element. A drop resolving to the element's own
+    // position is a no-op — never push a phantom undo entry for it.
+    const samePosition =
+      (hit.kind === 'series' &&
+        elementSource.rung === hit.rung &&
+        elementSource.branch === hit.branch &&
+        elementSource.index === hit.index) ||
+      (hit.kind === 'output' &&
+        elementSource.branch === -1 &&
+        elementSource.rung === hit.rung &&
+        elementSource.index === hit.index);
+    if (samePosition) {
+      return;
+    }
     if (hit.kind === 'series') {
       send(
         commands.moveElement(elementSource, {
@@ -190,28 +255,54 @@ function applyDrop(
   if (!payloadType) {
     return;
   }
-  // Palette drops map onto insertion commands.
-  if (hit.kind === 'series') {
-    send(
-      commands.insertContact(
-        hit.rung,
-        hit.branch,
-        hit.index,
-        'NewVar',
-        payloadType === 'nc-contact',
-      ),
-    );
-  } else if (hit.kind === 'parallel') {
-    send(commands.insertParallelBranch(hit.rung, 'NewVar'));
-  } else if (hit.kind === 'newRung') {
+  // Contact payloads insert contacts; coils/blocks land in the outputs of
+  // the hit rung — regardless of the exact zone, so the payload type and
+  // the drop rung are always honored.
+  const isContact = payloadType === 'no-contact' || payloadType === 'nc-contact';
+  if (isContact) {
+    if (hit.kind === 'series') {
+      send(
+        commands.insertContact(
+          hit.rung,
+          hit.branch,
+          hit.index,
+          'NewVar',
+          payloadType === 'nc-contact',
+        ),
+      );
+    } else if (hit.kind === 'parallel') {
+      send(commands.insertParallelBranch(hit.rung, 'NewVar'));
+    } else if (hit.kind === 'newRung') {
+      for (const command of paletteCommands(program, payloadType)) {
+        send(command);
+      }
+    } else {
+      // On/around an element or the output column: insert into the hit
+      // rung's first branch.
+      send(commands.insertContact(hit.rung, 0, 0, 'NewVar', payloadType === 'nc-contact'));
+    }
+    return;
+  }
+  // Coil / block payloads go to the outputs of the hit rung.
+  if (hit.kind === 'newRung') {
     for (const command of paletteCommands(program, payloadType)) {
       send(command);
     }
+    return;
   }
-  // 'output' and 'element' targets fall back to append semantics via the
-  // palette sequence (kept simple for MVP).
-  if (hit.kind === 'output' || hit.kind === 'element') {
-    for (const command of paletteCommands(program, payloadType)) {
+  const rung = hit.kind === 'element' || hit.kind === 'output' || hit.kind === 'parallel'
+    ? hit.rung
+    : program.rungs.length - 1;
+  if (payloadType === 'coil' || payloadType === 'set-coil' || payloadType === 'reset-coil') {
+    send(
+      commands.addCoil(
+        rung,
+        'OutVar',
+        payloadType === 'coil' ? 'normal' : payloadType === 'set-coil' ? 'set' : 'reset',
+      ),
+    );
+  } else {
+    for (const command of paletteCommands({ ...program, rungs: program.rungs.slice(0, rung + 1) }, payloadType)) {
       send(command);
     }
   }
@@ -320,8 +411,7 @@ function wire(): void {
     const elementSource = elementJson
       ? (JSON.parse(elementJson) as { rung: number; branch: number; index: number })
       : undefined;
-    const payloadType =
-      data.getData('application/x-ld-palette') || (elementSource ? undefined : undefined);
+    const payloadType = data.getData('application/x-ld-palette') || undefined;
     const canvas = byId('ld-canvas');
     const rect = canvas.getBoundingClientRect();
     const geometry = layout(program);
@@ -454,10 +544,12 @@ function wire(): void {
           program = { name: 'NewProgram', schema_version: 2, rungs: [] };
         }
         powerFlow = undefined;
+        selection = undefined;
         render();
         break;
       case 'state':
         program = message.program;
+        revalidateSelection();
         render();
         break;
       case 'powerFlow':

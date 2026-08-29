@@ -119,7 +119,7 @@ fn lower_contact(contact: &ContactElement) -> HirExpr {
 /// Convert an output element to a HIR statement, driven by the rung logic.
 fn lower_output(output: &OutputElement, rung_logic: &HirExpr) -> HirStmt {
     match output {
-        OutputElement::Coil { name, variant } => match variant {
+        OutputElement::Coil { name, variant, .. } => match variant {
             CoilVariant::Normal => HirStmt::Assign(plc_hir::HirAssign {
                 target: name.clone(),
                 value: rung_logic.clone(),
@@ -218,21 +218,27 @@ mod tests {
     fn simple_and_lowers_to_assignment() {
         // (A AND B) → C
         let program = LdProgram {
+            schema_version: CURRENT_SCHEMA_VERSION,
             name: "Test".to_owned(),
             rungs: vec![Rung {
+                id: None,
+                comment: None,
                 branches: vec![SeriesBranch {
                     elements: vec![
                         ContactElement {
+                            id: None,
                             name: "A".to_owned(),
                             negated: false,
                         },
                         ContactElement {
+                            id: None,
                             name: "B".to_owned(),
                             negated: false,
                         },
                     ],
                 }],
                 outputs: vec![OutputElement::Coil {
+                    id: None,
                     name: "C".to_owned(),
                     variant: CoilVariant::Normal,
                 }],
@@ -264,21 +270,27 @@ mod tests {
     fn nc_contact_lowers_to_not() {
         // (A AND NOT B) → C
         let program = LdProgram {
+            schema_version: CURRENT_SCHEMA_VERSION,
             name: "Test".to_owned(),
             rungs: vec![Rung {
+                id: None,
+                comment: None,
                 branches: vec![SeriesBranch {
                     elements: vec![
                         ContactElement {
+                            id: None,
                             name: "A".to_owned(),
                             negated: false,
                         },
                         ContactElement {
+                            id: None,
                             name: "B".to_owned(),
                             negated: true,
                         },
                     ],
                 }],
                 outputs: vec![OutputElement::Coil {
+                    id: None,
                     name: "C".to_owned(),
                     variant: CoilVariant::Normal,
                 }],
@@ -306,23 +318,29 @@ mod tests {
     fn parallel_branches_lowers_to_or() {
         // (A OR B) → C
         let program = LdProgram {
+            schema_version: CURRENT_SCHEMA_VERSION,
             name: "Test".to_owned(),
             rungs: vec![Rung {
+                id: None,
+                comment: None,
                 branches: vec![
                     SeriesBranch {
                         elements: vec![ContactElement {
+                            id: None,
                             name: "A".to_owned(),
                             negated: false,
                         }],
                     },
                     SeriesBranch {
                         elements: vec![ContactElement {
+                            id: None,
                             name: "B".to_owned(),
                             negated: false,
                         }],
                     },
                 ],
                 outputs: vec![OutputElement::Coil {
+                    id: None,
                     name: "C".to_owned(),
                     variant: CoilVariant::Normal,
                 }],
@@ -343,15 +361,20 @@ mod tests {
     #[test]
     fn set_coil_lowers_to_set_stmt() {
         let program = LdProgram {
+            schema_version: CURRENT_SCHEMA_VERSION,
             name: "Test".to_owned(),
             rungs: vec![Rung {
+                id: None,
+                comment: None,
                 branches: vec![SeriesBranch {
                     elements: vec![ContactElement {
+                        id: None,
                         name: "Start".to_owned(),
                         negated: false,
                     }],
                 }],
                 outputs: vec![OutputElement::Coil {
+                    id: None,
                     name: "Latched".to_owned(),
                     variant: CoilVariant::Set,
                 }],
@@ -368,15 +391,20 @@ mod tests {
     #[test]
     fn timer_block_lowers_to_fbcall() {
         let program = LdProgram {
+            schema_version: CURRENT_SCHEMA_VERSION,
             name: "Test".to_owned(),
             rungs: vec![Rung {
+                id: None,
+                comment: None,
                 branches: vec![SeriesBranch {
                     elements: vec![ContactElement {
+                        id: None,
                         name: "Start".to_owned(),
                         negated: false,
                     }],
                 }],
                 outputs: vec![OutputElement::Block {
+                    id: None,
                     fb_type: "TON".to_owned(),
                     instance: "Delay".to_owned(),
                     inputs: vec![
@@ -411,21 +439,27 @@ mod tests {
     #[test]
     fn variables_auto_declared() {
         let program = LdProgram {
+            schema_version: CURRENT_SCHEMA_VERSION,
             name: "Test".to_owned(),
             rungs: vec![Rung {
+                id: None,
+                comment: None,
                 branches: vec![SeriesBranch {
                     elements: vec![
                         ContactElement {
+                            id: None,
                             name: "A".to_owned(),
                             negated: false,
                         },
                         ContactElement {
+                            id: None,
                             name: "B".to_owned(),
                             negated: false,
                         },
                     ],
                 }],
                 outputs: vec![OutputElement::Coil {
+                    id: None,
                     name: "C".to_owned(),
                     variant: CoilVariant::Normal,
                 }],

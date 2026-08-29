@@ -10,10 +10,12 @@
 //! - **Power-flow** ([`power_flow`]): evaluates which elements in a rung are
 //!   energized given a variable state — used for live visualization.
 
+pub mod ids;
 pub mod lower;
 pub mod model;
 pub mod power_flow;
 
+pub use ids::normalize_ids;
 pub use lower::lower_ld_program;
 pub use model::*;
 pub use power_flow::{evaluate_power_flow, var_state_from_watch};

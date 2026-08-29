@@ -28,12 +28,14 @@ pub fn evaluate_power_flow(program: &LdProgram, state: &VarState) -> PowerFlowRe
 
 /// Evaluate one rung.
 fn evaluate_rung(rung: &Rung, state: &VarState) -> RungPowerFlow {
-    // Evaluate each parallel branch.
-    let branch_results: Vec<bool> = rung
-        .branches
-        .iter()
-        .map(|branch| evaluate_series(branch.elements.iter(), state))
-        .collect();
+    // Evaluate each parallel branch, tracking cumulative energy per contact.
+    let mut contact_results: Vec<Vec<bool>> = Vec::with_capacity(rung.branches.len());
+    let mut branch_results: Vec<bool> = Vec::with_capacity(rung.branches.len());
+    for branch in &rung.branches {
+        let (contacts, result) = evaluate_series(branch.elements.iter(), state);
+        contact_results.push(contacts);
+        branch_results.push(result);
+    }
 
     let rung_result = branch_results.iter().any(|&b| b);
 
@@ -44,18 +46,26 @@ fn evaluate_rung(rung: &Rung, state: &VarState) -> RungPowerFlow {
         .collect();
 
     RungPowerFlow {
+        contact_energized: contact_results,
         branch_energized: branch_results,
         output_energized: output_results,
         rung_result,
     }
 }
 
-/// Evaluate a series of contacts (AND).
+/// Evaluate a series of contacts (AND), reporting cumulative energy after
+/// each contact alongside the branch result.
 fn evaluate_series<'a>(
-    mut contacts: impl Iterator<Item = &'a ContactElement>,
+    contacts: impl Iterator<Item = &'a ContactElement>,
     state: &VarState,
-) -> bool {
-    contacts.all(|c| evaluate_contact(c, state))
+) -> (Vec<bool>, bool) {
+    let mut cumulative = Vec::new();
+    let mut energy = true;
+    for contact in contacts {
+        energy = energy && evaluate_contact(contact, state);
+        cumulative.push(energy);
+    }
+    (cumulative, energy)
 }
 
 /// A contact is energized if the variable state matches the contact type:
@@ -120,16 +130,20 @@ mod tests {
 
     fn make_rung(contacts: &[(&str, bool)], output_name: &str) -> Rung {
         Rung {
+            id: None,
+            comment: None,
             branches: vec![SeriesBranch {
                 elements: contacts
                     .iter()
                     .map(|(name, negated)| ContactElement {
+                        id: None,
                         name: (*name).to_owned(),
                         negated: *negated,
                     })
                     .collect(),
             }],
             outputs: vec![OutputElement::Coil {
+                id: None,
                 name: output_name.to_owned(),
                 variant: CoilVariant::Normal,
             }],
@@ -204,21 +218,26 @@ mod tests {
     #[test]
     fn parallel_or_logic() {
         let rung = Rung {
+            id: None,
+            comment: None,
             branches: vec![
                 SeriesBranch {
                     elements: vec![ContactElement {
+                        id: None,
                         name: "A".to_owned(),
                         negated: false,
                     }],
                 },
                 SeriesBranch {
                     elements: vec![ContactElement {
+                        id: None,
                         name: "B".to_owned(),
                         negated: false,
                     }],
                 },
             ],
             outputs: vec![OutputElement::Coil {
+                id: None,
                 name: "C".to_owned(),
                 variant: CoilVariant::Normal,
             }],

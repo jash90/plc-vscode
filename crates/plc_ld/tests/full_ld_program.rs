@@ -79,21 +79,27 @@ fn fixture_power_flow_start_pressed() {
 fn manual_program_lowers_and_evaluates() {
     // Build a program manually: (A AND NOT B) -> C
     let program = LdProgram {
+        schema_version: 2,
         name: "Manual".to_owned(),
         rungs: vec![Rung {
+            id: None,
+            comment: None,
             branches: vec![SeriesBranch {
                 elements: vec![
                     ContactElement {
+                        id: None,
                         name: "A".to_owned(),
                         negated: false,
                     },
                     ContactElement {
+                        id: None,
                         name: "B".to_owned(),
                         negated: true,
                     },
                 ],
             }],
             outputs: vec![OutputElement::Coil {
+                id: None,
                 name: "C".to_owned(),
                 variant: CoilVariant::Normal,
             }],

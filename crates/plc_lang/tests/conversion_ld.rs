@@ -126,3 +126,51 @@ fn invalid_ld_json_produces_error() {
         out.error
     );
 }
+
+/// PLC-108 — structural validation errors flow through `convert` and fail it
+/// loudly with their `LD00xx` codes (SourceHasErrors path).
+#[test]
+fn invalid_ld_convert_reports_ld_codes() {
+    let registry = LanguageRegistry::with_builtins();
+
+    // Rung with no branches → LD0001.
+    let bad = r#"{"name":"P","rungs":[{"branches":[],"outputs":[{"kind":"coil","name":"C","variant":"normal"}]}]}"#;
+    let result = registry.convert("ld", "st", &SourceDocument::new("file:///p.ld", 0, bad));
+    assert!(
+        result.error.is_some(),
+        "conversion must fail on structural errors"
+    );
+    assert!(
+        result.diagnostics.iter().any(|d| d.code == "LD0001"),
+        "expected LD0001 among diagnostics: {:?}",
+        result.diagnostics
+    );
+
+    // Unknown FB type → LD0003.
+    let bad = r#"{"name":"P","rungs":[{"branches":[{"elements":[{"name":"A","negated":false}]}],"outputs":[{"kind":"block","fb_type":"MAGIC","instance":"T1","inputs":[],"outputs":[]}]}]}"#;
+    let result = registry.convert("ld", "st", &SourceDocument::new("file:///p.ld", 0, bad));
+    assert!(result.error.is_some());
+    assert!(
+        result.diagnostics.iter().any(|d| d.code == "LD0003"),
+        "expected LD0003 among diagnostics: {:?}",
+        result.diagnostics
+    );
+
+    // Warnings must NOT block conversion: a rung without outputs is LD0004
+    // (warning), and the program still converts.
+    let warn = r#"{"name":"P","rungs":[{"branches":[{"elements":[{"name":"A","negated":false}]}],"outputs":[]}]}"#;
+    let result = registry.convert("ld", "st", &SourceDocument::new("file:///p.ld", 0, warn));
+    assert!(
+        result.error.is_none(),
+        "warnings must not fail conversion: {:?}",
+        result.diagnostics
+    );
+
+    // With the filter removed, warnings surface in ConversionResult.diagnostics
+    // (visible to the CLI and the LSP Problems panel) without failing.
+    assert!(
+        result.diagnostics.iter().any(|d| d.code == "LD0004"),
+        "warning should ride along in diagnostics: {:?}",
+        result.diagnostics
+    );
+}

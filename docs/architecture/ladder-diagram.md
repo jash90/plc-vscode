@@ -137,3 +137,20 @@ with:
 | `crates/plc_cli/src/main.rs` | `plc ld` subcommand |
 | `editors/vscode/src/ldEditor.ts` | Custom editor + webview |
 | `tests/ld/motor_control.ld` | Test fixture |
+
+### Validation (`validate.rs`, PLC-108)
+
+`validate(&LdProgram) → Vec<LdDiagnostic>` is a pure rule set shared by the
+editor, CLI, and LSP diagnostics. Diagnostics key on the PLC-107 element ids.
+`LdFrontend::lower()` attaches **errors only** (warnings must not block
+conversion through the SourceHasErrors path):
+
+| Code | Severity | Meaning |
+|---|---|---|
+| `LD0001` | error | Empty rung, or empty branch (lowers to a silent always-true) |
+| `LD0002` | error | Duplicate FB instance name (cross-rung) |
+| `LD0003` | error | FB type outside `STANDARD_FB_TYPES` (runtime dispatches exact names) |
+| `LD0004` | warning | Rung without outputs |
+| `LD0005` | warning | Pin unknown for the FB type (see `fb_pins`) |
+| `LD0006` | error | Empty variable/instance/pin value |
+| `LD0007` | error | FB instance name collides with a variable name (duplicate VARs in ST) |

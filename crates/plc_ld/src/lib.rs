@@ -14,11 +14,15 @@ pub mod ids;
 pub mod lower;
 pub mod model;
 pub mod power_flow;
+pub mod validate;
 
 pub use ids::normalize_ids;
 pub use lower::lower_ld_program;
 pub use model::*;
 pub use power_flow::{evaluate_power_flow, var_state_from_watch};
+pub use validate::{
+    LdDiagnostic, LdSeverity, STANDARD_FB_TYPES, fb_pins, is_standard_fb, validate,
+};
 
 /// Parse an [`LdProgram`] from a JSON string.
 ///

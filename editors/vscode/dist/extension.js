@@ -129,7 +129,9 @@ async function activate(context) {
     // Generated ST dual view (PLC-116) for .ld files.
     context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(ldStView_1.LD_ST_SCHEME, new ldStView_1.LdStContentProvider(context)));
     // Ladder Diagram custom editor for .ld files.
-    context.subscriptions.push(vscode.commands.registerCommand('plc-vscode.showGeneratedSt', (uri) => (0, ldStView_1.showGeneratedSt)(context, uri)), vscode.commands.registerCommand('plc-vscode.exportPlcopen', () => (0, plcopen_1.exportPlcopen)(context)), vscode.commands.registerCommand('plc-vscode.importPlcopen', () => (0, plcopen_1.importPlcopen)(context)), vscode.window.registerCustomEditorProvider('plc-vscode.ldEditor', new ldEditor_1.LdEditorProvider(context), {
+    context.subscriptions.push(
+    // E2E test hooks (PLC-117): operate on the ACTIVE LD document.
+    vscode.commands.registerCommand('plc-vscode.ld.testState', () => ldTestState()), vscode.commands.registerCommand('plc-vscode.ld.edit', (command) => ldHookRun((doc) => doc.applyEdit(command))), vscode.commands.registerCommand('plc-vscode.ld.undo', () => ldHookRun((doc) => doc.undo())), vscode.commands.registerCommand('plc-vscode.ld.simStep', () => ldSimCommand('step')), vscode.commands.registerCommand('plc-vscode.ld.simInput', (name, value) => ldSimCommand('input', name, value)), vscode.commands.registerCommand('plc-vscode.showGeneratedSt', (uri) => (0, ldStView_1.showGeneratedSt)(context, uri)), vscode.commands.registerCommand('plc-vscode.exportPlcopen', () => (0, plcopen_1.exportPlcopen)(context)), vscode.commands.registerCommand('plc-vscode.importPlcopen', () => (0, plcopen_1.importPlcopen)(context)), vscode.window.registerCustomEditorProvider('plc-vscode.ldEditor', new ldEditor_1.LdEditorProvider(context), {
         webviewOptions: { retainContextWhenHidden: true },
         supportsMultipleEditorsPerDocument: false,
     }));
@@ -347,5 +349,47 @@ function isStructuredTextEditor(editor) {
     return Boolean(editor &&
         editor.document.uri.scheme === 'file' &&
         editor.document.languageId === 'structured-text');
+}
+const ldTestHooks_1 = require("./ldTestHooks");
+function ldTestState() {
+    const doc = (0, ldTestHooks_1.activeLdDocument)();
+    const sim = (0, ldTestHooks_1.activeLdSimulation)();
+    return {
+        programJson: doc ? JSON.stringify(doc.current) : undefined,
+        dirty: vscode.window.tabGroups.all.some((group) => group.tabs.some((tab) => tab.input?.uri?.toString() ===
+            doc?.uri.toString() && tab.isDirty)),
+        powerFlow: sim?.lastPowerFlow,
+        watch: sim?.lastWatch,
+        scan: sim?.scan,
+    };
+}
+function ldHookRun(run) {
+    const doc = (0, ldTestHooks_1.activeLdDocument)();
+    if (doc) {
+        run(doc);
+    }
+}
+async function ldSimCommand(kind, name, value) {
+    const doc = (0, ldTestHooks_1.activeLdDocument)();
+    if (!doc) {
+        return;
+    }
+    const sim = (await (0, ldTestHooks_1.activeLdProvider)()?.ensureSim(doc));
+    if (!sim) {
+        return;
+    }
+    if (kind === 'step') {
+        sim.client.stop();
+        // Reload ONLY when the model changed — a raw reload resets scan and
+        // discards staged inputs (PLC-114 review semantics).
+        const provider = (0, ldTestHooks_1.activeLdProvider)();
+        if (provider) {
+            await provider.reloadIfChanged(sim, doc);
+        }
+        sim.client.tick();
+    }
+    else if (name !== undefined && value !== undefined) {
+        sim.client.setInput(name, value);
+    }
 }
 //# sourceMappingURL=extension.js.map

@@ -91,7 +91,14 @@ export async function showGeneratedSt(
   try {
     // The CLI reads from disk — save dirty diagram state first so the view
     // reflects what the user sees (matches the ST run/build commands).
-    await vscode.commands.executeCommand('workbench.action.files.save');
+    const active = vscode.window.activeTextEditor;
+    void active; // custom editors are not text editors; the save targets
+    // the active editor of ANY kind, and no-ops when nothing is dirty.
+    try {
+      await vscode.commands.executeCommand('workbench.action.files.save');
+    } catch {
+      // Saving is best-effort (nothing dirty, or no savable editor).
+    }
     await generateStText(context, source); // validate before opening
     const doc = await vscode.workspace.openTextDocument(stViewUri(source));
     await vscode.window.showTextDocument(doc, {

@@ -45,6 +45,9 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LdEditorProvider = void 0;
+exports.activeLdDocument = activeLdDocument;
+exports.activeLdProvider = activeLdProvider;
+exports.activeLdSimulation = activeLdSimulation;
 const vscode = __importStar(require("vscode"));
 const node_child_process_1 = require("node:child_process");
 const protocol_1 = require("./ldWebview/protocol");
@@ -54,6 +57,9 @@ const simClient_1 = require("./ld/simClient");
 const ldCapture_1 = require("./ldCapture");
 /** Open documents by URI so split views share one undo stack. */
 const documents = new Map();
+/** The resolved provider instance (set in resolveCustomEditor's owner) —
+ * test hooks and commands reach the active document through it. */
+let activeProvider;
 class LdEditorProvider {
     context;
     _onDidChange = new vscode.EventEmitter();
@@ -115,6 +121,7 @@ class LdEditorProvider {
         }
     }
     async resolveCustomEditor(document, webviewPanel, _token) {
+        activeProvider = this;
         webviewPanel.webview.options = { enableScripts: true };
         webviewPanel.webview.html = this.getHtml(webviewPanel.webview);
         const key = document.uri.toString();
@@ -218,6 +225,10 @@ class LdEditorProvider {
     /** Compile LD → ST, run, and send power-flow JSON back to the webview. */
     /** Live simulations by document URI (lazy-started, disposed with panels). */
     simulations = new Map();
+    /** Test/debug access to the simulations map (read-only view). */
+    simulationsView() {
+        return this.simulations;
+    }
     /** Reload only when the serialized model differs from the last load. */
     async reloadIfChanged(sim, document) {
         const json = JSON.stringify(document.current);
@@ -250,6 +261,16 @@ class LdEditorProvider {
             }
         });
         const client = new simClient_1.SimClient((0, simClient_1.asSimChild)(child), (event) => {
+            const entry = this.simulations.get(key);
+            if (entry) {
+                if (event.event === 'powerFlow') {
+                    entry.lastPowerFlow = event;
+                }
+                else if (event.event === 'state') {
+                    entry.lastWatch = event.watch;
+                    entry.scan = event.scan;
+                }
+            }
             this.forwardServeEvent(key, event);
         });
         client.start();
@@ -388,4 +409,34 @@ function getNonce() {
     return text;
 }
 /** Run an invocation and resolve with stdout (reject on non-zero exit). */
+/** The most recently active LD document (test hooks). */
+function activeLdDocument() {
+    const provider = activeProvider;
+    if (!provider) {
+        return undefined;
+    }
+    // The last-resolved document wins; panels track activity well enough
+    // for single-editor tests.
+    const tabs = vscode.window.tabGroups.all.flatMap((group) => group.tabs);
+    for (const tab of tabs) {
+        const input = tab.input;
+        if (input?.uri && documents.has(input.uri.toString())) {
+            return documents.get(input.uri.toString());
+        }
+    }
+    return [...documents.values()][0];
+}
+/** The resolved provider (test hooks). */
+function activeLdProvider() {
+    return activeProvider;
+}
+/** The simulation entry for the active document (test hooks). */
+function activeLdSimulation() {
+    const provider = activeProvider;
+    const doc = activeLdDocument();
+    if (!provider || !doc) {
+        return undefined;
+    }
+    return provider.simulationsView().get(doc.uri.toString());
+}
 //# sourceMappingURL=ldEditor.js.map

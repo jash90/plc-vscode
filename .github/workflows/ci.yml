@@ -102,6 +102,36 @@ jobs:
         # tests run on parallel threads (production runs one VM at a time).
         run: cargo test --manifest-path crates/plc_cpdev_vm/Cargo.toml -- --test-threads=1
 
+  # LD editor end-to-end (PLC-117): boots the Extension Development
+  # Host against the prebuilt debug CLI. Xvfb stands in for a display.
+  vscode-e2e:
+    name: vscode-e2e
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: e2e-plc-cli-${{ runner.os }}
+      - name: Build the debug CLI
+        run: cargo build -p plc_cli
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm ci || npm install
+      - name: Compile
+        run: npm run compile
+      - name: Run e2e tests
+        run: xvfb-run -a npm run test:e2e
+
   # VS Code extension client checks (ubuntu only, fast feedback on every run).
   vscode:
     name: vscode-client

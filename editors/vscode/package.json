@@ -24,7 +24,6 @@
     "onCommand:plc-vscode.importPlcopen",
     "onCommand:plc-vscode.showGeneratedSt"
   ],
-  "main": "./dist/extension.js",
   "contributes": {
     "languages": [
       {
@@ -283,16 +282,21 @@
     "test": "npm run compile && node test/package-contract.test.js && node test/verify-vsix.test.js && node test/ldWebview/protocol.test.js && node test/ldWebview/commands.test.js && node test/ldWebview/model.test.js && node test/ldWebview/layout.test.js && node test/ldWebview/hitTest.test.js && node test/ldWebview/completion.test.js && node test/ldWebview/render.test.js && node test/simClient.test.js && node test/ldStView.test.js",
     "verify-vsix": "node scripts/verify-vsix.js",
     "package": "vsce package --no-dependencies",
-    "build:webview": "node esbuild.js"
+    "build:webview": "node esbuild.js",
+    "test:e2e": "tsc -p tsconfig.e2e.json && node out/runTests.js"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/node": "^22.10.0",
     "@types/vscode": "^1.92.0",
+    "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^3.2.1",
     "esbuild": "^0.28.2",
+    "glob": "^13.0.6",
+    "mocha": "^11.8.0",
     "typescript": "^5.7.2"
   },
   "repository": {
@@ -300,5 +304,6 @@
     "url": "https://github.com/jash90/plc-vscode.git",
     "directory": "editors/vscode"
   },
-  "license": "SEE LICENSE IN LICENSE"
+  "license": "SEE LICENSE IN LICENSE",
+  "main": "./dist/extension.js"
 }

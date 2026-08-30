@@ -144,6 +144,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Ladder Diagram custom editor for .ld files.
   context.subscriptions.push(
+// E2E test hooks (PLC-117): operate on the ACTIVE LD document.
+    vscode.commands.registerCommand('plc-vscode.ld.testState', () => ldTestState()),
+    vscode.commands.registerCommand('plc-vscode.ld.edit', (command: unknown) => ldHookRun((doc) => doc.applyEdit(command as never))),
+    vscode.commands.registerCommand('plc-vscode.ld.undo', () => ldHookRun((doc) => doc.undo())),
+    vscode.commands.registerCommand('plc-vscode.ld.simStep', () => ldSimCommand('step')),
+    vscode.commands.registerCommand('plc-vscode.ld.simInput', (name: string, value: boolean) =>
+      ldSimCommand('input', name, value)),
     vscode.commands.registerCommand('plc-vscode.showGeneratedSt', (uri?: vscode.Uri) =>
       showGeneratedSt(context, uri)),
     vscode.commands.registerCommand('plc-vscode.exportPlcopen', () => exportPlcopen(context)),
@@ -421,4 +428,69 @@ function isStructuredTextEditor(editor: vscode.TextEditor | undefined): editor i
       editor.document.uri.scheme === 'file' &&
       editor.document.languageId === 'structured-text',
   );
+}
+
+// --- E2E test hooks (PLC-117) ---------------------------------------------
+// Operate on the ACTIVE LD custom editor via the provider's exported state.
+// Registered unconditionally: read-only snapshots and command bridges that
+// mirror the webview message surface; harmless outside tests.
+
+import { LdDocument } from './ldDocument';
+import { activeLdDocument, activeLdProvider, activeLdSimulation } from './ldTestHooks';
+
+function ldTestState(): Record<string, unknown> {
+  const doc = activeLdDocument();
+  const sim = activeLdSimulation();
+  return {
+    programJson: doc ? JSON.stringify(doc.current) : undefined,
+    dirty: vscode.window.tabGroups.all.some((group) =>
+      group.tabs.some(
+        (tab) =>
+          (tab.input as { uri?: vscode.Uri } | undefined)?.uri?.toString() ===
+            doc?.uri.toString() && tab.isDirty,
+      ),
+    ),
+    powerFlow: sim?.lastPowerFlow,
+    watch: sim?.lastWatch,
+    scan: sim?.scan,
+  };
+}
+
+function ldHookRun(run: (doc: LdDocument) => void): void {
+  const doc = activeLdDocument();
+  if (doc) {
+    run(doc);
+  }
+}
+
+async function ldSimCommand(
+  kind: 'step' | 'input',
+  name?: string,
+  value?: boolean,
+): Promise<void> {
+  const doc = activeLdDocument();
+  if (!doc) {
+    return;
+  }
+  const sim = (await activeLdProvider()?.ensureSim(doc)) as {
+    client: import('./ld/simClient').SimClient;
+  };
+  if (!sim) {
+    return;
+  }
+  if (kind === 'step') {
+    sim.client.stop();
+    // Reload ONLY when the model changed — a raw reload resets scan and
+    // discards staged inputs (PLC-114 review semantics).
+    const provider = activeLdProvider();
+    if (provider) {
+      await provider.reloadIfChanged(
+        sim as { client: import('./ld/simClient').SimClient; loadedJson?: string },
+        doc,
+      );
+    }
+    sim.client.tick();
+  } else if (name !== undefined && value !== undefined) {
+    sim.client.setInput(name, value);
+  }
 }

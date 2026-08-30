@@ -21,6 +21,18 @@ import { capture } from './ldCapture';
 /** Open documents by URI so split views share one undo stack. */
 const documents = new Map<string, LdDocument>();
 
+/** The resolved provider instance (set in resolveCustomEditor's owner) —
+ * test hooks and commands reach the active document through it. */
+let activeProvider: LdEditorProvider | undefined;
+
+export interface SimulationEntry {
+  client: SimClient;
+  loadedJson?: string;
+  lastPowerFlow?: unknown;
+  lastWatch?: string[];
+  scan?: number;
+}
+
 export class LdEditorProvider implements vscode.CustomEditorProvider<LdDocument> {
   private readonly _onDidChange =
     new vscode.EventEmitter<vscode.CustomDocumentContentChangeEvent<LdDocument>>();
@@ -113,6 +125,7 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<LdDocument>
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken,
   ): Promise<void> {
+    activeProvider = this;
     webviewPanel.webview.options = { enableScripts: true };
     webviewPanel.webview.html = this.getHtml(webviewPanel.webview);
 
@@ -217,10 +230,15 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<LdDocument>
 
   /** Compile LD → ST, run, and send power-flow JSON back to the webview. */
   /** Live simulations by document URI (lazy-started, disposed with panels). */
-  private readonly simulations = new Map<string, { client: SimClient; loadedJson?: string }>();
+  private readonly simulations = new Map<string, SimulationEntry>();
+
+  /** Test/debug access to the simulations map (read-only view). */
+  simulationsView(): ReadonlyMap<string, SimulationEntry> {
+    return this.simulations;
+  }
 
   /** Reload only when the serialized model differs from the last load. */
-  private async reloadIfChanged(
+  async reloadIfChanged(
     sim: { client: SimClient; loadedJson?: string },
     document: LdDocument,
   ): Promise<void> {
@@ -235,7 +253,7 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<LdDocument>
    * Lazily spawn the `plc ld --serve` child for a document and forward its
    * events to the webview as protocol messages.
    */
-  private async ensureSim(document: LdDocument): Promise<{ client: SimClient }> {
+  async ensureSim(document: LdDocument): Promise<{ client: SimClient }> {
     const key = document.uri.toString();
     const existing = this.simulations.get(key);
     if (existing) {
@@ -259,6 +277,15 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<LdDocument>
       }
     });
     const client = new SimClient(asSimChild(child), (event: ServeEvent) => {
+      const entry = this.simulations.get(key);
+      if (entry) {
+        if (event.event === 'powerFlow') {
+          entry.lastPowerFlow = event;
+        } else if (event.event === 'state') {
+          entry.lastWatch = event.watch as string[];
+          entry.scan = event.scan as number;
+        }
+      }
       this.forwardServeEvent(key, event);
     });
     client.start();
@@ -417,3 +444,37 @@ function getNonce(): string {
 }
 
 /** Run an invocation and resolve with stdout (reject on non-zero exit). */
+
+
+/** The most recently active LD document (test hooks). */
+export function activeLdDocument(): LdDocument | undefined {
+  const provider = activeProvider;
+  if (!provider) {
+    return undefined;
+  }
+  // The last-resolved document wins; panels track activity well enough
+  // for single-editor tests.
+  const tabs = vscode.window.tabGroups.all.flatMap((group) => group.tabs);
+  for (const tab of tabs) {
+    const input = tab.input as { uri?: vscode.Uri } | undefined;
+    if (input?.uri && documents.has(input.uri.toString())) {
+      return documents.get(input.uri.toString());
+    }
+  }
+  return [...documents.values()][0];
+}
+
+/** The resolved provider (test hooks). */
+export function activeLdProvider(): LdEditorProvider | undefined {
+  return activeProvider;
+}
+
+/** The simulation entry for the active document (test hooks). */
+export function activeLdSimulation(): SimulationEntry | undefined {
+  const provider = activeProvider;
+  const doc = activeLdDocument();
+  if (!provider || !doc) {
+    return undefined;
+  }
+  return provider.simulationsView().get(doc.uri.toString());
+}

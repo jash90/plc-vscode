@@ -11,3 +11,7 @@
 **/*.vsix
 # Bundled server binaries (produced by the release workflow)
 editors/vscode/server/
+
+# @vscode/test-electron downloads + user data (PLC-117 e2e)
+editors/vscode/.vscode-test/
+editors/vscode/out/

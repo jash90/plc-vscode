@@ -8,12 +8,6 @@ import * as vscode from 'vscode';
 
 const ROOT = path.resolve(__dirname, '../../../..');
 
-async function withDelay<T>(promise: Promise<T>, ms: number): Promise<T> {
-  const value = await promise;
-  await new Promise((resolve) => setTimeout(resolve, ms));
-  return value;
-}
-
 suite('LD editor e2e', function () {
   this.timeout(60000);
 
@@ -29,24 +23,27 @@ suite('LD editor e2e', function () {
     await config.update('cliArgs', [], vscode.ConfigurationTarget.Global);
   });
 
+  // NOTE: tests 2-4 are order-dependent on this test's open tab.
   test('opens LD fixture in the custom editor', async () => {
     const uri = vscode.Uri.file(path.join(ROOT, 'tests/ld/motor_control_v2.ld'));
-    const doc = await withDelay(
-      vscode.commands.executeCommand(
-        'vscode.openWith',
-        uri,
-        'plc-vscode.ldEditor',
-      ) as Promise<unknown>,
-      1500,
-    );
-    void doc;
-    const state = await vscode.commands.executeCommand('plc-vscode.ld.testState') as {
-      programJson: string;
-      dirty: boolean;
-    };
-    const program = JSON.parse(state.programJson);
-    assert.strictEqual(program.rungs.length, 4, 'fixture loaded');
-    assert.strictEqual(program.name, 'MotorControl');
+    await vscode.commands.executeCommand('vscode.openWith', uri, 'plc-vscode.ldEditor');
+    // Poll for readiness — the editor resolves asynchronously.
+    const deadline = Date.now() + 10000;
+    for (;;) {
+      const state = await vscode.commands.executeCommand('plc-vscode.ld.testState') as {
+        programJson?: string;
+      };
+      if (state.programJson !== undefined) {
+        const program = JSON.parse(state.programJson);
+        assert.strictEqual(program.rungs.length, 4, 'fixture loaded');
+        assert.strictEqual(program.name, 'MotorControl');
+        return;
+      }
+      if (Date.now() > deadline) {
+        assert.fail('custom editor ready (timed out)');
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
   });
 
   test('undo restores the previous model after an edit command', async () => {
@@ -89,8 +86,9 @@ suite('LD editor e2e', function () {
         powerFlow?: { rungs?: Array<{ rung_result?: boolean }> };
       };
       const rungs = state.powerFlow?.rungs;
-      if (rungs && rungs.length > 0) {
-        assert.strictEqual(rungs[0].rung_result, true, 'seal-in rung energized with Start on');
+      // The first step's event (Start=false) may still be in flight — keep
+      // polling until the EXPECTED value lands, not the first non-empty.
+      if (rungs && rungs.length > 0 && rungs[0].rung_result === true) {
         return;
       }
       if (Date.now() > deadline) {

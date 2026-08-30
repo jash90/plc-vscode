@@ -1,5 +1,10 @@
 # PLC VS Code roadmap phases and milestone gates
 
+<!-- PLC-106…118 (Aug 2026): Ladder Diagram shipped — model v2 with stable
+     ids/comments, LD00xx validation, FB-complete lowering, webview editor
+     (CSP/esbuild/undo/keyboard/drag-drop), serve-protocol simulation,
+     PLCopen XML interchange, LD↔ST dual view, JSON Schema, e2e suite. -->
+
 The roadmap follows the technical dependency order for the project: parser/LSP first, VM second, LLVM later, and IEC 61131-3 3rd edition object-oriented features last.
 
 ## Phase 0 — Foundation and scope control

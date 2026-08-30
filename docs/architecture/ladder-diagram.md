@@ -154,3 +154,19 @@ conversion through the SourceHasErrors path):
 | `LD0005` | warning | Pin unknown for the FB type (see `fb_pins`) |
 | `LD0006` | error | Empty variable/instance/pin value |
 | `LD0007` | error | FB instance name collides with a variable name (duplicate VARs in ST) |
+
+### Interchange, simulation, and testing (PLC-113…118)
+
+- `plc ld --serve` (crates/plc_cli/src/ld_serve.rs): synchronous
+  line-JSON simulation protocol over stdio; the CLIENT drives pacing
+  (`tick` = one scan), so the server is fully deterministic. The editor
+  paces ticks host-side and live-reloads the in-memory model — simulating
+  without saving.
+- PLCopen XML (crates/plc_plcopen): model-level interchange
+  (`to_plcopen`/`from_plcopen`), NOT through the HIR hub — the graphical
+  model (ids, comments, rungs) has no HIR representation. `plc convert ld
+  plcopen` / `plcopen ld`; extension export/import commands.
+- `syntaxes/ladder-diagram.schema.json`: JSON Schema for raw `.ld`
+  editing (jsonValidation), golden-tested against the fixture corpus.
+- E2E (`editors/vscode/test/e2e`): @vscode/test-electron suite asserting
+  through the `plc-vscode.ld.*` test hooks — never the webview DOM.

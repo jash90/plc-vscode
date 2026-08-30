@@ -115,21 +115,19 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Cache cargo build
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: e2e-plc-cli-${{ runner.os }}
+        uses: Swatinem/rust-cache@v2
+      # Explicit repo-root working-directory: the job default (editors/vscode)
+      # has no Cargo.toml — cargo only finds the workspace by walking up.
       - name: Build the debug CLI
+        working-directory: .
         run: cargo build -p plc_cli
       - name: Install Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Install dependencies
-        run: npm ci || npm install
-      - name: Compile
-        run: npm run compile
-      - name: Run e2e tests
+        run: npm ci
+      - name: Run e2e tests (compiles first)
         run: xvfb-run -a npm run test:e2e
 
   # VS Code extension client checks (ubuntu only, fast feedback on every run).

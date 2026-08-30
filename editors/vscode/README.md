@@ -1,5 +1,9 @@
 # PLC VS Code client
 
+<!-- v0.3.0: LD editor (graphical, undo, keyboard, drag-drop), live
+     simulation panel, PLCopen XML import/export, generated-ST view,
+     .ld JSON Schema validation, e2e coverage. -->
+
 TypeScript VS Code extension client for Structured Text / IEC 61131-3.
 
 ## Capabilities (MVP)

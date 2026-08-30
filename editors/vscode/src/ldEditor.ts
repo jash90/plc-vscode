@@ -200,13 +200,10 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<LdDocument>
               case 'simStop':
                 sim.client.stop();
                 break;
-              case 'simStep':
-                // One scan from the CURRENT state — no reload (a reload
-                // resets scan and wipes timers/inputs on the server).
-                sim.client.stop();
-                await this.reloadIfChanged(sim, document);
-                sim.client.tick();
+              case 'simStep': {
+                await this.stepSimulation(sim, document);
                 break;
+              }
               case 'simReset':
                 sim.client.stop();
                 sim.client.reload(JSON.stringify(document.current));
@@ -237,6 +234,15 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<LdDocument>
     return this.simulations;
   }
 
+  /** One scan from the CURRENT state — reload only if the model changed
+   * (a raw reload resets scan and discards staged inputs). Shared by the
+   * webview handler and the test hook so the invariant lives once. */
+  async stepSimulation(sim: SimulationEntry, document: LdDocument): Promise<void> {
+    sim.client.stop();
+    await this.reloadIfChanged(sim, document);
+    sim.client.tick();
+  }
+
   /** Reload only when the serialized model differs from the last load. */
   async reloadIfChanged(
     sim: { client: SimClient; loadedJson?: string },
@@ -253,7 +259,7 @@ export class LdEditorProvider implements vscode.CustomEditorProvider<LdDocument>
    * Lazily spawn the `plc ld --serve` child for a document and forward its
    * events to the webview as protocol messages.
    */
-  async ensureSim(document: LdDocument): Promise<{ client: SimClient }> {
+  async ensureSim(document: LdDocument): Promise<SimulationEntry> {
     const key = document.uri.toString();
     const existing = this.simulations.get(key);
     if (existing) {
@@ -446,22 +452,33 @@ function getNonce(): string {
 /** Run an invocation and resolve with stdout (reject on non-zero exit). */
 
 
-/** The most recently active LD document (test hooks). */
-export function activeLdDocument(): LdDocument | undefined {
-  const provider = activeProvider;
-  if (!provider) {
+/**
+ * The ACTIVE LD document (test hooks): the active tab's document first,
+ * then any open tab's. With requireTab, no document is returned unless a
+ * tab actually shows it — mutating hooks use this so they can never hit
+ * an arbitrary unfocused document.
+ */
+export function activeLdDocument(requireTab = false): LdDocument | undefined {
+  if (!activeProvider) {
     return undefined;
   }
-  // The last-resolved document wins; panels track activity well enough
-  // for single-editor tests.
-  const tabs = vscode.window.tabGroups.all.flatMap((group) => group.tabs);
-  for (const tab of tabs) {
-    const input = tab.input as { uri?: vscode.Uri } | undefined;
-    if (input?.uri && documents.has(input.uri.toString())) {
-      return documents.get(input.uri.toString());
+  const byTab = (tab: vscode.Tab | undefined): LdDocument | undefined => {
+    const input = (tab?.input as { uri?: vscode.Uri } | undefined)?.uri;
+    return input ? documents.get(input.toString()) : undefined;
+  };
+  const active = byTab(vscode.window.tabGroups.activeTabGroup?.activeTab);
+  if (active) {
+    return active;
+  }
+  for (const group of vscode.window.tabGroups.all) {
+    for (const tab of group.tabs) {
+      const doc = byTab(tab);
+      if (doc) {
+        return doc;
+      }
     }
   }
-  return [...documents.values()][0];
+  return requireTab ? undefined : [...documents.values()][0];
 }
 
 /** The resolved provider (test hooks). */

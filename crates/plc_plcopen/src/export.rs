@@ -130,10 +130,10 @@ fn write_rung(
                 write_position(writer, output_x, output_y)?;
                 write_connections(writer, &rung_source_ids)?;
                 for arg in inputs {
-                    write_block_arg(writer, b"inVariable", arg)?;
+                    write_block_arg(writer, b"inVariable", &output_id, arg)?;
                 }
                 for arg in outputs {
-                    write_block_arg(writer, b"outVariable", arg)?;
+                    write_block_arg(writer, b"outVariable", &output_id, arg)?;
                 }
                 write_close_tag(writer, b"block")?;
             }
@@ -193,10 +193,16 @@ fn write_contact(
 fn write_block_arg(
     writer: &mut Writer<&mut Vec<u8>>,
     tag: &[u8],
+    block_id: &str,
     arg: &BlockArg,
 ) -> Result<(), PlcopenError> {
     write_start_tag_with(writer, tag, |attrs| {
-        attrs.push_attribute(("localId", format!("{}-{}", arg.name, arg.value).as_str()));
+        // localIds are identities within the body — include the owning
+        // block so identical pins across blocks stay unique.
+        attrs.push_attribute((
+            "localId",
+            format!("{block_id}-{}-{}", arg.name, arg.value).as_str(),
+        ));
         attrs.push_attribute(("formalParameter", arg.name.as_str()));
     })?;
     write_position(writer, 0, 0)?;

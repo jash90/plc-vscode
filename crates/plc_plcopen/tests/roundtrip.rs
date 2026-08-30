@@ -219,3 +219,129 @@ fn ids_survive_via_localid() {
     let back = from_plcopen(&xml).expect("import");
     assert_eq!(back.rungs[0].id.as_deref(), Some("r0"));
 }
+
+#[test]
+fn escaping_round_trips_through_entities() {
+    let mut program = LdProgram::new("Esc");
+    program.rungs.push(plc_ld::Rung {
+        id: Some("r0".to_owned()),
+        comment: Some("a<b & c>d".to_owned()),
+        branches: vec![plc_ld::SeriesBranch {
+            elements: vec![plc_ld::ContactElement {
+                id: Some("e0".to_owned()),
+                name: "x<y&z\"".to_owned(),
+                negated: false,
+            }],
+        }],
+        outputs: vec![plc_ld::OutputElement::Block {
+            id: Some("e1".to_owned()),
+            fb_type: "TON".to_owned(),
+            instance: "Delay&1".to_owned(),
+            inputs: vec![plc_ld::BlockArg {
+                name: "IN".to_owned(),
+                value: "x>5".to_owned(),
+            }],
+            outputs: vec![],
+        }],
+    });
+    let xml = to_plcopen(&program).expect("export");
+    let back = from_plcopen(&xml).expect("import");
+    assert_eq!(
+        program, back,
+        "entities must round-trip in text AND attributes"
+    );
+}
+
+#[test]
+fn forward_references_stay_series() {
+    // contact 2 → contact 3 (later in document) → rail: a series chain.
+    let xml = r#"<?xml version="1.0"?>
+<project xmlns="http://www.plcopen.org/xml/tc6_0201"><types><pous>
+<pou name="P" pouType="program"><body><LD>
+  <leftPowerRail localId="1"/>
+  <contact localId="2" negated="false"><connectionPointIn><connection refLocalId="3"/></connectionPointIn><variable>A</variable></contact>
+  <contact localId="3" negated="false"><connectionPointIn><connection refLocalId="1"/></connectionPointIn><variable>B</variable></contact>
+  <coil localId="4" storage="none"><connectionPointIn><connection refLocalId="2"/></connectionPointIn><variable>Out</variable></coil>
+</LD></body></pou></pous></types></project>"#;
+    let program = from_plcopen(xml).expect("import");
+    assert_eq!(
+        program.rungs[0].branches.len(),
+        1,
+        "series chain, not parallel"
+    );
+    let names: Vec<&str> = program.rungs[0].branches[0]
+        .elements
+        .iter()
+        .map(|c| c.name.as_str())
+        .collect();
+    assert_eq!(names, vec!["B", "A"], "chain order rail→B→A");
+}
+
+#[test]
+fn empty_rung_survives_round_trip() {
+    let mut program = LdProgram::new("Empty");
+    program.rungs.push(plc_ld::Rung {
+        id: Some("r0".to_owned()),
+        comment: None,
+        branches: vec![],
+        outputs: vec![],
+    });
+    let xml = to_plcopen(&program).expect("export");
+    let back = from_plcopen(&xml).expect("import");
+    assert_eq!(
+        program.rungs.len(),
+        back.rungs.len(),
+        "empty rung preserved"
+    );
+}
+
+#[test]
+fn foreign_comment_becomes_note_not_phantom_rung() {
+    let xml = r#"<?xml version="1.0"?>
+<project xmlns="http://www.plcopen.org/xml/tc6_0201"><types><pous>
+<pou name="P" pouType="program"><body><LD>
+  <comment localId="9"><content>standalone note</content></comment>
+  <leftPowerRail localId="1"/>
+  <contact localId="2" negated="false"><connectionPointIn><connection refLocalId="1"/></connectionPointIn><variable>A</variable></contact>
+  <coil localId="3" storage="none"><connectionPointIn><connection refLocalId="2"/></connectionPointIn><variable>Out</variable></coil>
+</LD></body></pou></pous></types></project>"#;
+    let (program, notes) = from_plcopen_with_notes(xml).expect("import");
+    assert_eq!(program.rungs.len(), 1, "no phantom rung");
+    assert!(
+        notes.iter().any(|note| note.contains("standalone note")),
+        "foreign comment surfaces as a note: {notes:?}"
+    );
+}
+
+#[test]
+fn id_less_v1_model_exports_with_synthesized_ids() {
+    // Pre-PLC-107 models carry no ids; export synthesizes them (r{n}/r{n}-c…)
+    // and import keeps them — a documented one-way normalization to v2.
+    let mut program = LdProgram::new("V1");
+    program.rungs.push(plc_ld::Rung {
+        id: None,
+        comment: None,
+        branches: vec![plc_ld::SeriesBranch {
+            elements: vec![plc_ld::ContactElement {
+                id: None,
+                name: "A".to_owned(),
+                negated: false,
+            }],
+        }],
+        outputs: vec![plc_ld::OutputElement::Coil {
+            id: None,
+            name: "Out".to_owned(),
+            variant: plc_ld::CoilVariant::Normal,
+        }],
+    });
+    let xml = to_plcopen(&program).expect("export");
+    let back = from_plcopen(&xml).expect("import");
+    assert_eq!(back.rungs[0].id.as_deref(), Some("r0"));
+    assert!(
+        back.rungs[0].branches[0].elements[0].id.is_some(),
+        "synthesized ids materialize on import"
+    );
+    // Semantics survive the normalization.
+    assert_eq!(back.rungs[0].branches[0].elements[0].name, "A");
+    assert_eq!(back.rungs[0].outputs.len(), 1);
+}

@@ -582,7 +582,6 @@ dependencies = [
 name = "plc_plcopen"
 version = "0.1.0"
 dependencies = [
- "plc_hir",
  "plc_ld",
  "quick-xml",
 ]

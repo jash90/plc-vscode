@@ -2,7 +2,8 @@
 /**
  * PLCopen XML export/import commands (PLC-115). Both drive the `plc` CLI's
  * special-cased `convert` (model-level interchange through plc_plcopen) —
- * the extension never reimplements the mapping.
+ * the extension never reimplements the mapping. Destinations go through
+ * save dialogs so nothing is silently overwritten.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -45,17 +46,23 @@ const ldCapture_1 = require("./ldCapture");
 const ldCli_1 = require("./ldCli");
 async function exportPlcopen(context) {
     const editor = vscode.window.activeTextEditor;
-    const target = editor?.document.uri ??
-        (await pickFile('Choose the .ld file to export'))?.fsPath;
+    const target = editor?.document.languageId === 'ladder-diagram'
+        ? editor.document.uri
+        : await pickFile('Choose the .ld file to export');
     if (!target) {
         return;
     }
-    const source = typeof target === 'string' ? vscode.Uri.file(target) : target;
-    const destination = vscode.Uri.file(source.fsPath.replace(/\.ld$/, '.plcopen'));
+    const destination = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(target.fsPath.replace(/\.ld$/i, '.plcopen')),
+        filters: { 'PLCopen XML': ['plcopen', 'xml'] },
+    });
+    if (!destination) {
+        return;
+    }
     const invocation = (0, ldCli_1.resolveRunInvocation)(context, 'convert', [
         'ld',
         'plcopen',
-        source.fsPath,
+        target.fsPath,
     ]);
     try {
         const xml = await (0, ldCapture_1.capture)(invocation);
@@ -75,7 +82,13 @@ async function importPlcopen(context) {
         return;
     }
     const source = picked[0];
-    const destination = vscode.Uri.file(source.fsPath.replace(/\.(plcopen|xml)$/, '.ld'));
+    const destination = await vscode.window.showSaveDialog({
+        defaultUri: vscode.Uri.file(source.fsPath.replace(/\.(plcopen|xml)$/i, '.ld')),
+        filters: { 'Ladder Diagram': ['ld'] },
+    });
+    if (!destination) {
+        return;
+    }
     const invocation = (0, ldCli_1.resolveRunInvocation)(context, 'convert', [
         'plcopen',
         'ld',

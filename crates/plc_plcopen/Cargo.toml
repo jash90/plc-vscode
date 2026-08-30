@@ -11,5 +11,4 @@ path = "src/lib.rs"
 
 [dependencies]
 plc_ld = { path = "../plc_ld" }
-plc_hir = { path = "../plc_hir" }
 quick-xml = "0.38"

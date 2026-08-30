@@ -57,7 +57,6 @@ pub fn from_plcopen_with_notes(xml: &str) -> Result<(LdProgram, Vec<String>), Pl
     let mut current_contact: Option<RawContact> = None;
     let mut current_output: Option<RawOutput> = None;
     let mut current_comment: Option<(String, String)> = None;
-    let mut in_connections = false;
 
     loop {
         match reader.read_event() {
@@ -66,8 +65,13 @@ pub fn from_plcopen_with_notes(xml: &str) -> Result<(LdProgram, Vec<String>), Pl
                 let attr = |key: &str| {
                     start.attributes().with_checks(false).find_map(|a| {
                         a.ok().and_then(|a| {
-                            (a.key.as_ref() == key.as_bytes())
-                                .then(|| String::from_utf8_lossy(&a.value).to_string())
+                            (a.key.as_ref() == key.as_bytes()).then(|| {
+                                a.unescape_value()
+                                    .map(|v| v.to_string())
+                                    .unwrap_or_else(|_| {
+                                        String::from_utf8_lossy(&a.value).to_string()
+                                    })
+                            })
                         })
                     })
                 };
@@ -107,6 +111,11 @@ pub fn from_plcopen_with_notes(xml: &str) -> Result<(LdProgram, Vec<String>), Pl
                         current_comment =
                             Some((attr("localId").unwrap_or_default(), String::new()));
                     }
+                    "content" if current_comment.is_some() => {
+                        // TC6 nests comment text in <content>; treat it as
+                        // comment body.
+                        current_tag = "comment".to_owned();
+                    }
                     "inVariable" | "outVariable" => {
                         if let Some(formal) = attr("formalParameter") {
                             if let Some(output) = current_output.as_mut() {
@@ -125,7 +134,6 @@ pub fn from_plcopen_with_notes(xml: &str) -> Result<(LdProgram, Vec<String>), Pl
                             notes.push(format!("skipped unsupported element <{name}>"));
                         }
                     }
-                    "connectionPointIn" => in_connections = true,
                     "connection" => {
                         if let Some(ref_id) = attr("refLocalId") {
                             let sink = if let Some(contact) = current_contact.as_mut() {
@@ -157,7 +165,9 @@ pub fn from_plcopen_with_notes(xml: &str) -> Result<(LdProgram, Vec<String>), Pl
                         }
                     }
                 }
-                current_tag = name;
+                if name != "content" {
+                    current_tag = name;
+                }
             }
             Ok(Event::Text(text)) => {
                 // Unescape entities (&gt; etc.) — the event carries raw bytes.
@@ -170,9 +180,9 @@ pub fn from_plcopen_with_notes(xml: &str) -> Result<(LdProgram, Vec<String>), Pl
                 match current_tag.as_str() {
                     "variable" => {
                         if let Some(contact) = current_contact.as_mut() {
-                            contact.variable = value.trim().to_owned();
+                            contact.variable.push_str(value.trim());
                         } else if let Some(output) = current_output.as_mut() {
-                            output.variable = value.trim().to_owned();
+                            output.variable.push_str(value.trim());
                         }
                     }
                     "comment" => {
@@ -184,7 +194,7 @@ pub fn from_plcopen_with_notes(xml: &str) -> Result<(LdProgram, Vec<String>), Pl
                         if let Some(output) = current_output.as_mut()
                             && let Some(last) = output.args.last_mut()
                         {
-                            last.1.value = value.trim().to_owned();
+                            last.1.value.push_str(value.trim());
                         }
                     }
                     _ => {}
@@ -208,8 +218,8 @@ pub fn from_plcopen_with_notes(xml: &str) -> Result<(LdProgram, Vec<String>), Pl
                             comments.push(comment);
                         }
                     }
-                    "connectionPointIn" => in_connections = false,
-                    "inVariable" | "outVariable" | "variable" => {
+                    "inVariable" | "outVariable" | "variable" | "position" | "relPosition"
+                    | "content" => {
                         current_tag = String::new();
                     }
                     "LD" | "body" | "pou" | "project" | "types" | "pous" => {}
@@ -253,6 +263,13 @@ pub fn from_plcopen_with_notes(xml: &str) -> Result<(LdProgram, Vec<String>), Pl
                             comment.1.push_str(&value);
                         }
                     }
+                    "inVariable" | "outVariable" => {
+                        if let Some(output) = current_output.as_mut()
+                            && let Some(last) = output.args.last_mut()
+                        {
+                            last.1.value.push_str(&value);
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -262,8 +279,13 @@ pub fn from_plcopen_with_notes(xml: &str) -> Result<(LdProgram, Vec<String>), Pl
                 let attr = |key: &str| {
                     empty.attributes().with_checks(false).find_map(|a| {
                         a.ok().and_then(|a| {
-                            (a.key.as_ref() == key.as_bytes())
-                                .then(|| String::from_utf8_lossy(&a.value).to_string())
+                            (a.key.as_ref() == key.as_bytes()).then(|| {
+                                a.unescape_value()
+                                    .map(|v| v.to_string())
+                                    .unwrap_or_else(|_| {
+                                        String::from_utf8_lossy(&a.value).to_string()
+                                    })
+                            })
                         })
                     })
                 };
@@ -295,126 +317,143 @@ pub fn from_plcopen_with_notes(xml: &str) -> Result<(LdProgram, Vec<String>), Pl
             }
         }
     }
-    void(in_connections);
 
-    // --- reconstruct rungs by connectivity ---------------------------------
-    let rail_ids: std::collections::HashSet<String> = rails.iter().cloned().collect();
+    // --- reconstruct rungs ----------------------------------------------
+    // Rails define the rung order (document order), so empty and
+    // comment-only rungs survive and nothing is reordered.
+    let mut rungs: Vec<RungBuilder> = rails
+        .iter()
+        .map(|rail| RungBuilder {
+            id: rail.strip_suffix("-rail").map(str::to_owned),
+            ..RungBuilder::default()
+        })
+        .collect();
+    let rail_position: HashMap<&String, usize> = rails
+        .iter()
+        .enumerate()
+        .map(|(index, rail)| (rail, index))
+        .collect();
 
-    // contact id → rung rail id (walk upstream until a rail is found).
-    let mut contact_rung: HashMap<String, String> = HashMap::new();
-    let mut contact_branch_index: HashMap<String, usize> = HashMap::new();
-
-    // rung rail id → ordered structure
-    let mut rung_order: Vec<String> = Vec::new();
-    let mut rungs: HashMap<String, RungBuilder> = HashMap::new();
-
-    let rung_of_contact = |contact: &RawContact,
-                           contacts: &[RawContact],
-                           rail_ids: &std::collections::HashSet<String>|
-     -> Option<String> {
+    // Resolve each contact's rung by walking upstream to a rail.
+    let mut contact_rung: HashMap<String, usize> = HashMap::new();
+    for contact in &contacts {
         let mut seen = std::collections::HashSet::new();
         let mut current = contact.id.clone();
-        loop {
-            if rail_ids.contains(&current) {
-                return Some(current);
+        let rail = loop {
+            if let Some(position) = rail_position.get(&current) {
+                break *position;
             }
             if !seen.insert(current.clone()) {
-                return None; // cycle guard
+                return Err(PlcopenError(format!(
+                    "contact {} not connected to a rail (cycle)",
+                    contact.id
+                )));
             }
-            let found = contacts
+            let next = contacts
                 .iter()
-                .find(|candidate| candidate.id == current)?
-                .upstream
-                .first()
-                .cloned();
-            current = found?;
-        }
-    };
-
-    for contact in &contacts {
-        let rail = rung_of_contact(contact, &contacts, &rail_ids).ok_or_else(|| {
-            PlcopenError(format!("contact {} not connected to a rail", contact.id))
-        })?;
-        contact_rung.insert(contact.id.clone(), rail.clone());
-        let builder = rungs.entry(rail.clone()).or_insert_with(|| {
-            rung_order.push(rail.clone());
-            RungBuilder::default()
-        });
-
-        let starts_branch = contact.upstream.iter().any(|up| {
-            rail_ids.contains(up) || !contact_rung.contains_key(up) && rail_ids.contains(up)
-        }) || contact.upstream.iter().any(|up| rail_ids.contains(up));
-        if starts_branch {
-            builder.branches.push(SeriesBranch {
-                elements: vec![contact_element(contact)],
-            });
-            contact_branch_index.insert(contact.id.clone(), builder.branches.len() - 1);
-        } else {
-            let parent = contact
-                .upstream
-                .iter()
-                .find_map(|up| contact_branch_index.get(up).copied());
-            match parent {
-                Some(branch_index) => {
-                    builder.branches[branch_index]
-                        .elements
-                        .push(contact_element(contact));
-                    contact_branch_index.insert(contact.id.clone(), branch_index);
-                }
+                .find(|candidate| candidate.id == current)
+                .and_then(|candidate| candidate.upstream.first().cloned());
+            match next {
+                Some(next) => current = next,
                 None => {
-                    builder.branches.push(SeriesBranch {
-                        elements: vec![contact_element(contact)],
-                    });
-                    contact_branch_index.insert(contact.id.clone(), builder.branches.len() - 1);
+                    return Err(PlcopenError(format!(
+                        "contact {} not connected to a rail",
+                        contact.id
+                    )));
                 }
             }
+        };
+        contact_rung.insert(contact.id.clone(), rail);
+    }
+
+    // Assign contacts to branches. Forward references are resolved by
+    // iterating to a fixpoint: each pass places contacts whose upstream
+    // is a rail (branch start) or an already-placed contact.
+    let mut contact_branch: HashMap<String, usize> = HashMap::new();
+    let mut placed: Vec<bool> = vec![false; contacts.len()];
+    for _ in 0..=contacts.len() {
+        let mut progress = false;
+        for (index, contact) in contacts.iter().enumerate() {
+            if placed[index] {
+                continue;
+            }
+            let builder = &mut rungs[contact_rung[&contact.id]];
+            let rail = &rails[contact_rung[&contact.id]];
+            let starts_branch = contact.upstream.iter().any(|up| up == rail);
+            let extends_branch = contact
+                .upstream
+                .iter()
+                .find_map(|up| contact_branch.get(up).copied());
+            if starts_branch {
+                builder.branches.push(SeriesBranch {
+                    elements: vec![contact_element(contact)],
+                });
+                contact_branch.insert(contact.id.clone(), builder.branches.len() - 1);
+                placed[index] = true;
+                progress = true;
+            } else if let Some(branch_index) = extends_branch {
+                builder.branches[branch_index]
+                    .elements
+                    .push(contact_element(contact));
+                contact_branch.insert(contact.id.clone(), branch_index);
+                placed[index] = true;
+                progress = true;
+            }
         }
+        if placed.iter().all(|done| *done) || !progress {
+            break;
+        }
+    }
+    if let Some(unplaced) = placed.iter().position(|done| !*done) {
+        return Err(PlcopenError(format!(
+            "contact {} references an unplaced or foreign upstream",
+            contacts[unplaced].id
+        )));
     }
 
     for output in &outputs {
-        let rail = output
+        let position = output
             .upstream
             .iter()
-            .find(|up| rail_ids.contains(up.as_str()))
-            .cloned()
+            .find_map(|up| rail_position.get(up).copied())
             .or_else(|| {
                 output
                     .upstream
                     .iter()
-                    .find_map(|up| contact_rung.get(up).cloned())
+                    .find_map(|up| contact_rung.get(up).copied())
             })
             .ok_or_else(|| PlcopenError(format!("output {} not connected to a rung", output.id)))?;
-        let builder = rungs.entry(rail.clone()).or_insert_with(|| {
-            rung_order.push(rail.clone());
-            RungBuilder::default()
-        });
-        builder.outputs.push(output_element(output));
+        rungs[position].outputs.push(output_element(output));
     }
 
+    // Comments attach to the rung exporting the matching {id}-rail; a
+    // foreign comment whose id matches no rail becomes a fidelity note
+    // instead of a phantom rung.
     for (rung_id, text) in &comments {
         let rail = format!("{rung_id}-rail");
-        let builder = rungs.entry(rail).or_insert_with(|| {
-            rung_order.push(format!("{rung_id}-rail"));
-            RungBuilder::default()
-        });
-        builder.comment = Some(text.clone());
-        builder.id = Some(rung_id.clone());
+        match rail_position.get(&rail) {
+            Some(position) => {
+                rungs[*position].comment = Some(text.clone());
+                rungs[*position].id = Some(rung_id.clone());
+            }
+            None => {
+                if !text.is_empty() {
+                    notes.push(format!("skipped foreign comment '{text}'"));
+                } else {
+                    notes.push("skipped foreign comment".to_owned());
+                }
+            }
+        }
     }
 
-    // Rung ids: prefer the exported scheme (strip "-rail").
     let mut program = LdProgram::new(program_name);
     program.schema_version = CURRENT_SCHEMA_VERSION;
-    for rail in &rung_order {
-        let builder = &rungs[rail];
-        let rung_id = builder
-            .id
-            .clone()
-            .or_else(|| rail.strip_suffix("-rail").map(str::to_owned));
+    for builder in rungs {
         program.rungs.push(Rung {
-            id: rung_id,
-            comment: builder.comment.clone(),
-            branches: builder.branches.clone(),
-            outputs: builder.outputs.clone(),
+            id: builder.id,
+            comment: builder.comment,
+            branches: builder.branches,
+            outputs: builder.outputs,
         });
     }
 
@@ -468,5 +507,3 @@ fn output_element(raw: &RawOutput) -> OutputElement {
         }
     }
 }
-
-fn void(_: bool) {}

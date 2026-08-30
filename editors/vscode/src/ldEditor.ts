@@ -16,6 +16,7 @@ import { parseWebviewMessage } from './ldWebview/protocol';
 import { LdDocument } from './ldDocument';
 import { resolveRunInvocation } from './ldCli';
 import { SimClient, asSimChild, ServeEvent } from './ld/simClient';
+import { capture } from './ldCapture';
 
 /** Open documents by URI so split views share one undo stack. */
 const documents = new Map<string, LdDocument>();
@@ -416,32 +417,3 @@ function getNonce(): string {
 }
 
 /** Run an invocation and resolve with stdout (reject on non-zero exit). */
-function capture(invocation: {
-  command: string;
-  args: string[];
-  cwd?: string;
-}): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const child = spawn(
-      invocation.command,
-      invocation.args,
-      invocation.cwd ? { cwd: invocation.cwd } : undefined,
-    );
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-    child.on('close', (code: number | null) => {
-      if (code === 0) {
-        resolve(stdout);
-      } else {
-        reject(new Error(stderr || `Exit code ${code}`));
-      }
-    });
-    child.on('error', reject);
-  });
-}

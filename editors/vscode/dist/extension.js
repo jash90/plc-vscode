@@ -42,6 +42,7 @@ const node_1 = require("vscode-languageclient/node");
 const bundled_1 = require("./bundled");
 const ldCli_1 = require("./ldCli");
 const ldEditor_1 = require("./ldEditor");
+const plcopen_1 = require("./plcopen");
 let client;
 let outputChannel;
 function workspaceRoot(context) {
@@ -125,7 +126,7 @@ async function activate(context) {
     const debugProvider = new PlcDebugConfigurationProvider();
     context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('plc-st', debugProvider), vscode.debug.registerDebugConfigurationProvider('plc-st', debugProvider, vscode.DebugConfigurationProviderTriggerKind.Dynamic), vscode.debug.registerDebugAdapterDescriptorFactory('plc-st', new PlcDebugAdapterFactory(context)));
     // Ladder Diagram custom editor for .ld files.
-    context.subscriptions.push(vscode.window.registerCustomEditorProvider('plc-vscode.ldEditor', new ldEditor_1.LdEditorProvider(context), {
+    context.subscriptions.push(vscode.commands.registerCommand('plc-vscode.exportPlcopen', () => (0, plcopen_1.exportPlcopen)(context)), vscode.commands.registerCommand('plc-vscode.importPlcopen', () => (0, plcopen_1.importPlcopen)(context)), vscode.window.registerCustomEditorProvider('plc-vscode.ldEditor', new ldEditor_1.LdEditorProvider(context), {
         webviewOptions: { retainContextWhenHidden: true },
         supportsMultipleEditorsPerDocument: false,
     }));

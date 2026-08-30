@@ -206,6 +206,32 @@ fn build_file(path: PathBuf, output: Option<PathBuf>, target: &str) -> Result<()
 /// another through the canonical-IR hub, printing the converted source to stdout
 /// and any fidelity notes / diagnostics to stderr.
 fn convert_file(from: &str, to: &str, path: PathBuf) -> Result<(), String> {
+    // PLCopen XML is model-level interchange, not a semantic IR conversion
+    // (positions/comments/rung structure do not survive the HIR) — handled
+    // by the dedicated crate (PLC-115).
+    match (from, to) {
+        ("ld", "plcopen") => {
+            let text = read_source(&path)?;
+            let program = plc_ld::parse_ld_json(&text).map_err(|e| format!("invalid LD: {e}"))?;
+            let xml = plc_plcopen::to_plcopen(&program).map_err(|e| e.to_string())?;
+            print!("{xml}");
+            return Ok(());
+        }
+        ("plcopen", "ld") => {
+            let text = read_source(&path)?;
+            let (program, notes) =
+                plc_plcopen::from_plcopen_with_notes(&text).map_err(|e| e.to_string())?;
+            for note in &notes {
+                eprintln!("note: {note}");
+            }
+            let json = serde_json::to_string_pretty(&program)
+                .map_err(|e| format!("serialization failed: {e}"))?;
+            println!("{json}");
+            return Ok(());
+        }
+        _ => {}
+    }
+
     let text = read_source(&path)?;
     let document = SourceDocument::new(format!("file://{}", path.display()), 0, text);
 

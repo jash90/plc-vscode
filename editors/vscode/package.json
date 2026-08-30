@@ -19,7 +19,9 @@
     "onCommand:plc-vscode.debugCurrentFile",
     "onCommand:plc-vscode.buildCpdev",
     "onDebugResolve:plc-st",
-    "onDebugDynamicConfigurations:plc-st"
+    "onDebugDynamicConfigurations:plc-st",
+    "onCommand:plc-vscode.exportPlcopen",
+    "onCommand:plc-vscode.importPlcopen"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -140,6 +142,16 @@
       {
         "command": "plc-vscode.runLdFile",
         "title": "PLC VS Code: Run Ladder Diagram"
+      },
+      {
+        "command": "plc-vscode.exportPlcopen",
+        "title": "Export Ladder Diagram to PLCopen XML",
+        "category": "PLC"
+      },
+      {
+        "command": "plc-vscode.importPlcopen",
+        "title": "Import PLCopen XML as Ladder Diagram",
+        "category": "PLC"
       }
     ],
     "menus": {

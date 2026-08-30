@@ -102,6 +102,34 @@ jobs:
         # tests run on parallel threads (production runs one VM at a time).
         run: cargo test --manifest-path crates/plc_cpdev_vm/Cargo.toml -- --test-threads=1
 
+  # LD editor end-to-end (PLC-117): boots the Extension Development
+  # Host against the prebuilt debug CLI. Xvfb stands in for a display.
+  vscode-e2e:
+    name: vscode-e2e
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+      # Explicit repo-root working-directory: the job default (editors/vscode)
+      # has no Cargo.toml — cargo only finds the workspace by walking up.
+      - name: Build the debug CLI
+        working-directory: .
+        run: cargo build -p plc_cli
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm ci
+      - name: Run e2e tests (compiles first)
+        run: xvfb-run -a npm run test:e2e
+
   # VS Code extension client checks (ubuntu only, fast feedback on every run).
   vscode:
     name: vscode-client
@@ -119,5 +147,11 @@ jobs:
         run: npm ci || npm install
       - name: Type-check
         run: npx tsc --noEmit
+      - name: Type-check webview
+        run: npx tsc -p tsconfig.webview.json --noEmit
       - name: Test
         run: npm test
+      - name: Committed build outputs are fresh
+        # npm test regenerates dist/ + media/; the tree must be identical
+        # afterwards, otherwise a stale committed bundle slipped in.
+        run: git diff --exit-code -- media/ldEditor dist

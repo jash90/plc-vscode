@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 mod dap;
 
-const USAGE: &str = "usage:\n  plc run <file.st> [scans]\n  plc build <file.st> [--target cpdev] [-o <out.xcp>]\n  plc convert <from-id> <to-id> <file>   (ids: plc languages)\n  plc debug                              (Debug Adapter Protocol over stdio)";
+const USAGE: &str = "usage:\n  plc run <file.st> [scans]\n  plc build <file.st> [--target cpdev] [-o <out.xcp>]\n  plc convert <from-id> <to-id> <file>   (ids: plc languages)\n  plc ld <file.ld> [--watch|--serve]     (compile+run LD, power-flow JSON, or the serve protocol)\n  plc debug                              (Debug Adapter Protocol over stdio)";
 
 fn main() {
     if let Err(error) = run() {
@@ -50,6 +50,26 @@ fn run() -> Result<(), String> {
                 println!("{id}");
             }
             Ok(())
+        }
+        Some("ld") => {
+            // Collect first: Iterator::any would consume the tail and eat
+            // --watch when --serve is absent.
+            let rest: Vec<String> = args.collect();
+            let serve = rest.iter().any(|flag| flag == "--serve");
+            if serve {
+                // The program arrives via the `load` op; no file argument
+                // is needed (mirrors `plc debug`).
+                let stdin = std::io::BufReader::new(std::io::stdin());
+                return plc_cli::run_ld_serve(stdin, std::io::stdout())
+                    .map_err(|error| format!("serve loop failed: {error}"));
+            }
+            let path = rest
+                .iter()
+                .find(|flag| !flag.starts_with("--"))
+                .map(PathBuf::from)
+                .ok_or_else(|| USAGE.to_owned())?;
+            let watch = rest.iter().any(|flag| flag == "--watch");
+            run_ld_file(path, watch)
         }
         // Debug Adapter Protocol server over stdio; the program path arrives in
         // the DAP `launch` request, so no file argument here.
@@ -186,6 +206,32 @@ fn build_file(path: PathBuf, output: Option<PathBuf>, target: &str) -> Result<()
 /// another through the canonical-IR hub, printing the converted source to stdout
 /// and any fidelity notes / diagnostics to stderr.
 fn convert_file(from: &str, to: &str, path: PathBuf) -> Result<(), String> {
+    // PLCopen XML is model-level interchange, not a semantic IR conversion
+    // (positions/comments/rung structure do not survive the HIR) — handled
+    // by the dedicated crate (PLC-115).
+    match (from, to) {
+        ("ld", "plcopen") => {
+            let text = read_source(&path)?;
+            let program = plc_ld::parse_ld_json(&text).map_err(|e| format!("invalid LD: {e}"))?;
+            let xml = plc_plcopen::to_plcopen(&program).map_err(|e| e.to_string())?;
+            print!("{xml}");
+            return Ok(());
+        }
+        ("plcopen", "ld") => {
+            let text = read_source(&path)?;
+            let (program, notes) =
+                plc_plcopen::from_plcopen_with_notes(&text).map_err(|e| e.to_string())?;
+            for note in &notes {
+                eprintln!("note: {note}");
+            }
+            let json = serde_json::to_string_pretty(&program)
+                .map_err(|e| format!("serialization failed: {e}"))?;
+            println!("{json}");
+            return Ok(());
+        }
+        _ => {}
+    }
+
     let text = read_source(&path)?;
     let document = SourceDocument::new(format!("file://{}", path.display()), 0, text);
 
@@ -205,6 +251,58 @@ fn convert_file(from: &str, to: &str, path: PathBuf) -> Result<(), String> {
     Ok(())
 }
 
+/// `plc ld <file.ld> [--watch]`: compile a Ladder Diagram file to ST through
+/// the IR hub, execute it via the runtime, and either print the watch table or
+/// emit power-flow JSON for the VS Code editor.
+fn run_ld_file(path: PathBuf, watch: bool) -> Result<(), String> {
+    let text = read_source(&path)?;
+    let document = SourceDocument::new(format!("file://{}", path.display()), 0, text);
+
+    let registry = LanguageRegistry::with_builtins();
+
+    // Convert LD → ST through the IR hub.
+    let result = registry.convert("ld", "st", &document);
+    if let Some(error) = result.error {
+        for diagnostic in &result.diagnostics {
+            eprintln!("{}: {}", diagnostic.code, diagnostic.message);
+        }
+        return Err(format!("ld -> st conversion failed: {error:?}"));
+    }
+
+    let st_text = &result.text;
+    eprintln!("LD compiled to ST:\n{}", st_text);
+
+    if watch {
+        // Parse the LD model for power-flow evaluation.
+        let ld_program = plc_ld::parse_ld_json(document.text())
+            .map_err(|error| format!("invalid LD JSON: {error}"))?;
+
+        // Execute the ST program to get variable values.
+        let mut runtime = plc_runtime::Runtime::from_source(st_text);
+        runtime.run_scans(DEFAULT_SCANS);
+        let watch_lines = runtime.watch();
+
+        // Evaluate power-flow.
+        let state = plc_ld::var_state_from_watch(&watch_lines);
+        let power_flow = plc_ld::evaluate_power_flow(&ld_program, &state);
+        let json = serde_json::to_string_pretty(&power_flow)
+            .map_err(|error| format!("power-flow serialization failed: {error}"))?;
+        println!("{json}");
+    } else {
+        // Execute the ST program.
+        let st_doc = SourceDocument::new(
+            format!("file://{}", path.with_extension("st").display()),
+            0,
+            st_text.clone(),
+        );
+        let service = CompilerCore;
+        let mut engine = ScanRuntimeEngine::default();
+        return run_with(&service, &mut engine, &st_doc, DEFAULT_SCANS);
+    }
+
+    Ok(())
+}
+
 /// Read a source file, decoding common non-UTF-8 encodings so legacy ST files
 /// are not dropped from coverage: UTF-16 LE/BE (detected by BOM), a UTF-8 BOM,
 /// and a Latin-1 fallback for other non-UTF-8 bytes (e.g. Windows-1252).
@@ -216,17 +314,13 @@ fn read_source(path: &Path) -> Result<String, String> {
 
 fn decode_source(bytes: &[u8]) -> String {
     if let [0xFF, 0xFE, rest @ ..] = bytes {
-        let units: Vec<u16> = rest
-            .chunks_exact(2)
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .collect();
+        let (pairs, _) = rest.as_chunks::<2>();
+        let units: Vec<u16> = pairs.iter().map(|pair| u16::from_le_bytes(*pair)).collect();
         return String::from_utf16_lossy(&units);
     }
     if let [0xFE, 0xFF, rest @ ..] = bytes {
-        let units: Vec<u16> = rest
-            .chunks_exact(2)
-            .map(|pair| u16::from_be_bytes([pair[0], pair[1]]))
-            .collect();
+        let (pairs, _) = rest.as_chunks::<2>();
+        let units: Vec<u16> = pairs.iter().map(|pair| u16::from_be_bytes(*pair)).collect();
         return String::from_utf16_lossy(&units);
     }
 

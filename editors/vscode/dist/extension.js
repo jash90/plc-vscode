@@ -40,53 +40,19 @@ const node_child_process_1 = require("node:child_process");
 const vscode = __importStar(require("vscode"));
 const node_1 = require("vscode-languageclient/node");
 const bundled_1 = require("./bundled");
+const ldCli_1 = require("./ldCli");
+const ldEditor_1 = require("./ldEditor");
+const plcopen_1 = require("./plcopen");
+const ldStView_1 = require("./ldStView");
 let client;
 let outputChannel;
 function workspaceRoot(context) {
     return path.resolve(context.extensionPath, '..', '..');
 }
-/** Installed (Marketplace) extensions run in Production mode. */
-function isProduction(context) {
-    return context.extensionMode === vscode.ExtensionMode.Production;
-}
-/**
- * Build the command/args to invoke a `plc` subcommand (`run`, `debug`, …),
- * shared by the run command and the debug adapter so both resolve the dev
- * (cargo) vs production (bundled binary) launch the same way.
- */
-function resolveRunInvocation(context, subcommand, extraArgs) {
-    if (isProduction(context)) {
-        // Installed extension: run the bundled CLI binary directly.
-        return {
-            command: context.asAbsolutePath((0, bundled_1.bundledBinaryRelativePath)(bundled_1.CLI_BINARY)),
-            args: [subcommand, ...extraArgs],
-        };
-    }
-    // Development: drive the workspace CLI via cargo. `cliArgs` ends with the
-    // `run` subcommand by default; swap that trailing subcommand for the
-    // requested one so `run` and `debug` share the same cargo prefix.
-    const config = vscode.workspace.getConfiguration('plcVscode');
-    const command = config.get('cliCommand', 'cargo');
-    const cliArgs = config.get('cliArgs', [
-        'run',
-        '--quiet',
-        '--package',
-        'plc_cli',
-        '--',
-        'run',
-    ]);
-    const cargoPrefix = cliArgs.slice(0, -1);
-    const repositoryRoot = config.get('repositoryRoot', '') || workspaceRoot(context);
-    return {
-        command,
-        args: [...cargoPrefix, subcommand, ...extraArgs],
-        cwd: repositoryRoot,
-    };
-}
 function serverOptions(context) {
     // Installed extension: run the bundled, platform-specific server binary so
     // end users need neither the repository nor a Rust toolchain.
-    if (isProduction(context)) {
+    if ((0, ldCli_1.isProduction)(context)) {
         return {
             command: context.asAbsolutePath((0, bundled_1.bundledBinaryRelativePath)(bundled_1.SERVER_BINARY)),
             args: [],
@@ -131,12 +97,48 @@ async function activate(context) {
         await debugCurrentStructuredTextFile(resource);
     }), vscode.commands.registerCommand('plc-vscode.buildCpdev', async (resource) => {
         await compileCurrentFileToCpdev(context, resource);
+    }), vscode.commands.registerCommand('plc-vscode.runLdFile', async (resource) => {
+        if (resource && resource.scheme === 'file') {
+            const ldInvocation = (0, ldCli_1.resolveRunInvocation)(context, 'ld', [resource.fsPath]);
+            const spawnOpts = ldInvocation.cwd ? { cwd: ldInvocation.cwd } : {};
+            outputChannel?.clear();
+            outputChannel?.appendLine(`$ ${ldInvocation.command} ${ldInvocation.args.join(' ')}`);
+            outputChannel?.show(true);
+            const child = (0, node_child_process_1.spawn)(ldInvocation.command, ldInvocation.args, spawnOpts);
+            child.stdout.on('data', (chunk) => outputChannel?.append(chunk.toString()));
+            child.stderr.on('data', (chunk) => outputChannel?.append(chunk.toString()));
+            child.on('close', (code) => {
+                if (code === 0) {
+                    void vscode.window.showInformationMessage('PLC LD run completed.');
+                }
+                else {
+                    void vscode.window.showErrorMessage(`PLC LD run failed with exit code ${code}.`);
+                }
+            });
+        }
     }));
     // Stepping debugger: contribute the `plc-st` debug type. The provider fills a
     // default launch config for F5-without-launch.json; the factory spawns the
     // `plc debug` DAP adapter.
     const debugProvider = new PlcDebugConfigurationProvider();
     context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('plc-st', debugProvider), vscode.debug.registerDebugConfigurationProvider('plc-st', debugProvider, vscode.DebugConfigurationProviderTriggerKind.Dynamic), vscode.debug.registerDebugAdapterDescriptorFactory('plc-st', new PlcDebugAdapterFactory(context)));
+    // Generated ST dual view (PLC-116) for .ld files.
+    context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(ldStView_1.LD_ST_SCHEME, new ldStView_1.LdStContentProvider(context)));
+    // Ladder Diagram custom editor for .ld files.
+    context.subscriptions.push(
+    // E2E test hooks (PLC-117): operate on the ACTIVE LD document.
+    ...(!(0, ldCli_1.isProduction)(context)
+        ? [
+            vscode.commands.registerCommand('plc-vscode.ld.testState', () => ldTestState()),
+            vscode.commands.registerCommand('plc-vscode.ld.edit', (command) => ldHookRun((doc) => doc.applyEdit(command))),
+            vscode.commands.registerCommand('plc-vscode.ld.undo', () => ldHookRun((doc) => doc.undo())),
+            vscode.commands.registerCommand('plc-vscode.ld.simStep', () => ldSimCommand('step')),
+            vscode.commands.registerCommand('plc-vscode.ld.simInput', (name, value) => ldSimCommand('input', name, value)),
+        ]
+        : []), vscode.commands.registerCommand('plc-vscode.showGeneratedSt', (uri) => (0, ldStView_1.showGeneratedSt)(context, uri)), vscode.commands.registerCommand('plc-vscode.exportPlcopen', () => (0, plcopen_1.exportPlcopen)(context)), vscode.commands.registerCommand('plc-vscode.importPlcopen', () => (0, plcopen_1.importPlcopen)(context)), vscode.window.registerCustomEditorProvider('plc-vscode.ldEditor', new ldEditor_1.LdEditorProvider(context), {
+        webviewOptions: { retainContextWhenHidden: true },
+        supportsMultipleEditorsPerDocument: false,
+    }));
     if (vscode.workspace.getConfiguration('plcVscode').get('autoRunOnOpen', false)) {
         const activeEditor = vscode.window.activeTextEditor;
         if (activeEditor && activeEditor.document.languageId === 'structured-text') {
@@ -175,7 +177,7 @@ async function runCurrentStructuredTextFile(context, resource) {
         await vscode.window.showWarningMessage('Open a Structured Text file before running PLC VS Code.');
         return;
     }
-    const invocation = resolveRunInvocation(context, 'run', [target]);
+    const invocation = (0, ldCli_1.resolveRunInvocation)(context, 'run', [target]);
     const command = invocation.command;
     const args = invocation.args;
     const spawnOptions = invocation.cwd ? { cwd: invocation.cwd } : {};
@@ -211,7 +213,7 @@ async function compileCurrentFileToCpdev(context, resource) {
     // `plc build` defaults to `--target cpdev` and writes `<file>.xcp` plus its
     // `.dcp` sidecar next to the source. It is pure Rust, so it works on every
     // platform regardless of whether the VM (`cpdev` feature) is bundled.
-    const invocation = resolveRunInvocation(context, 'build', [target]);
+    const invocation = (0, ldCli_1.resolveRunInvocation)(context, 'build', [target]);
     const command = invocation.command;
     const args = invocation.args;
     const spawnOptions = invocation.cwd ? { cwd: invocation.cwd } : {};
@@ -283,7 +285,7 @@ class PlcDebugAdapterFactory {
         this.context = context;
     }
     createDebugAdapterDescriptor() {
-        const invocation = resolveRunInvocation(this.context, 'debug', []);
+        const invocation = (0, ldCli_1.resolveRunInvocation)(this.context, 'debug', []);
         const options = invocation.cwd
             ? { cwd: invocation.cwd }
             : undefined;
@@ -351,5 +353,48 @@ function isStructuredTextEditor(editor) {
     return Boolean(editor &&
         editor.document.uri.scheme === 'file' &&
         editor.document.languageId === 'structured-text');
+}
+const ldTestHooks_1 = require("./ldTestHooks");
+function ldTestState() {
+    const doc = (0, ldTestHooks_1.activeLdDocument)();
+    const sim = (0, ldTestHooks_1.activeLdSimulation)();
+    return {
+        programJson: doc ? JSON.stringify(doc.current) : undefined,
+        dirty: vscode.window.tabGroups.all.some((group) => group.tabs.some((tab) => tab.input?.uri?.toString() ===
+            doc?.uri.toString() && tab.isDirty)),
+        powerFlow: sim?.lastPowerFlow,
+        watch: sim?.lastWatch,
+        scan: sim?.scan,
+    };
+}
+function ldHookRun(run) {
+    // Mutating hook: only a tab-visible document.
+    const doc = (0, ldTestHooks_1.activeLdDocument)(true);
+    if (doc) {
+        run(doc);
+    }
+}
+async function ldSimCommand(kind, name, value) {
+    const doc = (0, ldTestHooks_1.activeLdDocument)();
+    if (!doc) {
+        return;
+    }
+    const sim = (await (0, ldTestHooks_1.activeLdProvider)()?.ensureSim(doc));
+    if (!sim) {
+        return;
+    }
+    if (kind === 'step') {
+        sim.client.stop();
+        // Reload ONLY when the model changed — a raw reload resets scan and
+        // discards staged inputs (PLC-114 review semantics).
+        const provider = (0, ldTestHooks_1.activeLdProvider)();
+        if (provider) {
+            await provider.reloadIfChanged(sim, doc);
+        }
+        sim.client.tick();
+    }
+    else if (name !== undefined && value !== undefined) {
+        sim.client.setInput(name, value);
+    }
 }
 //# sourceMappingURL=extension.js.map

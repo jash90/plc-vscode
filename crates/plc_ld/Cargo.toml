@@ -1,0 +1,15 @@
+[package]
+name = "plc_ld"
+version = "0.1.0"
+edition = "2024"
+license-file = "../../LICENSE"
+publish = false
+description = "Ladder Diagram (LD) model, LD→HIR lowering, and power-flow evaluation for PLC VS Code."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+plc_hir = { path = "../plc_hir" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

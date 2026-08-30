@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Ladder Diagram program (.ld)",
+  "description": "PLC VS Code Ladder Diagram model, wire format v2 (PLC-107). Golden-tested against tests/ld/*.ld fixtures.",
+  "type": "object",
+  "required": ["name", "rungs"],
+  "additionalProperties": false,
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2,
+      "default": 2,
+      "description": "Wire format version; v2 is additive over v1 (ids, comments)."
+    },
+    "rungs": { "type": "array", "items": { "$ref": "#/definitions/rung" } }
+  },
+  "definitions": {
+    "elementId": {
+      "type": "string",
+      "minLength": 2,
+      "description": "Stable element identity (r{n}/e{n} by convention; preserved across sessions)."
+    },
+    "rung": {
+      "type": "object",
+      "required": ["branches", "outputs"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/elementId" },
+        "comment": { "type": "string", "description": "Free-text rung comment; never affects semantics." },
+        "branches": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/seriesBranch" },
+          "description": "Parallel (OR) composition of series branches."
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/outputElement" }
+        }
+      }
+    },
+    "seriesBranch": {
+      "type": "object",
+      "required": ["elements"],
+      "additionalProperties": false,
+      "properties": {
+        "elements": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/contactElement" },
+          "description": "Series (AND) chain of contacts."
+        }
+      }
+    },
+    "contactElement": {
+      "type": "object",
+      "required": ["name", "negated"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/elementId" },
+        "name": { "type": "string", "minLength": 1 },
+        "negated": {
+          "type": "boolean",
+          "description": "false = normally-open | |, true = normally-closed |/|."
+        }
+      }
+    },
+    "outputElement": {
+      "oneOf": [
+        { "$ref": "#/definitions/coil" },
+        { "$ref": "#/definitions/block" }
+      ]
+    },
+    "coil": {
+      "type": "object",
+      "required": ["kind", "name", "variant"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "coil" },
+        "id": { "$ref": "#/definitions/elementId" },
+        "name": { "type": "string", "minLength": 1 },
+        "variant": { "enum": ["normal", "set", "reset"] }
+      }
+    },
+    "block": {
+      "type": "object",
+      "required": ["kind", "fb_type", "instance", "inputs", "outputs"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "block" },
+        "id": { "$ref": "#/definitions/elementId" },
+        "fb_type": {
+          "enum": ["TON", "TOF", "TP", "CTU", "CTD", "CTUD", "R_TRIG", "F_TRIG"],
+          "description": "Standard function-block type (runtime dispatch set)."
+        },
+        "instance": { "type": "string", "minLength": 1 },
+        "inputs": { "type": "array", "items": { "$ref": "#/definitions/blockArg" } },
+        "outputs": { "type": "array", "items": { "$ref": "#/definitions/blockArg" } }
+      }
+    },
+    "blockArg": {
+      "type": "object",
+      "required": ["name", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Pin name (e.g. IN, PT, Q)."
+        },
+        "value": {
+          "type": "string",
+          "description": "Variable name or literal (T#2s, 10). Output pins must be variable names."
+        }
+      }
+    }
+  }
+}

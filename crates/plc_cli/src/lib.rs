@@ -5,6 +5,10 @@
 //! [`LanguageService`] analyzer and/or its own [`ExecutionEngine`] backend. The
 //! `plc` binary wires the default `CompilerCore` + `ScanRuntimeEngine`.
 
+pub mod ld_serve;
+
+pub use ld_serve::run_ld_serve;
+
 use plc_api::{ExecutionEngine, LanguageService, SourceDocument};
 use plc_lang::LanguageRegistry;
 

@@ -112,4 +112,25 @@ assert.strictEqual(
 const vscodeignore = fs.readFileSync(path.join(root, '.vscodeignore'), 'utf8');
 assert.ok(!/^server(\/|\b)/m.test(vscodeignore), 'server/ must be packaged, not ignored');
 
+// LD webview (PLC-110): the esbuild bundle and stylesheet are committed
+// build outputs and must ship with the extension.
+assert.ok(
+  pkg.scripts['build:webview'] === 'node esbuild.js',
+  'build:webview script must run esbuild.js',
+);
+assert.ok(
+  (pkg.scripts.compile || '').includes('build:webview'),
+  'compile must chain build:webview so dist/media never drift',
+);
+for (const asset of ['main.js', 'main.css']) {
+  assert.ok(
+    fs.existsSync(path.join(root, 'media', 'ldEditor', asset)),
+    `media/ldEditor/${asset} missing (run: npm run build:webview)`,
+  );
+}
+assert.ok(
+  !/^media(\/|\b)/m.test(vscodeignore),
+  'media/ must be packaged, not ignored',
+);
+
 console.log('package contract ok');

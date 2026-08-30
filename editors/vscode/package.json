@@ -157,7 +157,8 @@
       {
         "command": "plc-vscode.showGeneratedSt",
         "title": "Show Generated Structured Text",
-        "category": "PLC"
+        "category": "PLC",
+        "icon": "$(output)"
       }
     ],
     "menus": {
@@ -215,7 +216,7 @@
       "editor/title": [
         {
           "command": "plc-vscode.showGeneratedSt",
-          "when": "resourceLangId == ladder-diagram",
+          "when": "resourceLangId == ladder-diagram || resourceScheme == plc-ld-st",
           "group": "navigation"
         }
       ]

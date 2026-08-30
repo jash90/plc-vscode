@@ -129,7 +129,7 @@ async function activate(context) {
     // Generated ST dual view (PLC-116) for .ld files.
     context.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider(ldStView_1.LD_ST_SCHEME, new ldStView_1.LdStContentProvider(context)));
     // Ladder Diagram custom editor for .ld files.
-    context.subscriptions.push(vscode.commands.registerCommand('plc-vscode.showGeneratedSt', () => (0, ldStView_1.showGeneratedSt)(context)), vscode.commands.registerCommand('plc-vscode.exportPlcopen', () => (0, plcopen_1.exportPlcopen)(context)), vscode.commands.registerCommand('plc-vscode.importPlcopen', () => (0, plcopen_1.importPlcopen)(context)), vscode.window.registerCustomEditorProvider('plc-vscode.ldEditor', new ldEditor_1.LdEditorProvider(context), {
+    context.subscriptions.push(vscode.commands.registerCommand('plc-vscode.showGeneratedSt', (uri) => (0, ldStView_1.showGeneratedSt)(context, uri)), vscode.commands.registerCommand('plc-vscode.exportPlcopen', () => (0, plcopen_1.exportPlcopen)(context)), vscode.commands.registerCommand('plc-vscode.importPlcopen', () => (0, plcopen_1.importPlcopen)(context)), vscode.window.registerCustomEditorProvider('plc-vscode.ldEditor', new ldEditor_1.LdEditorProvider(context), {
         webviewOptions: { retainContextWhenHidden: true },
         supportsMultipleEditorsPerDocument: false,
     }));

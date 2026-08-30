@@ -57,6 +57,16 @@ check('view without query yields no source', () => {
   assert.strictEqual(sourceOfStView(bare), undefined);
 });
 
+check('view uri carries the .st suffix for ST highlighting', () => {
+  const view = stViewUri(vscodeShim.Uri.file('/tmp/motor.ld'));
+  assert.ok(view.toString().includes('motor.st'), view.toString());
+});
+
+check('malformed query yields no source instead of throwing', () => {
+  const bad = vscodeShim.Uri.parse('plc-ld-st://generated/motor.st?%zz');
+  assert.strictEqual(sourceOfStView(bad), undefined);
+});
+
 if (failures > 0) {
   process.exit(1);
 }

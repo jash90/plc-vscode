@@ -144,7 +144,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Ladder Diagram custom editor for .ld files.
   context.subscriptions.push(
-    vscode.commands.registerCommand('plc-vscode.showGeneratedSt', () => showGeneratedSt(context)),
+    vscode.commands.registerCommand('plc-vscode.showGeneratedSt', (uri?: vscode.Uri) =>
+      showGeneratedSt(context, uri)),
     vscode.commands.registerCommand('plc-vscode.exportPlcopen', () => exportPlcopen(context)),
     vscode.commands.registerCommand('plc-vscode.importPlcopen', () => importPlcopen(context)),
     vscode.window.registerCustomEditorProvider(

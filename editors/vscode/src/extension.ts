@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import * as vscode from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node';
 import { CLI_BINARY, SERVER_BINARY, bundledBinaryRelativePath } from './bundled';
-import { resolveRunInvocation } from './ldCli';
+import { isProduction, resolveRunInvocation } from './ldCli';
 import { LdEditorProvider } from './ldEditor';
 import { exportPlcopen, importPlcopen } from './plcopen';
 import { LdStContentProvider, LD_ST_SCHEME, showGeneratedSt } from './ldStView';
@@ -13,11 +13,6 @@ let outputChannel: vscode.OutputChannel | undefined;
 
 function workspaceRoot(context: vscode.ExtensionContext): string {
   return path.resolve(context.extensionPath, '..', '..');
-}
-
-/** Installed (Marketplace) extensions run in Production mode. */
-function isProduction(context: vscode.ExtensionContext): boolean {
-  return context.extensionMode === vscode.ExtensionMode.Production;
 }
 
 function serverOptions(context: vscode.ExtensionContext): ServerOptions {
@@ -145,12 +140,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Ladder Diagram custom editor for .ld files.
   context.subscriptions.push(
 // E2E test hooks (PLC-117): operate on the ACTIVE LD document.
-    vscode.commands.registerCommand('plc-vscode.ld.testState', () => ldTestState()),
-    vscode.commands.registerCommand('plc-vscode.ld.edit', (command: unknown) => ldHookRun((doc) => doc.applyEdit(command as never))),
-    vscode.commands.registerCommand('plc-vscode.ld.undo', () => ldHookRun((doc) => doc.undo())),
-    vscode.commands.registerCommand('plc-vscode.ld.simStep', () => ldSimCommand('step')),
-    vscode.commands.registerCommand('plc-vscode.ld.simInput', (name: string, value: boolean) =>
-      ldSimCommand('input', name, value)),
+    ...(!isProduction(context)
+      ? [
+          vscode.commands.registerCommand('plc-vscode.ld.testState', () => ldTestState()),
+          vscode.commands.registerCommand('plc-vscode.ld.edit', (command: unknown) =>
+            ldHookRun((doc) => doc.applyEdit(command as LdCommand))),
+          vscode.commands.registerCommand('plc-vscode.ld.undo', () => ldHookRun((doc) => doc.undo())),
+          vscode.commands.registerCommand('plc-vscode.ld.simStep', () => ldSimCommand('step')),
+          vscode.commands.registerCommand('plc-vscode.ld.simInput', (name: string, value: boolean) =>
+            ldSimCommand('input', name, value)),
+        ]
+      : []),
     vscode.commands.registerCommand('plc-vscode.showGeneratedSt', (uri?: vscode.Uri) =>
       showGeneratedSt(context, uri)),
     vscode.commands.registerCommand('plc-vscode.exportPlcopen', () => exportPlcopen(context)),
@@ -435,6 +435,7 @@ function isStructuredTextEditor(editor: vscode.TextEditor | undefined): editor i
 // Registered unconditionally: read-only snapshots and command bridges that
 // mirror the webview message surface; harmless outside tests.
 
+import { LdCommand } from './ldWebview/commands';
 import { LdDocument } from './ldDocument';
 import { activeLdDocument, activeLdProvider, activeLdSimulation } from './ldTestHooks';
 
@@ -457,7 +458,8 @@ function ldTestState(): Record<string, unknown> {
 }
 
 function ldHookRun(run: (doc: LdDocument) => void): void {
-  const doc = activeLdDocument();
+  // Mutating hook: only a tab-visible document.
+  const doc = activeLdDocument(true);
   if (doc) {
     run(doc);
   }

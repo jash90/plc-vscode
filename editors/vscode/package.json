@@ -2,7 +2,7 @@
   "name": "plc-vscode",
   "displayName": "PLC VS Code",
   "description": "Structured Text / IEC 61131-3 support backed by the PLC VS Code Rust language server.",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "publisher": "raccoonsoftware",
   "private": true,
   "engines": {
@@ -274,16 +274,22 @@
           "description": "Automatically run a Structured Text file when it is opened. Intended for demos and smoke tests."
         }
       }
-    }
+    },
+    "jsonValidation": [
+      {
+        "fileMatch": "*.ld",
+        "url": "./syntaxes/ladder-diagram.schema.json"
+      }
+    ]
   },
   "scripts": {
     "compile": "npm run build:webview && tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "npm run compile && node test/package-contract.test.js && node test/verify-vsix.test.js && node test/ldWebview/protocol.test.js && node test/ldWebview/commands.test.js && node test/ldWebview/model.test.js && node test/ldWebview/layout.test.js && node test/ldWebview/hitTest.test.js && node test/ldWebview/completion.test.js && node test/ldWebview/render.test.js && node test/simClient.test.js && node test/ldStView.test.js",
+    "test": "npm run compile && node test/package-contract.test.js && node test/verify-vsix.test.js && node test/ldWebview/protocol.test.js && node test/ldWebview/commands.test.js && node test/ldWebview/model.test.js && node test/ldWebview/layout.test.js && node test/ldWebview/hitTest.test.js && node test/ldWebview/completion.test.js && node test/ldWebview/render.test.js && node test/simClient.test.js && node test/ldStView.test.js && node test/schema.test.js",
     "verify-vsix": "node scripts/verify-vsix.js",
     "package": "vsce package --no-dependencies",
     "build:webview": "node esbuild.js",
-    "test:e2e": "tsc -p tsconfig.e2e.json && node out/runTests.js"
+    "test:e2e": "npm run compile && tsc -p tsconfig.e2e.json && node out/runTests.js"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
@@ -294,6 +300,7 @@
     "@types/vscode": "^1.92.0",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^3.2.1",
+    "ajv": "^8.20.0",
     "esbuild": "^0.28.2",
     "glob": "^13.0.6",
     "mocha": "^11.8.0",
